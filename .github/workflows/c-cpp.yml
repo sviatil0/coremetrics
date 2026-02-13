@@ -1,0 +1,32 @@
+name: C/C++ CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: tests/
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: SDL3 Dependencies
+      uses: libsdl-org/setup-sdl@main
+      id: sdl3
+      with:
+        install-linux-dependencies: true
+        version: 3-latest
+        version-sdl-ttf: 3-latest
+    - name: make
+      run: |
+        export SDL_VIDEO_DRIVER=dummy
+        export LD_LIBRARY_PATH=${SDL3_ROOT}/lib:$LD_LIBRARY_PATH
+        make
+        ./a.out
