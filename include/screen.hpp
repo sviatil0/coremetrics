@@ -2,6 +2,7 @@
 #define __SCREEN_HPP__
 
 #include <iostream>
+#include <cstring>
 #include <SDL3/SDL.h>
 #include "vec2.hpp"
 #include "vec3.hpp"
@@ -36,7 +37,19 @@ public:
     template<typename T, typename U>
     void drawPixel(const Tvec2<T>& pos, const Tvec3<U>& color)
     {
+        if (pos.x < 0 || pos.x >= width || pos.y < 0 || pos.y >= height)
+        {
+            std::cerr << "Invalid position" << "\n";
+            return;
+        }
 
+        uint8_t* pixels = static_cast<uint8_t*>(surface->pixels);
+        
+        pixels = pixels + (pos.y * surface->pitch) + (pos.x * SDL_BYTESPERPIXEL(surface->format));
+        pixels[0] = 255;
+        pixels[1] = static_cast<uint8_t>(color[2]);
+        pixels[2] = static_cast<uint8_t>(color[1]);
+        pixels[3] = static_cast<uint8_t>(color[0]);
     }
 
     template<typename T, typename U, typename V>
@@ -60,15 +73,44 @@ public:
         }
     }
 
-    template<typename T, typename U, typename V>
+    template<typename T, typename U, typename V> // should be non-templated (ivec2, ivec3 as per instructions)
     void drawBox(const Tvec2<T>& a, const Tvec2<U>& b, const Tvec3<V>& color)
     {
         //determine which vec is min and which is max within method
+        T minX = std::min(a.x, static_cast<T>(b.x));
+        T minY = std::min(a.y, static_cast<T>(b.y));
+        T maxX = std::max(a.x,static_cast<T>(b.x));
+        T maxY = std::max(a.y,static_cast<T>(b.y));
+
+        for (T y = minY; y <= maxY; y++)
+        {
+            for (T x = minX; x <= maxX; x++)
+            {
+                drawPixel(Tvec2(x,y),color);
+            }
+        }
+
     }
 
     void blitTo(SDL_Surface* target)
     {
+        if (target==nullptr)
+        {
+            std::cerr << "Invalid Target" << '\n';
+            return;
+        } else if (surface==nullptr)
+        {
+            std::cerr << "Invalid Surface" << '\n';
+            return;
+        }
 
+        uint8_t* src = static_cast<uint8_t*>(surface->pixels);
+        uint8_t* destination = static_cast<uint8_t*>(target->pixels);
+
+        for (unsigned int y = 0; y < height; y++)
+        {
+            memcpy(destination + y*target->pitch, src + y*surface->pitch, surface->pitch);
+        }
     }
 
 private:
