@@ -97,12 +97,7 @@ public:
             x * rhs.y - y * rhs.x);
     }
 
-    T operator[](int index)
-    {
-        return components[index];
-    }
-
-    const T operator[](int index) const
+    T& operator[](int index)
     {
         return components[index];
     }
