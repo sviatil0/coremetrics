@@ -7,11 +7,86 @@ private:
 
 public:
     Matrix() = default;
-    Matrix(float _data[3][3]);
-    Matrix(const Matrix &copy);
-    Matrix &operator=(const Matrix &copy);
-    bool operator==(const Matrix &rhs) const;
-    Matrix operator*(const Matrix &rhs) const;
-    Matrix toTranspose() const;
+    Matrix toTranspose() const
+    {
+        Matrix result;
+        for (int i = 0; i < 3; ++i)
+        {
+            for (int j = 0; j < 3; ++j)
+            {
+                result.components[i][j] = components[j][i];
+            }
+        }
+        return result;
+    };
+
+    Matrix(float _data[3][3])
+    {
+        for (int i = 0; i < 3; ++i)
+        {
+            for (int j = 0; j < 3; ++j)
+            {
+                components[i][j] = _data[i][j];
+            }
+        }
+    }
+    Matrix(const Matrix &copy)
+    {
+
+        for (int i = 0; i < 3; ++i)
+        {
+            for (int j = 0; j < 3; ++j)
+            {
+                components[i][j] = copy.components[i][j];
+            }
+        }
+    }
+    Matrix &operator=(const Matrix &copy)
+    {
+        if (this == &copy)
+        {
+            return *this;
+        }
+
+        for (int i = 0; i < 3; ++i)
+        {
+            for (int j = 0; j < 3; ++j)
+            {
+                components[i][j] = copy.components[i][j];
+            }
+        }
+        return *this;
+    }
+    Matrix operator*(const Matrix &rhs) const
+    {
+
+        Matrix result;
+
+        for (int i = 0; i < 3; ++i)
+        {
+            for (int j = 0; j < 3; ++j)
+            {
+                float sum = 0.0f;
+                for (int k = 0; k < 3; ++k)
+                {
+                    sum += components[i][k] * rhs.components[k][j];
+                }
+                result.components[i][j] = sum;
+            }
+        }
+        return result;
+    }
+    bool operator==(const Matrix &rhs) const
+    {
+        for (int i = 0; i < 3; ++i)
+        {
+            for (int j = 0; j < 3; ++j)
+            {
+                if (components[i][j] != rhs.components[i][j])
+                    return false;
+            }
+        }
+        return true;
+    }
 };
 #endif
