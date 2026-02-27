@@ -1,6 +1,5 @@
-#include "GUIFile.hpp"
-
-GUIFile::GUIFile() {} //do we need to do anything with the constructor?
+#include "../include/GUIFile.hpp"
+#include <iostream>
 
 void GUIFile::setPoint(Point point)
 {
@@ -17,16 +16,16 @@ void GUIFile::setBox(Box box)
 
 std::vector<Point> GUIFile::getPoints()
 {
-
+    return points;
 }
 std::vector<Line> GUIFile::getLines()
 {
-
+    return lines;
 }
 std::vector<Box> GUIFile::getBoxes()
 {
-
-}
+    return boxes;
+}   
 
 std::vector<std::string> GUIFile::splitString(const std::string &str, const std::string &delim)
 {
@@ -51,67 +50,77 @@ std::vector<std::string> GUIFile::splitString(const std::string &str, const std:
     return tokens;
 }
 
-void GUIFile::readFile(std::string fileName);
+void GUIFile::readFile(std::string fileName)
 {
     std::ifstream fp{fileName};
     if (!(fp))
     {
         return;
     }
-    //while reading file, split each line by < and > symbols to interpret what is supposed to be read
-    //store current mode to validate what can be read next
-    //possible modes: {layout, line, box, point, vec2, vec3, ivec2, ivec3, x, y, z};
-    
+    //while reading file, split each line by < and > symbols to interpret what is supposed to be added to the object
     //parse all data in the file into tokens vector, split by the < and > chars
     std::string data;
     std::vector<std::string> curLine;
     while (fp >> data)
     {
         curLine = splitString(data, "<>");
-        tokens.insert(tokens.end(), curLine.begin(), curLine.end())
+        tokens.insert(tokens.end(), curLine.begin(), curLine.end());
     }
     
     //declare/initialize temporary containers to hold whatever is currently being read
     std::map<std::string, float> fVec = {{"x", -1}, {"y", -1}, {"z", -1}};
     std::map<std::string, int> iVec = {{"x", -1}, {"y", -1}, {"z", -1}};
     size_t vecCount = 0, colorVec = 0;
+    float fNum;
+    int iNum;
     Line tempContainer;
 
     //treat tags as scopes, track them using a stack
-    std::stack<std::string> modes;
-    modes.push("start");
+    //to use a switch case, make enum of possible modes/identifier tags
+    enum modeTypes {START, LAYOUT, LINE, BOX, POINT, VEC2, VEC3, IVEC2, IVEC3, X, Y, Z, IX, IY, IZ,
+                    END_LAYOUT, END_LINE, END_BOX, END_POINT, END_VEC2, END_VEC3, END_IVEC2, END_IVEC3,
+                    END_X, END_Y, END_Z};
+    std::map<std::string, modeTypes> modeMap = {{"layout", LAYOUT}, {"line", LINE}, {"box", BOX}, {"point", POINT}, 
+                    {"vec2", VEC2}, {"vec3", VEC3}, {"ivec2", IVEC2}, {"ivec3", IVEC3}, {"x", X}, {"y", Y}, {"z", Z},
+                    {"/layout", END_LAYOUT}, {"/line", END_LINE}, {"/box", END_BOX}, {"/point", END_POINT}, 
+                    {"/vec2", END_VEC2}, {"/vec3", END_VEC3}, {"/ivec2", END_IVEC2}, {"/ivec3", END_IVEC3},
+                    {"/x", END_X}, {"/y", END_Y}, {"/z", END_Z}};
+    std::stack<modeTypes> modes;
+    modes.push(START);
+    modeTypes nextMode;
     for (auto token : tokens)
     {
+        nextMode = modeMap[token];
         switch (modes.top()) 
         {
-            case "start":
+            case START:
                 if (token != "layout")
                 {
                     return;
                 }
-                modes.push(token);
+                modes.push(LAYOUT);
                 break;
-            case "layout":
-                switch (token)
+            case LAYOUT:
+                switch (nextMode)
                 {
-                    case "line":
-                    case "box":
-                    case "point":
-                        modes.push(token);
+                    case LINE:
+                    case BOX:
+                    case POINT:
+                        modes.push(nextMode);
                         break;
-                    case "/layout":
+                    case END_LAYOUT:
                         modes.pop();
-                        modes.push("start");
+                        modes.push(START);
                         break;
                     default:
                         return; //clear containers when invalid structure encountered?
                 }
                 break;
-            case "line":
-                switch (token)
+            case LINE:
+                switch (nextMode)
                 {
-                    case "vec2":
-                    case "ivec2":
+                    case VEC2:
+                    case IVEC2:
                         if (vecCount < 2)
                         {
                             vecCount++;
@@ -119,10 +128,10 @@ void GUIFile::readFile(std::string fileName);
                         {
                             return;
                         }
-                        modes.push(token);
+                        modes.push(nextMode);
                         break;
-                    case "vec3":
-                    case "ivec3":
+                    case VEC3:
+                    case IVEC3:
                         if (colorVec == 0)
                         {
                             colorVec = 1;
@@ -130,55 +139,24 @@ void GUIFile::readFile(std::string fileName);
                         {
                             return;
                         }
-                        modes.push(token);
+                        modes.push(nextMode);
                         break;
-                    case "/line":
+                    case END_LINE:
                         lines.push_back(Line{tempContainer.start, tempContainer.end, tempContainer.color});
                         modes.pop();
+                        vecCount = 0;
+                        colorVec = 0;
                         break;
                     default:
                         return; //clear containers when invalid structure encountered?
                 }
                 break;
-            case "box":
-                switch (token)
+            case BOX:
+                switch (nextMode)
                 {
-                    case "vec2":
-                    case "ivec2":
+                    case VEC2:
+                    case IVEC2:
                         if (vecCount < 2)
-                        {
-                            vecCount++;
-                        } else
-                        {
-                            return;
-                        }
-                        modes.push(token);
-                        break;
-                    case "vec3":
-                    case "ivec3":
-                        if (colorVec == 0)
-                        {
-                            colorVec = 1;
-                        } else 
-                        {
-                            return;
-                        }
-                        modes.push(token);
-                        break;
-                    case "/box":
-                        boxes.push_back(Box{tempContainer.start, tempContainer.end, tempContainer.color});
-                        modes.pop();
-                        break;
-                    default:
-                        return; //clear containers when invalid structure encountered?
-                }
-                break;
-            case "point":
-                switch (token)
-                {
-                    case "vec2":
-                    case "ivec2":
-                        if (vecCount < 1)
                         {
                             vecCount++;
                         } 
@@ -186,10 +164,10 @@ void GUIFile::readFile(std::string fileName);
                         {
                             return;
                         }
-                        modes.push(token);
+                        modes.push(nextMode);
                         break;
-                    case "vec3":
-                    case "ivec3":
+                    case VEC3:
+                    case IVEC3:
                         if (colorVec == 0)
                         {
                             colorVec = 1;
@@ -198,64 +176,104 @@ void GUIFile::readFile(std::string fileName);
                         {
                             return;
                         }
-                        modes.push(token);
+                        modes.push(nextMode);
                         break;
-                    case "/point":
+                    case END_BOX:
+                        boxes.push_back(Box{tempContainer.start, tempContainer.end, tempContainer.color});
+                        modes.pop();
+                        vecCount = 0;
+                        colorVec = 0;
+                        break;
+                    default:
+                        return; //clear containers when invalid structure encountered?
+                }
+                break;
+            case POINT:
+                switch (nextMode)
+                {
+                    case VEC2:
+                    case IVEC2:
+                        if (vecCount < 1)
+                        {
+                            vecCount++;
+                        } 
+                        else
+                        {
+                            return;
+                        }
+                        modes.push(nextMode);
+                        break;
+                    case VEC3:
+                    case IVEC3:
+                        if (colorVec == 0)
+                        {
+                            colorVec = 1;
+                        } 
+                        else 
+                        {
+                            return;
+                        }
+                        modes.push(nextMode);
+                        break;
+                    case END_POINT:
                         points.push_back(Point{tempContainer.start, tempContainer.color});
                         modes.pop();
+                        vecCount = 0;
+                        colorVec = 0;
                         break;
                     default:
                         return; //clear containers when invalid structure encountered?
                 }
                 break;
-            case "vec2":
-                switch (token)
+            case VEC2:
+                switch (nextMode)
                 {
-                    case "x":
-                    case "y":
+                    case X:
+                    case Y:
                         if (fVec[token] != -1)
                         {
                             return;
                         }
-                        modes.push(token);
+                        modes.push(nextMode);
                         break;
-                    case "/x":
-                    case "/y":
+                    case END_X:
+                    case END_Y:
                         break;
-                    case "/vec2":
+                    case END_VEC2:
                         if (vecCount == 1)
                         {
-                            tempContainer.start = new vec2(fVec["x"], fVec["y"]);
+                            tempContainer.start = vec2(fVec["x"], fVec["y"]);
                         }
                         else
                         {
-                            tempContainer.end = new vec2(iVec["x"], fVec["y"]);
+                            tempContainer.end = vec2(iVec["x"], fVec["y"]);
                         }
                         fVec = {{"x", -1}, {"y", -1}, {"z", -1}};
+                        std::cout << "END OF VEC2\n";
                         modes.pop();
                         break;
                     default:
                         return; //clear containers when invalid structure encountered?
                 }
                 break;
-            case "vec3":
-                switch (token)
+            case VEC3:
+                switch (nextMode)
                 {
-                    case "x":
-                    case "y":
-                    case "z":
+                    case X:
+                    case Y:
+                    case Z:
                         if (fVec[token] != -1)
                         {
                             return;
                         }
-                        modes.push(token);
+                        modes.push(nextMode);
                         break;
-                    case "/x":
-                    case "/y":
-                    case "/z":
+                    case END_X:
+                    case END_Y:
+                    case END_Z:
                         break;
-                    case "/vec3":
-                        tempContainer.color = new vec3(fVec["x"], fVec["y"], fVec["z"]);
+                    case END_VEC3:
+                        tempContainer.color = vec3(fVec["x"], fVec["y"], fVec["z"]);
                         fVec = {{"x", -1}, {"y", -1}, {"z", -1}};
                         modes.pop();
                         break;
@@ -263,28 +281,34 @@ void GUIFile::readFile(std::string fileName);
                         return; //clear containers when invalid structure encountered?
                 }
                 break;
-            case "ivec2":
-                switch (token)
+            case IVEC2:
+                switch (nextMode)
                 {
-                    case "x":
-                    case "y":
+                    case X:
                         if (iVec[token] != -1)
                         {
                             return;
                         }
-                        modes.push("i" + token);
+                        modes.push(IX);
                         break;
-                    case "/x":
-                    case "/y":
+                    case Y:
+                        if (iVec[token] != -1)
+                        {
+                            return;
+                        }
+                        modes.push(IY);
                         break;
-                    case "/ivec2":
+                    case END_X:
+                    case END_Y:
+                        break;
+                    case END_IVEC2:
                         if (vecCount == 1)
                         {
-                            tempContainer.start = new ivec2(iVec["x"], iVec["y"]);
+                            tempContainer.start = vec2(iVec["x"], iVec["y"]);
                         }
                         else
                         {
-                            tempContainer.end = new ivec2(iVec["x"], iVec["y"]);
+                            tempContainer.end = vec2(iVec["x"], iVec["y"]);
                         }
                         iVec = {{"x", -1}, {"y", -1}, {"z", -1}};
                         modes.pop();
@@ -293,24 +317,36 @@ void GUIFile::readFile(std::string fileName);
                         return; //clear containers when invalid structure encountered?
                 }
                 break;
-            case "ivec3":
-                switch (token)
+            case IVEC3:
+                switch (nextMode)
                 {
-                    case "x":
-                    case "y":
-                    case "z":
+                    case X:
                         if (iVec[token] != -1)
                         {
                             return;
                         }
-                        modes.push("i" + token);
+                        modes.push(IX);
                         break;
-                    case "/x":
-                    case "/y":
-                    case "/z":
+                    case Y:
+                        if (iVec[token] != -1)
+                        {
+                            return;
+                        }
+                        modes.push(IY);
                         break;
-                    case "/ivec3":
-                        tempContainer.color = new ivec3(iVec["x"], iVec["y"], iVec["z"]);
+                    case Z:
+                        if (iVec[token] != -1)
+                        {
+                            return;
+                        }
+                        modes.push(IZ);
+                        break;
+                    case END_X:
+                    case END_Y:
+                    case END_Z:
+                        break;
+                    case END_IVEC3:
+                        tempContainer.color = vec3(iVec["x"], iVec["y"], iVec["z"]);
                         iVec = {{"x", -1}, {"y", -1}, {"z", -1}};
                         modes.pop();
                         break;
@@ -318,77 +354,77 @@ void GUIFile::readFile(std::string fileName);
                         return; //clear containers when invalid structure encountered?
                 }
                 break;
-            case "x":
+            case X:
                 try
                 {
-                    float num;
-                    std::stof(token, num);
+                    fNum = std::stof(token);
                 } 
                 catch (const std::invalid_argument &ia)
                 {
                     return;
                 }
-                fVec["x"] = num;
+                fVec["x"] = fNum;
+                modes.pop();
                 break;
-            case "y":
+            case Y:
                 try
                 {
-                    float num;
-                    std::stof(token, num);
+                    fNum = std::stof(token);
                 } 
                 catch (const std::invalid_argument &ia)
                 {
                     return;
                 }
-                fVec["y"] = num;
+                fVec["y"] = fNum;
+                modes.pop();
                 break;
-            case "z":
+            case Z:
                 try
                 {
-                    float num;
-                    std::stof(token, num);
+                    fNum = std::stof(token);
                 } 
                 catch (const std::invalid_argument &ia)
                 {
                     return;
                 }
-                fVec["z"] = num;
+                fVec["z"] = fNum;
+                modes.pop();
                 break;
-            case "ix":
+            case IX:
                 try
                 {
-                    float num;
-                    std::stoi(token, num);
+                    iNum = std::stoi(token);
                 } 
                 catch (const std::invalid_argument &ia)
                 {
                     return;
                 }
-                iVec["x"] = num;
+                iVec["x"] = iNum;
+                modes.pop();
                 break;
-            case "iy":
+            case IY:
                 try
                 {
-                    float num;
-                    std::stoi(token, num);
+                    iNum = std::stoi(token);
                 } 
                 catch (const std::invalid_argument &ia)
                 {
                     return;
                 }
-                iVec["y"] = num;
+                iVec["y"] = iNum;
+                modes.pop();
                 break;
-            case "iz":
+            case IZ:
                 try
                 {
-                    float num;
-                    std::stoi(token, num);
+                    iNum = std::stoi(token);
                 } 
                 catch (const std::invalid_argument &ia)
                 {
                     return;
                 }
-                iVec["z"] = num;
+                iVec["z"] = iNum;
+                modes.pop();
                 break;
             default:
                 return;
@@ -397,13 +433,23 @@ void GUIFile::readFile(std::string fileName);
     }
 
 
-    close(fp);
+    fp.close();
 }
 void GUIFile::writeFile(std::string fileName)
 {
-    if (!(std::filesystem::exists(fileName)))
-    {
-        return;
-    }
+    
 
+}
+
+int main() {
+    GUIFile g;
+    g.readFile("/escnfs/home/amelotik/SP26_Team04/tests/ex1.xml");
+    std::cout << "FROM MAIN: " << g.getLines().size() << " line\n";
+    std::cout << "FROM MAIN: " << g.getBoxes().size() << " box\n";
+    std::cout << "FROM MAIN: " << g.getPoints().size() << " point\n";
+    bool passed = g.getPoints().size() == 1
+               && g.getLines().size() == 1
+               && g.getBoxes().size() == 1;
+    std::cout << (passed ? "PASS" : "FAIL") << '\n';
+    return 0;
 }
