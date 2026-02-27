@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cstdlib>
 #include <iostream>
+#include <cstring>
 #include <SDL3/SDL.h>
 #include "linear.hpp"
 
