@@ -67,6 +67,7 @@ note right of "Tvec3<T>"
 end note
 
 class Screen {
+    -{static} MAX_CHANNEL_VALUE: int
     -width: unsigned int
     -height: unsigned int
     -surface: SDL_Surface*
@@ -79,16 +80,17 @@ class Screen {
 
     +blitTo(target: SDL_Surface*): void
 
-    ' Template operations (UML style)
-    +drawPixel<T,U>(pos: Tvec2<T>, color: Tvec3< U>): void
-    +drawLine<T,U,V>(a: Tvec2<T>, b: Tvec2< U>, color: Tvec3<V>): void
-    +drawBox<T,U,V>(a: Tvec2<T>, b: Tvec2< U>, color: Tvec3<V>): void
+    +drawPixel<T>(pos: Tvec2<T>, color: Tvec3<float>): void
+    +drawPixel<T>(pos: Tvec2<T>, color: Tvec3<int>): void
+    +drawLine<T,U>(a: Tvec2<T>, b: Tvec2<U>, color: Tvec3<float>): void
+    +drawLine<T,U>(a: Tvec2<T>, b: Tvec2<U>, color: Tvec3<int>): void
+    +drawBox<T,U,V>(a: Tvec2<T>, b: Tvec2<U>, color: Tvec3<V>): void
 }
 
 note right of Screen
-  drawPixel, drawLine, drawBox
-  are template operations:
-  e.g. drawPixel<T,U>(pos: Tvec2<T>, color: Tvec3<U>)
+  drawPixel and drawLine are overloaded:
+  float color expects [0.0, 1.0] range
+  int color expects [0, 255] range
 end note
 
 class Matrix{
