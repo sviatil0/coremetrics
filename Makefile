@@ -16,11 +16,13 @@ TEST_TARGET = $(BINDIR)/tests
 TEST_SOURCES = $(TESTDIR)/tests.cpp \
                $(TESTDIR)/linearTest.cpp \
                $(TESTDIR)/screenTest.cpp \
-               $(SRCDIR)/screen.cpp
+               $(SRCDIR)/screen.cpp \
+               $(SRCDIR)/matrix.cpp
 TEST_OBJECTS = $(OBJDIR)/tests.o \
                $(OBJDIR)/linearTest.o \
                $(OBJDIR)/screenTest.o \
-               $(OBJDIR)/screen.o
+               $(OBJDIR)/screen.o \
+               $(OBJDIR)/matrix.o
 HEADERS = $(INCDIR)/linear.hpp $(INCDIR)/screen.hpp $(INCDIR)/linearTest.hpp $(INCDIR)/screenTest.hpp
 
 demo: directories $(DEMO_TARGET)
@@ -47,7 +49,10 @@ $(OBJDIR)/screenTest.o: $(TESTDIR)/screenTest.cpp $(HEADERS)
 $(OBJDIR)/screen.o: $(SRCDIR)/screen.cpp $(INCDIR)/screen.hpp $(INCDIR)/linear.hpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@ $(LDFLAGS)
 
-$(DEMO_TARGET): $(OBJDIR)/main.o $(OBJDIR)/screen.o
+$(OBJDIR)/matrix.o: $(SRCDIR)/matrix.cpp $(INCDIR)/matrix.hpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+$(DEMO_TARGET): $(OBJDIR)/main.o $(OBJDIR)/screen.o $(OBJDIR)/matrix.o
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
 
 $(OBJDIR)/main.o: main.cpp $(INCDIR)/screen.hpp $(INCDIR)/linear.hpp
