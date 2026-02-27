@@ -2,6 +2,7 @@
 #include <SDL3/SDL.h>
 #include "linearTest.hpp"
 #include "screenTest.hpp"
+#include "guiFileTest.hpp"
 
 int main(int argc, char **argv)
 {
@@ -13,6 +14,9 @@ int main(int argc, char **argv)
 
 	linearTestSuite();
 	screenTestSuite();
+	guiFileTestSuite()
+	
+
 
 	SDL_Quit();
 
