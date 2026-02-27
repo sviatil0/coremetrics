@@ -1,18 +1,20 @@
 #ifndef __MATRIX_HPP__
 #define __MATRIX_HPP__
+
 class Matrix
 {
 private:
-    float components[3][3]{};
+    static constexpr int SIZE = 3;
+    float components[SIZE][SIZE]{};
 
 public:
     Matrix() = default;
     Matrix toTranspose() const
     {
         Matrix result;
-        for (int i = 0; i < 3; ++i)
+        for (int i = 0; i < SIZE; ++i)
         {
-            for (int j = 0; j < 3; ++j)
+            for (int j = 0; j < SIZE; ++j)
             {
                 result.components[i][j] = components[j][i];
             }
@@ -22,9 +24,9 @@ public:
 
     Matrix(float _data[3][3])
     {
-        for (int i = 0; i < 3; ++i)
+        for (int i = 0; i < SIZE; ++i)
         {
-            for (int j = 0; j < 3; ++j)
+            for (int j = 0; j < SIZE; ++j)
             {
                 components[i][j] = _data[i][j];
             }
@@ -33,9 +35,9 @@ public:
     Matrix(const Matrix &copy)
     {
 
-        for (int i = 0; i < 3; ++i)
+        for (int i = 0; i < SIZE; ++i)
         {
-            for (int j = 0; j < 3; ++j)
+            for (int j = 0; j < SIZE; ++j)
             {
                 components[i][j] = copy.components[i][j];
             }
@@ -48,9 +50,9 @@ public:
             return *this;
         }
 
-        for (int i = 0; i < 3; ++i)
+        for (int i = 0; i < SIZE; ++i)
         {
-            for (int j = 0; j < 3; ++j)
+            for (int j = 0; j < SIZE; ++j)
             {
                 components[i][j] = copy.components[i][j];
             }
@@ -62,12 +64,12 @@ public:
 
         Matrix result;
 
-        for (int i = 0; i < 3; ++i)
+        for (int i = 0; i < SIZE; ++i)
         {
-            for (int j = 0; j < 3; ++j)
+            for (int j = 0; j < SIZE; ++j)
             {
                 float sum = 0.0f;
-                for (int k = 0; k < 3; ++k)
+                for (int k = 0; k < SIZE; ++k)
                 {
                     sum += components[i][k] * rhs.components[k][j];
                 }
@@ -78,12 +80,14 @@ public:
     }
     bool operator==(const Matrix &rhs) const
     {
-        for (int i = 0; i < 3; ++i)
+        for (int i = 0; i < SIZE; ++i)
         {
-            for (int j = 0; j < 3; ++j)
+            for (int j = 0; j < SIZE; ++j)
             {
                 if (components[i][j] != rhs.components[i][j])
+                {
                     return false;
+                }
             }
         }
         return true;

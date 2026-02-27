@@ -27,7 +27,9 @@ public:
 	Tvec2<T>& operator=(const Tvec2<T> &copy)
 	{
 		if (this == &copy)
+		{
 			return *this;
+		}
 		components[0] = copy.x;
 		components[1] = copy.y;
 		return *this;
