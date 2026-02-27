@@ -2,7 +2,7 @@
 
 # main.cpp
 ## Description
-main.cpp is a demonstration program
+main.cpp is a demonstration program that utilizes the Screen and GUIFile classes to load, display, and save GUI elements.
 
 # GUIFile
 ## Description
@@ -40,7 +40,56 @@ Class description
 ### return identifier(parameter list)
 Description of methods
 
+etc..
 
-### readFile(std::string fileName)
-This method takes in a std::string file name to open and parse, assuming it is an xml file. If it exists, the class reads in the file using the splitString() method to divide the content where tags are found (indicated by < and >). Then, each token is processed using a very long switch case statement to make sure the proper tokens are contained inside of its opening and closing tags. If the parser ever encounters an out of place token, it returns. If the file did not exist in the first place, no GUI elements are processed or stored and the method returns.
+# Screen
+## Description
+The Screen class provides an interface for rendering geometric primitives onto an SDL surface.
 
+## Methods
+### void drawPixel(ivec2 pos, vec3 color)
+Colors a single pixel at the specified integer coordinate.
+
+### void drawLine(ivec2 start, ivec2 end, vec3 color)
+Renders a line between two points. This method handles horizontal, vertical, and diagonal orientations.
+
+### void drawBox(ivec2 minPos, ivec2 maxPos, vec3 color)
+Renders a rectangle between the specified minimum and maximum corners.
+
+### void blitTo(SDL_Surface* surface)
+Copies the internal Screen buffer to the provided SDL surface for display.
+
+# GUIFile
+## Description
+The GUIFile class manages the loading, staging, and saving of GUI layout elements. It acts as the bridge between the internal data structures and the external XML file format.
+
+## Containers
+* **std::vector<Point>**: Stores individual point elements parsed from XML or staged for saving.
+* **std::vector<Line>**: Stores line elements, including start/end positions and color data.
+* **std::vector<Box>**: Stores box elements, including min/max bounds and color data.
+* **Selection Logic**: Vectors provide contiguous memory for fast iteration during rendering and writing. To optimize for mobile use and memory efficiency, all containers are cleared before loading new data from a file.
+
+## Methods
+### void setPoint(Point point)
+Adds a Point object to the internal container, staging it for a file write operation.
+
+### void setLine(Line line)
+Adds a Line object to the internal container, staging it for a file write operation.
+
+### void setBox(Box box)
+Adds a Box object to the internal container, staging it for a file write operation.
+
+### std::vector<Point> getPoints()
+Returns a copy of the internal points vector. Returning by value ensures the class's internal data cannot be modified by the caller.
+
+### std::vector<Line> getLines()
+Returns a copy of the internal lines vector to provide read-only access to staged data.
+
+### std::vector<Box> getBoxes()
+Returns a copy of the internal boxes vector to provide read-only access to staged data.
+
+### void readFile(std::string fileName)
+Parses a specified XML file into GUI elements. The method clears all internal containers before parsing to ensure no data overlap.
+
+### void writeFile(std::string fileName)
+Writes currently staged elements to an XML file. The output follows a strict schema where nested tags are indented and value tags (like <x>) are on a single line for human readability.

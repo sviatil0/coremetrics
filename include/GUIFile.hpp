@@ -1,6 +1,11 @@
 #ifndef __GUIFILE_HPP__
 #define __GUIFILE_HPP__
-#include "stdlib.h"
+#include <stdlib.h>
+#include <vector>
+#include <map>
+#include <stack>
+#include <string>
+#include <fstream>
 #include "GUIElements.hpp"
 
 class GUIFile
@@ -9,6 +14,8 @@ private:
     std::vector<Point> points;
     std::vector<Line> lines;
     std::vector<Box> boxes;
+    std::vector<std::string> tokens;
+    std::vector<std::string> splitString(const std::string &str, const std::string &delim);
 
 public:
     GUIFile() = default;

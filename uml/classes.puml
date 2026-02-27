@@ -1,0 +1,110 @@
+@startuml
+
+class "Tvec2<T>" {
+    -components: T[2]
+
+    +x: T&
+    +y: T&
+
+    +Tvec2()
+    +Tvec2(copy: Tvec2<T>)
+    +Tvec2(_x: T, _y: T)
+
+    +operator=(copy: Tvec2<T>): Tvec2<T>&
+    +operator==(rhs: Tvec2<T>): bool
+    +operator+(rhs: Tvec2<T>): Tvec2<T>
+    +operator-(rhs: Tvec2<T>): Tvec2<T>
+    +operator*(scalar: T): Tvec2<T>
+    +operator+=(rhs: Tvec2<T>): Tvec2<T>
+    +operator-=(rhs: Tvec2<T>): Tvec2<T>
+    +operator*=(scalar: T): Tvec2<T>
+    +operator[](index: int): T&
+
+    +dot(rhs: Tvec2<T>): T
+    +magnitude(): T
+    +unit(): Tvec2<T>
+}
+
+note right of "Tvec2<T>"
+  Typedefs: vec2 = Tvec2<float>, ivec2 = Tvec2<int>
+  Tvec2<int> specializations:
+    magnitude() uses L1 (Manhattan) norm
+    unit() uses integer division by L1 magnitude
+end note
+
+class "Tvec3<T>" {
+    -components: T[3]
+
+    +x: T&
+    +y: T&
+    +z: T&
+
+    +Tvec3()
+    +Tvec3(copy: Tvec3<T>)
+    +Tvec3(_x: T, _y: T, _z: T)
+
+    +operator=(copy: Tvec3<T>): Tvec3<T>
+    +operator==(rhs: Tvec3<T>): bool
+    +operator+(rhs: Tvec3<T>): Tvec3<T>
+    +operator-(rhs: Tvec3<T>): Tvec3<T>
+    +operator*(scalar: T): Tvec3<T>
+    +operator+=(rhs: Tvec3<T>): Tvec3<T>
+    +operator-=(rhs: Tvec3<T>): Tvec3<T>
+    +operator*=(scalar: T): Tvec3<T>
+    +operator[](index: int): T&
+
+    +dot(rhs: Tvec3<T>): T
+    +magnitude(): T
+    +unit(): Tvec3<T>
+    +cross(rhs: Tvec3<T>): Tvec3<T>
+}
+
+note right of "Tvec3<T>"
+  Typedefs: vec3 = Tvec3<float>, ivec3 = Tvec3<int>
+  Tvec3<int> specializations:
+    magnitude() uses L1 (Manhattan) norm
+    unit() uses integer division by L1 magnitude
+end note
+
+class Screen {
+    -{static} MAX_CHANNEL_VALUE: int
+    -width: unsigned int
+    -height: unsigned int
+    -surface: SDL_Surface*
+
+    -plotLineLow(a: Tvec2<int>, b: Tvec2<int>, color: Tvec3<float>): void
+    -plotLineHigh(a: Tvec2<int>, b: Tvec2<int>, color: Tvec3<float>): void
+
+    +Screen(w: unsigned int, h: unsigned int)
+    +\~Screen()
+
+    +blitTo(target: SDL_Surface*): void
+
+    +drawPixel<T>(pos: Tvec2<T>, color: Tvec3<float>): void
+    +drawPixel<T>(pos: Tvec2<T>, color: Tvec3<int>): void
+    +drawLine<T,U>(a: Tvec2<T>, b: Tvec2<U>, color: Tvec3<float>): void
+    +drawLine<T,U>(a: Tvec2<T>, b: Tvec2<U>, color: Tvec3<int>): void
+    +drawBox<T,U,V>(a: Tvec2<T>, b: Tvec2<U>, color: Tvec3<V>): void
+}
+
+note right of Screen
+  drawPixel and drawLine are overloaded:
+  float color expects [0.0, 1.0] range
+  int color expects [0, 255] range
+end note
+
+class Matrix{
+    -components: float[3][3]
+
+    +Matrix()
+    +Matrix(data: float[3][3])
+    +Matrix(copy: Matrix)
+
+    +operator=(copy: Matrix): Matrix&
+    +operator*(rhs: Matrix): Matrix
+    +operator==(rhs: Matrix): bool
+    +toTranspose(): Matrix 
+
+
+}
+@enduml

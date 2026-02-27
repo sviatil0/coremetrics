@@ -29,7 +29,9 @@ public:
     Tvec3<T> operator=(const Tvec3<T> &copy)
     {
         if (this == &copy)
+        {
             return *this;
+        }
         components[0] = copy.x;
         components[1] = copy.y;
         components[2] = copy.z;
@@ -97,12 +99,7 @@ public:
             x * rhs.y - y * rhs.x);
     }
 
-    T operator[](int index)
-    {
-        return components[index];
-    }
-
-    const T operator[](int index) const
+    T& operator[](int index)
     {
         return components[index];
     }

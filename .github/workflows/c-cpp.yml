@@ -11,10 +11,6 @@ jobs:
 
     runs-on: ubuntu-latest
 
-    defaults:
-      run:
-        working-directory: tests/
-
     steps:
     - uses: actions/checkout@v4
     - name: SDL3 Dependencies
@@ -24,9 +20,8 @@ jobs:
         install-linux-dependencies: true
         version: 3-latest
         version-sdl-ttf: 3-latest
-    - name: make
+    - name: Build and Test
       run: |
         export SDL_VIDEO_DRIVER=dummy
         export LD_LIBRARY_PATH=${SDL3_ROOT}/lib:$LD_LIBRARY_PATH
-        make
-        ./a.out
+        make CXXFLAGS="-std=c++23 -Wall -I ./include $(pkg-config --cflags sdl3)" LDFLAGS="$(pkg-config --libs sdl3)" test
