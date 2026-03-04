@@ -20,12 +20,14 @@ TEST_SOURCES = $(TESTDIR)/tests.cpp \
 			   $(TESTDIR)/guiFileTest.cpp \
                $(SRCDIR)/screen.cpp \
                $(SRCDIR)/matrix.cpp \
+			   $(SRCDIR)/GUIFile.cpp
 TEST_OBJECTS = $(OBJDIR)/tests.o \
                $(OBJDIR)/linearTest.o \
                $(OBJDIR)/screenTest.o \
 			   $(OBJDIR)/guiFileTest.o \
                $(OBJDIR)/screen.o \
-               $(OBJDIR)/matrix.o
+               $(OBJDIR)/matrix.o \
+			   $(OBJDIR)/GUIFile.o
 HEADERS = $(INCDIR)/linear.hpp $(INCDIR)/screen.hpp $(INCDIR)/linearTest.hpp $(INCDIR)/screenTest.hpp $(INCDIR)/guiFileTest.hpp
 
 demo: directories $(DEMO_TARGET)
@@ -56,6 +58,9 @@ $(OBJDIR)/screen.o: $(SRCDIR)/screen.cpp $(INCDIR)/screen.hpp $(INCDIR)/linear.h
 	$(CXX) $(CXXFLAGS) -c $< -o $@ $(LDFLAGS)
 
 $(OBJDIR)/matrix.o: $(SRCDIR)/matrix.cpp $(INCDIR)/matrix.hpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+$(OBJDIR)/GUIFile.o: $(SRCDIR)/GUIFile.cpp $(INCDIR)/GUIFile.hpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 $(DEMO_TARGET): $(OBJDIR)/main.o $(OBJDIR)/screen.o $(OBJDIR)/matrix.o

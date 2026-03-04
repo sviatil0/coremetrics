@@ -3,8 +3,6 @@
 #include <filesystem>
 #include <iostream>
 
-GUIFile::GUIFile() {} //do we need to do anything with the constructor?
-
 void GUIFile::setPoint(Point point)
 {
     points.push_back(point);
@@ -436,6 +434,16 @@ void GUIFile::readFile(std::string fileName)
                 return;
             
         }
+    }
+}
+
+void GUIFile::writeFile(std::string fileName)
+{
+    std::ofstream outFile(fileName);
+
+    if (!outFile.is_open())
+    {
+        return;
     }
 
     outFile << "<layout>\n";
