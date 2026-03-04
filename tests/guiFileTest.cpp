@@ -1,4 +1,9 @@
-#include "guiFileTest.hpp"
+#include <iostream>
+#include <fstream>
+#include <string>
+#include <vector>
+#include <filesystem>
+#include "GUIFile.hpp"
 
 static bool fileContains(const std::string& fileName, const std::string& search)
 {
