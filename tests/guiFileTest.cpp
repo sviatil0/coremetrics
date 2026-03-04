@@ -4,6 +4,7 @@
 #include <vector>
 #include <filesystem>
 #include "GUIFile.hpp"
+#include "guiFileTest.hpp"
 
 static bool fileContains(const std::string& fileName, const std::string& search)
 {
@@ -87,11 +88,22 @@ static void testWriteFile()
     
     bool passed = hasLayout && hasPoint && hasValueOnOneLine;
     std::cout << (passed ? "PASS" : "FAIL") << '\n';
-    
+
     if (std::filesystem::exists(testFile)) 
     {
         std::filesystem::remove(testFile);
     }
+}
+
+static void testFileRead()
+{
+    std::cout << "GUIFile readFile: ";
+    GUIFile g;
+    g.readFile("tests/ex1.xml");
+    bool passed = g.getPoints().size() == 1
+               && g.getLines().size() == 1
+               && g.getBoxes().size() == 1;
+    std::cout << (passed ? "PASS" : "FAIL") << '\n';
 }
 
 void guiFileTestSuite()
@@ -106,6 +118,7 @@ void guiFileTestSuite()
     testSetAndGetBox();
     testGetterDataProtection();
     testWriteFile();
+    testFileRead();
 
     std::cout << '\n';
     std::cout << "=============================================" << '\n';

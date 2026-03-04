@@ -3,8 +3,6 @@
 #include <filesystem>
 #include <iostream>
 
-GUIFile::GUIFile() {} //do we need to do anything with the constructor?
-
 void GUIFile::setPoint(Point point)
 {
     points.push_back(point);
@@ -255,7 +253,6 @@ void GUIFile::readFile(std::string fileName)
                             tempContainer.end = vec2(iVec["x"], fVec["y"]);
                         }
                         fVec = {{"x", -1}, {"y", -1}, {"z", -1}};
-                        std::cout << "END OF VEC2\n";
                         modes.pop();
                         break;
                     default:
@@ -436,6 +433,17 @@ void GUIFile::readFile(std::string fileName)
                 return;
             
         }
+    }
+    fp.close();
+}
+
+void GUIFile::writeFile(std::string fileName)
+{
+    std::ofstream outFile(fileName);
+
+    if (!outFile.is_open())
+    {
+        return;
     }
 
     outFile << "<layout>\n";

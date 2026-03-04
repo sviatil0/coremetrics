@@ -14,9 +14,8 @@ int main(int argc, char **argv)
 
 	linearTestSuite();
 	screenTestSuite();
-	guiFileTestSuite()
+	guiFileTestSuite();
 	
-
 
 	SDL_Quit();
 
