@@ -95,6 +95,17 @@ static void testWriteFile()
     }
 }
 
+static void testFileRead()
+{
+    std::cout << "File read: ";
+    GUIFile g;
+    g.readFile("ex1.xml");
+    bool passed = g.getPoints().size() == 1
+               && g.getLines().size() == 1
+               && g.getBoxes().size() == 1;
+    std::cout << (passed ? "PASS" : "FAIL") << '\n';
+}
+
 void guiFileTestSuite()
 {
     std::cout << "=============================================" << '\n';
@@ -107,6 +118,7 @@ void guiFileTestSuite()
     testSetAndGetBox();
     testGetterDataProtection();
     testWriteFile();
+    testFileRead();
 
     std::cout << '\n';
     std::cout << "=============================================" << '\n';
