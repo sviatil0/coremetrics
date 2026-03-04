@@ -17,14 +17,16 @@ TEST_TARGET = $(BINDIR)/tests
 TEST_SOURCES = $(TESTDIR)/tests.cpp \
                $(TESTDIR)/linearTest.cpp \
                $(TESTDIR)/screenTest.cpp \
+			   $(TESTDIR)/guiFileTest.cpp \
                $(SRCDIR)/screen.cpp \
-               $(SRCDIR)/matrix.cpp
+               $(SRCDIR)/matrix.cpp \
 TEST_OBJECTS = $(OBJDIR)/tests.o \
                $(OBJDIR)/linearTest.o \
                $(OBJDIR)/screenTest.o \
+			   $(OBJDIR)/guiFileTest.o \
                $(OBJDIR)/screen.o \
                $(OBJDIR)/matrix.o
-HEADERS = $(INCDIR)/linear.hpp $(INCDIR)/screen.hpp $(INCDIR)/linearTest.hpp $(INCDIR)/screenTest.hpp
+HEADERS = $(INCDIR)/linear.hpp $(INCDIR)/screen.hpp $(INCDIR)/linearTest.hpp $(INCDIR)/screenTest.hpp $(INCDIR)/guiFileTest.hpp
 
 demo: directories $(DEMO_TARGET)
 	./$(DEMO_TARGET)
@@ -46,6 +48,9 @@ $(OBJDIR)/linearTest.o: $(TESTDIR)/linearTest.cpp $(HEADERS)
 
 $(OBJDIR)/screenTest.o: $(TESTDIR)/screenTest.cpp $(HEADERS)
 	$(CXX) $(CXXFLAGS) -c $< -o $@ $(LDFLAGS)
+
+$(OBJDIR)/guiFileTest.o: $(TESTDIR)/guiFileTest.cpp $(HEADERS)
+	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 $(OBJDIR)/screen.o: $(SRCDIR)/screen.cpp $(INCDIR)/screen.hpp $(INCDIR)/linear.hpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@ $(LDFLAGS)
