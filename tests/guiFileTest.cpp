@@ -88,18 +88,18 @@ static void testWriteFile()
     
     bool passed = hasLayout && hasPoint && hasValueOnOneLine;
     std::cout << (passed ? "PASS" : "FAIL") << '\n';
-    
+    /*
     if (std::filesystem::exists(testFile)) 
     {
         std::filesystem::remove(testFile);
-    }
+    } */
 }
 
 static void testFileRead()
 {
-    std::cout << "File read: ";
+    std::cout << "GUIFile readFile: ";
     GUIFile g;
-    g.readFile("ex1.xml");
+    g.readFile("tests/ex1.xml");
     bool passed = g.getPoints().size() == 1
                && g.getLines().size() == 1
                && g.getBoxes().size() == 1;
