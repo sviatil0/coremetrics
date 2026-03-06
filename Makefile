@@ -18,17 +18,25 @@ TEST_SOURCES = $(TESTDIR)/tests.cpp \
                $(TESTDIR)/linearTest.cpp \
                $(TESTDIR)/screenTest.cpp \
 			   $(TESTDIR)/guiFileTest.cpp \
+			   $(TESTDIR)/GUIElementTest.cpp \
                $(SRCDIR)/screen.cpp \
                $(SRCDIR)/matrix.cpp \
-			   $(SRCDIR)/GUIFile.cpp
+			   $(SRCDIR)/GUIFile.cpp \
+			   $(SRCDIR)/image.cpp \
+			   $(SRCDIR)/label.cpp \
+			   $(SRCDIR)/selection.cpp
 TEST_OBJECTS = $(OBJDIR)/tests.o \
                $(OBJDIR)/linearTest.o \
                $(OBJDIR)/screenTest.o \
 			   $(OBJDIR)/guiFileTest.o \
+			   $(OBJDIR)/GUIElementTest.o \
                $(OBJDIR)/screen.o \
                $(OBJDIR)/matrix.o \
-			   $(OBJDIR)/GUIFile.o
-HEADERS = $(INCDIR)/linear.hpp $(INCDIR)/screen.hpp $(INCDIR)/linearTest.hpp $(INCDIR)/screenTest.hpp $(INCDIR)/guiFileTest.hpp
+			   $(OBJDIR)/GUIFile.o \
+			   $(OBJDIR)/image.o \
+			   $(OBJDIR)/label.o \
+			   $(OBJDIR)/selection.o
+HEADERS = $(INCDIR)/linear.hpp $(INCDIR)/screen.hpp $(INCDIR)/linearTest.hpp $(INCDIR)/screenTest.hpp $(INCDIR)/guiFileTest.hpp $(INCDIR)/GUIElementTest.hpp $(INCDIR)/image.hpp $(INCDIR)/selection.hpp $(INCDIR)/label.hpp
 
 demo: directories $(DEMO_TARGET)
 	./$(DEMO_TARGET)
@@ -54,6 +62,9 @@ $(OBJDIR)/screenTest.o: $(TESTDIR)/screenTest.cpp $(HEADERS)
 $(OBJDIR)/guiFileTest.o: $(TESTDIR)/guiFileTest.cpp $(HEADERS)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
+$(OBJDIR)/GUIElementTest.o: $(TESTDIR)/GUIElementTest.cpp $(HEADERS)
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
 $(OBJDIR)/screen.o: $(SRCDIR)/screen.cpp $(INCDIR)/screen.hpp $(INCDIR)/linear.hpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@ $(LDFLAGS)
 
@@ -61,6 +72,15 @@ $(OBJDIR)/matrix.o: $(SRCDIR)/matrix.cpp $(INCDIR)/matrix.hpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 $(OBJDIR)/GUIFile.o: $(SRCDIR)/GUIFile.cpp $(INCDIR)/GUIFile.hpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+$(OBJDIR)/label.o: $(SRCDIR)/label.cpp $(INCDIR)/label.hpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+$(OBJDIR)/selection.o: $(SRCDIR)/selection.cpp $(INCDIR)/selection.hpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+$(OBJDIR)/image.o: $(SRCDIR)/image.cpp $(INCDIR)/image.hpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 $(DEMO_TARGET): $(OBJDIR)/main.o $(OBJDIR)/screen.o $(OBJDIR)/matrix.o
