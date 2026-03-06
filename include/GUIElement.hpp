@@ -1,13 +1,13 @@
-#ifndef __ELEMENT_HPP__
-#define __ELEMENT_HPP__
+#ifndef __GUIELEMENT_HPP__
+#define __GUIELEMENT_HPP__
 
 #include "screen.hpp"
 
 // abstact base class for GUI elements
-class Element
+class GUIElement
 {
 public:
-    virtual ~Element() {}
+    virtual ~GUIElement() {}
     virtual void draw(Screen& screen) = 0;
 };
 
