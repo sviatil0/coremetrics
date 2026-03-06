@@ -93,3 +93,47 @@ Parses a specified XML file into GUI elements. The method clears all internal co
 
 ### void writeFile(std::string fileName)
 Writes currently staged elements to an XML file. The output follows a strict schema where nested tags are indented and value tags (like <x>) are on a single line for human readability.
+
+# GUIElement
+## Description
+An abstract base class (ABC) that serves as the foundation for all renderable UI components. It enforces a polymorphic interface, ensuring that any UI component can be drawn using a provided `Screen` reference without the caller needing to know the specific type of the element.
+
+## Methods
+### virtual void draw(Screen& screen) = 0
+A pure virtual method that subclasses must implement. By receiving a `Screen` reference as a parameter, the element remains decoupled from the specific rendering target, allowing for better memory efficiency and flexibility.
+
+# Label
+## Description
+A UI component responsible for managing and displaying text strings. It currently utilizes a "placeholder" system that renders a proportional box for each character to verify layout, spacing, and color before a full font engine is integrated.
+
+## Methods
+### void draw(Screen& screen) override
+Iterates through the stored string and calculates the screen coordinates for each character, rendering a filled box via the screen's `drawBox` method to represent the text footprint.
+
+### std::string getText() const
+Returns the string content currently assigned to the label.
+
+# Selection
+## Description
+A stateful checkbox component used for user input. It manages a boolean selection state and provides a multi-layered visual representation including a border, a background, and a conditional "check" mark.
+
+## Methods
+### void draw(Screen& screen) override
+Renders the checkbox components. It draws a white border and dark background. If the internal state is set to true, it renders a green internal mark to indicate the "selected" status.
+
+### void toggle()
+Inverts the current selection state (flips between true and false).
+
+### bool isSelected() const
+Returns the current boolean value of the checkbox state.
+
+# Image
+## Description
+A component designed to render bitmap (BMP) assets. Following a "reductionist" approach, this class avoids high-level SDL blitting functions and instead manually iterates through raw pixel buffers to plot images coordinate-by-coordinate.
+
+## Methods
+### void draw(Screen& screen) override
+Loads a BMP file into a temporary buffer, converts it to a standard RGBA8888 format, and executes a nested loop to plot every non-transparent pixel to the screen using `drawPixel`.
+
+### std::string getFilePath() const
+Returns the file path of the image asset associated with this object.
