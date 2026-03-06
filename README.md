@@ -52,6 +52,9 @@ Renders a rectangle between the specified minimum and maximum corners.
 ### void blitTo(SDL_Surface* surface)
 Copies the internal Screen buffer to the provided SDL surface for display.
 
+### void drawTriange(ivec2 vert1, ivec2 vert2, ivec2 vert3, vec3 color)
+Renders a triangle using the three vertices using their cross vectors. It is filled in with color, and the vertices can be given in clockwise or counter-clockwise direction.
+
 # GUIFile
 ## Description
 The GUIFile class manages the loading, staging, and saving of GUI layout elements. It acts as the bridge between the internal data structures and the external XML file format.
@@ -133,3 +136,15 @@ Loads a BMP file into a temporary buffer, converts it to a standard RGBA8888 for
 
 ### std::string getFilePath() const
 Returns the file path of the image asset associated with this object.
+
+
+# Button
+## Description
+A component designed to render a box which recognizes when it is clicked. 
+
+## Methods
+### void draw(Screen& screen) override
+Using the screen class'`drawBox` function, draws a box between the button's min and max boundaries, filled in with the given color and a one pixel thick white border.
+
+### bool checkToggle(int mouseX, int mouseY)
+Checks if the mouse coordinates are within the bounds of the button component.
