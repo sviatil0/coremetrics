@@ -42,28 +42,10 @@ public:
         Uint8 r = static_cast<Uint8>(std::clamp(color.x, 0.0f, 1.0f) * static_cast<float>(MAX_CHANNEL_VALUE));
         Uint8 g = static_cast<Uint8>(std::clamp(color.y, 0.0f, 1.0f) * static_cast<float>(MAX_CHANNEL_VALUE));
         Uint8 b = static_cast<Uint8>(std::clamp(color.z, 0.0f, 1.0f) * static_cast<float>(MAX_CHANNEL_VALUE));
-        Uint32 *pixels = static_cast<Uint32 *>(surface->pixels);
-        pixels[y * static_cast<int>(width) + x] = SDL_MapSurfaceRGBA(surface, r, g, b, static_cast<Uint8>(MAX_CHANNEL_VALUE));
-    }
 
-    template <typename T>
-    void drawPixel(const Tvec2<T> &pos, const Tvec3<int> &color)
-    {
-        if (!surface)
-        {
-            return;
-        }
-        int x = static_cast<int>(pos.x);
-        int y = static_cast<int>(pos.y);
-        if (x < 0 || x >= static_cast<int>(width) || y < 0 || y >= static_cast<int>(height))
-        {
-            return;
-        }
-        Uint8 r = static_cast<Uint8>(std::clamp(color.x, 0, MAX_CHANNEL_VALUE));
-        Uint8 g = static_cast<Uint8>(std::clamp(color.y, 0, MAX_CHANNEL_VALUE));
-        Uint8 b = static_cast<Uint8>(std::clamp(color.z, 0, MAX_CHANNEL_VALUE));
-        Uint32 *pixels = static_cast<Uint32 *>(surface->pixels);
-        pixels[y * static_cast<int>(width) + x] = SDL_MapSurfaceRGBA(surface, r, g, b, static_cast<Uint8>(MAX_CHANNEL_VALUE));
+        Uint8* row = static_cast<Uint8 *>(surface->pixels) + y * surface->pitch;
+        Uint32 *pixels = reinterpret_cast<Uint32 *>(row);
+        pixels[x] = SDL_MapSurfaceRGBA(surface, r, g, b, static_cast<Uint8>(MAX_CHANNEL_VALUE));
     }
 
     template <typename T, typename U>
@@ -121,7 +103,39 @@ public:
             }
         }
     }
-    
+        
+    int crossEdge(const ivec2& a, const ivec2& b, const ivec2& c)
+    {
+        return (((b.y-a.y)*(c.x-a.x)) - ((b.x-a.x)*(c.y-a.y)));
+    }
+
+    void drawTriangle(const ivec2& v1, const ivec2& v2, const ivec2& v3, const vec3& color)
+    {
+        //drawing help from: https://www.scratchapixel.com/lessons/3d-basic-rendering/rasterization-practical-implementation/rasterization-stage.html
+        // get bounding coords to loop over (square)
+        int minX = static_cast<int>(fmin(v1.x, fmin(v2.x, v3.x)));
+        int minY = static_cast<int>(fmin(v1.y, fmin(v2.y, v3.y)));
+        int maxX = static_cast<int>(fmax(v1.x, fmax(v2.x, v3.x)));
+        int maxY = static_cast<int>(fmax(v1.y, fmax(v2.y, v3.y)));
+
+        // within boundaries, check if each pixel is inside triangle or not
+        for (int x = minX; x <= maxX; x++)
+        {
+            for (int y = minY; y <= maxY; y++)
+            {
+                ivec2 p = ivec2(x, y);
+                int w0 = crossEdge(v2, v3, p);
+                int w1 = crossEdge(v3, v1, p);
+                int w2 = crossEdge(v1, v2, p);
+
+                if ((w0 >= 0 && w1 >= 0 && w2 >= 0) || //if clockwise order of verts
+                    (w0 <= 0 && w1 <= 0 && w2 <= 0)) //if counter-clockwise order of verts
+                {
+                    drawPixel(p, color);
+                }
+            }
+        }
+    }
 };
 
 #endif

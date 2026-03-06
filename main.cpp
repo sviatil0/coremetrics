@@ -45,6 +45,12 @@ int main(int argc, char** argv)
 	screen.drawLine(center, bottomLeft, lineColor);
 	screen.drawLine(center, bottomRight, lineColor);
 
+	vec3 triangleColor(0.8f, 0.2f, 0.3f);
+	vec2 triV1(center.x - BOX_HALF_WIDTH, center.y - BOX_HALF_HEIGHT);
+	vec2 triV3(center.x, center.y);
+	vec2 triV2(center.x - BOX_HALF_WIDTH, center.y + BOX_HALF_HEIGHT);
+	screen.drawTriangle(triV1, triV2, triV3, triangleColor);
+
 	SDL_Event event;
 	bool end = false;
 	while (!end)
