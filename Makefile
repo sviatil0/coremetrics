@@ -24,7 +24,8 @@ TEST_SOURCES = $(TESTDIR)/tests.cpp \
 			   $(SRCDIR)/GUIFile.cpp \
 			   $(SRCDIR)/image.cpp \
 			   $(SRCDIR)/label.cpp \
-			   $(SRCDIR)/selection.cpp
+			   $(SRCDIR)/selection.cpp \
+			   $(SRCDIR)/button.cpp
 TEST_OBJECTS = $(OBJDIR)/tests.o \
                $(OBJDIR)/linearTest.o \
                $(OBJDIR)/screenTest.o \
@@ -35,8 +36,9 @@ TEST_OBJECTS = $(OBJDIR)/tests.o \
 			   $(OBJDIR)/GUIFile.o \
 			   $(OBJDIR)/image.o \
 			   $(OBJDIR)/label.o \
-			   $(OBJDIR)/selection.o
-HEADERS = $(INCDIR)/linear.hpp $(INCDIR)/screen.hpp $(INCDIR)/linearTest.hpp $(INCDIR)/screenTest.hpp $(INCDIR)/guiFileTest.hpp $(INCDIR)/GUIElementTest.hpp $(INCDIR)/image.hpp $(INCDIR)/selection.hpp $(INCDIR)/label.hpp
+			   $(OBJDIR)/selection.o \
+			   $(OBJDIR)/button.o
+HEADERS = $(INCDIR)/linear.hpp $(INCDIR)/screen.hpp $(INCDIR)/linearTest.hpp $(INCDIR)/screenTest.hpp $(INCDIR)/guiFileTest.hpp $(INCDIR)/GUIElementTest.hpp $(INCDIR)/image.hpp $(INCDIR)/selection.hpp $(INCDIR)/label.hpp $(INCDIR)/button.hpp
 
 demo: directories $(DEMO_TARGET)
 	./$(DEMO_TARGET)
@@ -83,7 +85,10 @@ $(OBJDIR)/selection.o: $(SRCDIR)/selection.cpp $(INCDIR)/selection.hpp
 $(OBJDIR)/image.o: $(SRCDIR)/image.cpp $(INCDIR)/image.hpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-$(DEMO_TARGET): $(OBJDIR)/main.o $(OBJDIR)/screen.o $(OBJDIR)/matrix.o
+$(OBJDIR)/button.o: $(SRCDIR)/button.cpp $(INCDIR)/button.hpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+$(DEMO_TARGET): $(OBJDIR)/main.o $(OBJDIR)/screen.o $(OBJDIR)/matrix.o $(OBJDIR)/button.o
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
 
 $(OBJDIR)/main.o: main.cpp $(INCDIR)/screen.hpp $(INCDIR)/linear.hpp

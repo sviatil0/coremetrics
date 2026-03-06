@@ -1,15 +1,11 @@
 #include "button.hpp"
 
-Button::Button(ivec2 minPos, ivec2 maxPos, vec3 color, bool clicked = false)
-    : minPos(minPos), maxPos(maxPos), color(color), clicked(clicked)
+Button::Button(ivec2 minP, ivec2 maxP, vec3 col)
+    : minPos(minP), maxPos(maxP), color(col)
 {
 }
 
-Button::~Button() 
-{
-}
-
-void draw(Screen& screen) override
+void Button::draw(Screen& screen)
 {
     //like selection element, draw white border around button element
     vec3 borderColor = { 1.0f, 1.0f, 1.0f }; // White border
@@ -22,15 +18,12 @@ void draw(Screen& screen) override
     //probably add label implementation here later
 }
 
-bool checkToggle(int mouseX, int mouseY)
+bool Button::checkToggle(int mouseX, int mouseY)
 {
     if (((mouseX >= minPos.x) && (mouseX <= maxPos.x))
         && ((mouseY >= minPos.y) && (mouseY <= maxPos.y)))
     {
         return true;
     }
-    else
-    {
-        return false;
-    }
+    return false;
 }
