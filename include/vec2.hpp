@@ -24,7 +24,7 @@ public:
 		y = _y;
 	}
 
-	Tvec2<T>& operator=(const Tvec2<T> &copy)
+	Tvec2<T> &operator=(const Tvec2<T> &copy)
 	{
 		if (this == &copy)
 		{
@@ -72,22 +72,22 @@ public:
 		return Tvec2(x / mag, y / mag);
 	}
 
-	T& operator[](int index) 
+	T &operator[](int index)
 	{
 		return components[index];
 	}
 
-	Tvec2<T> operator+=(const Tvec2<T> &rhs)
+	Tvec2<T> &operator+=(const Tvec2<T> &rhs)
 	{
 		*this = *this + rhs;
 		return *this;
 	}
-	Tvec2<T> operator-=(const Tvec2<T> &rhs)
+	Tvec2<T> &operator-=(const Tvec2<T> &rhs)
 	{
 		*this = *this - rhs;
 		return *this;
 	}
-	Tvec2<T> operator*=(T scalar)
+	Tvec2<T> &operator*=(T scalar)
 	{
 		*this = *this * scalar;
 		return *this;

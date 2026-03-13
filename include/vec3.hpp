@@ -7,12 +7,12 @@ template <typename T>
 class Tvec3
 {
 private:
-	T components[3];
+    T components[3];
 
 public:
-	T &x, &y, &z;
+    T &x, &y, &z;
 
-	Tvec3() : components{0, 0, 0}, x(components[0]), y(components[1]), z(components[2]) {}
+    Tvec3() : components{0, 0, 0}, x(components[0]), y(components[1]), z(components[2]) {}
     Tvec3(const Tvec3<T> &copy) : Tvec3()
     {
         x = copy.x;
@@ -26,7 +26,7 @@ public:
         z = _z;
     }
 
-    Tvec3<T> operator=(const Tvec3<T> &copy)
+    Tvec3<T> &operator=(const Tvec3<T> &copy)
     {
         if (this == &copy)
         {
@@ -37,17 +37,17 @@ public:
         components[2] = copy.z;
         return *this;
     }
-    Tvec3<T> operator+=(const Tvec3<T> &rhs)
+    Tvec3<T> &operator+=(const Tvec3<T> &rhs)
     {
         *this = *this + rhs;
         return *this;
     }
-    Tvec3<T> operator-=(const Tvec3<T> &rhs)
+    Tvec3<T> &operator-=(const Tvec3<T> &rhs)
     {
         *this = *this - rhs;
         return *this;
     }
-    Tvec3<T> operator*=(T scalar)
+    Tvec3<T> &operator*=(T scalar)
     {
         *this = *this * scalar;
         return *this;
@@ -99,11 +99,10 @@ public:
             x * rhs.y - y * rhs.x);
     }
 
-    T& operator[](int index)
+    T &operator[](int index)
     {
         return components[index];
     }
-
 };
 
 // Specialization for ivec3: magnitude returns int
