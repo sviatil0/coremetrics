@@ -22,7 +22,7 @@ private:
 
 public:
     Screen(unsigned int w, unsigned int h);
-    ~Screen();
+    ~Screen() = default;
 
     void blitTo(SDL_Surface *target);
 
@@ -101,8 +101,7 @@ public:
         vec3 floatColor(
             static_cast<float>(color.x) / static_cast<float>(MAX_CHANNEL_VALUE),
             static_cast<float>(color.y) / static_cast<float>(MAX_CHANNEL_VALUE),
-            static_cast<float>(color.z) / static_cast<float>(MAX_CHANNEL_VALUE)
-        );
+            static_cast<float>(color.z) / static_cast<float>(MAX_CHANNEL_VALUE));
         drawLine(a, b, floatColor);
     }
 
