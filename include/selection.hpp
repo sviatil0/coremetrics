@@ -3,6 +3,7 @@
 
 #include "GUIElement.hpp"
 #include "linear.hpp"
+#include <string>
 
 class Selection : public GUIElement
 {
