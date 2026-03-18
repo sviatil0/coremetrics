@@ -30,7 +30,7 @@ TEST_OBJECTS = $(OBJDIR)/tests.o \
                $(OBJDIR)/screen.o \
                $(OBJDIR)/matrix.o \
                $(OBJDIR)/GUIFile.o
-HEADERS = $(INCDIR)/linear.hpp $(INCDIR)/screen.hpp $(INCDIR)/linearTest.hpp $(INCDIR)/screenTest.hpp
+HEADERS = $(INCDIR)/linear.hpp $(INCDIR)/screen.hpp $(INCDIR)/linearTest.hpp $(INCDIR)/screenTest.hpp $(INCDIR)/guiFileTest.hpp
 
 demo: directories $(DEMO_TARGET)
 	./$(DEMO_TARGET)
@@ -53,6 +53,9 @@ $(OBJDIR)/linearTest.o: $(TESTDIR)/linearTest.cpp $(HEADERS)
 $(OBJDIR)/screenTest.o: $(TESTDIR)/screenTest.cpp $(HEADERS)
 	$(CXX) $(CXXFLAGS) -c $< -o $@ $(LDFLAGS)
 
+$(OBJDIR)/guiFileTest.o: $(TESTDIR)/guiFileTest.cpp $(HEADERS)
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
 $(OBJDIR)/screen.o: $(SRCDIR)/screen.cpp $(INCDIR)/screen.hpp $(INCDIR)/linear.hpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@ $(LDFLAGS)
 
@@ -61,8 +64,6 @@ $(OBJDIR)/matrix.o: $(SRCDIR)/matrix.cpp $(INCDIR)/matrix.hpp
 
 $(OBJDIR)/GUIFile.o: $(SRCDIR)/GUIFile.cpp $(INCDIR)/GUIFile.hpp $(INCDIR)/GUIElements.hpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
-
-$(OBJDIR)/guiFileTest.o: $(TESTDIR)/guiFileTest.cpp $(INCDIR)/guiFileTest.hpp $(INCDIR)/GUIFile.hpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 $(DEMO_TARGET): $(OBJDIR)/main.o $(OBJDIR)/screen.o $(OBJDIR)/matrix.o

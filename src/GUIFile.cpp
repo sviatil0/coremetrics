@@ -253,7 +253,6 @@ void GUIFile::readFile(std::string fileName)
                             tempContainer.end = vec2(iVec["x"], fVec["y"]);
                         }
                         fVec = {{"x", -1}, {"y", -1}, {"z", -1}};
-                        std::cout << "END OF VEC2\n";
                         modes.pop();
                         break;
                     default:
@@ -435,6 +434,7 @@ void GUIFile::readFile(std::string fileName)
 
         }
     }
+    fp.close();
 }
 
 void GUIFile::writeFile(std::string fileName)
