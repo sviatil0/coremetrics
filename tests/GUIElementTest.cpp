@@ -5,14 +5,14 @@
 #include "selection.hpp"
 #include "image.hpp"
 
-static bool checkPixel(SDL_Surface *surface, int x, int y, Uint8 expectedR, Uint8 expectedG, Uint8 expectedB)
+bool checkPixel(SDL_Surface *surface, int x, int y, Uint8 expectedR, Uint8 expectedG, Uint8 expectedB)
 {
     Uint8 r = 0, g = 0, b = 0, a = 0;
     SDL_ReadSurfacePixel(surface, x, y, &r, &g, &b, &a);
     return r == expectedR && g == expectedG && b == expectedB;
 }
 
-static void testLabelPlacement()
+void testLabelPlacement()
 {
     std::cout << "Label - Placeholder Rendering: ";
     Screen s(50, 50);
@@ -28,7 +28,7 @@ static void testLabelPlacement()
     std::cout << (passed ? "PASS" : "FAIL") << '\n';
 }
 
-static void testSelectionLogic()
+void testSelectionLogic()
 {
     std::cout << "Selection - State Toggling: ";
     Selection sel(ivec2(0, 0), "Check", false);
@@ -41,7 +41,7 @@ static void testSelectionLogic()
     std::cout << (passed ? "PASS" : "FAIL") << '\n';
 }
 
-static void testSelectionCheckedVisual()
+void testSelectionCheckedVisual()
 {
     std::cout << "Selection - Green Mark Logic: ";
     Screen s(40, 40);
@@ -57,7 +57,7 @@ static void testSelectionCheckedVisual()
     std::cout << (passed ? "PASS" : "FAIL") << '\n';
 }
 
-static void testImageMissingFile()
+void testImageMissingFile()
 {
     std::cout << "Image - Graceful Load Failure: ";
     Screen s(10, 10);

@@ -4,10 +4,6 @@ Label::Label(std::string text, ivec2 pos, vec3 col) : m_text(text), m_position(p
 {
 }
 
-Label::~Label() 
-{
-}
-
 std::string Label::getText() const 
 {
     return m_text;

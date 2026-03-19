@@ -13,7 +13,7 @@ private:
 
 public:
     Image(std::string filePath, ivec2 position);
-    virtual ~Image() {}
+    virtual ~Image() = default;
     virtual void draw(Screen& screen) override;
 
     std::string getFilePath() const;

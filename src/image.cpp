@@ -4,11 +4,6 @@
 Image::Image(std::string filePath, ivec2 pos) : m_filePath(filePath), m_position(pos) 
 {
 }
-
-Image::~Image() 
-{
-}
-
 std::string Image::getFilePath() const 
 {
     return m_filePath;

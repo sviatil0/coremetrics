@@ -11,12 +11,12 @@ private:
     ivec2 m_position;
     std::string m_label;
     bool m_isSelected;
-    const int m_boxSize = 20; // currently hard coded
+    static constexpr int m_boxSize = 20; // currently hard coded
 
 public:
     Selection(ivec2 position, std::string label, bool checked = false);
 
-    virtual ~Selection() {}
+    virtual ~Selection() = default;
 
     virtual void draw(Screen& screen) override;
 

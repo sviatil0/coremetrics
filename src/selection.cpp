@@ -5,10 +5,6 @@ Selection::Selection(ivec2 pos, std::string label, bool checked)
 {
 }
 
-Selection::~Selection() 
-{
-}
-
 void Selection::toggle() 
 {
     m_isSelected = !m_isSelected;
