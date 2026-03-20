@@ -17,7 +17,7 @@ void Image::draw(Screen& screen)
         return;
     }
 
-    SDL_Surface* formattedSurface = SDL_ConvertSurfaceFormat(tempSurface, SDL_PIXELFORMAT_RGBA8888); // format properly
+    SDL_Surface* formattedSurface = SDL_ConvertSurface(tempSurface, SDL_PIXELFORMAT_RGBA8888);
     SDL_DestroySurface(tempSurface);
 
     if (!formattedSurface)
@@ -34,7 +34,8 @@ void Image::draw(Screen& screen)
             Uint32 pixelColor = pixels[y * formattedSurface->w + x];
 
             Uint8 r, g, b, a;
-            SDL_GetRGBA(pixelColor, formattedSurface->format, nullptr, &r, &g, &b, &a);
+            const SDL_PixelFormatDetails* formatDetails = SDL_GetPixelFormatDetails(formattedSurface->format);
+            SDL_GetRGBA(pixelColor, formatDetails, nullptr, &r, &g, &b, &a);
 
             if (a > 0)
             {
