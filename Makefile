@@ -2,6 +2,8 @@ CXX = g++
 #CXXFLAGS = -std=c++23 -Wall -I ./include# MacOS, STEFAN 
 #LDFLAGS = -F/Library/Frameworks -framework sdl3  -Wl,-rpath,/Library/Frameworks  
 # CXXFLAGS = -std=c++23 -Wall -F/Library/Frameworks -I ./include -framework sdl3  -Wl,-rpath,/Library/Frameworks  # Martin (TODO)
+# CXXFLAGS = -std=c++17 -Wall -F/Library/Frameworks -I./include # Martin
+# LDFLAGS = -F/Library/Frameworks -framework SDL3 # Martin
 CXXFLAGS = -std=c++17 -Wall -I./include -I$(HOME)/libs/SDL/include # Alicia
 LDFLAGS = -L$(HOME)/libs/SDL/build -lSDL3 -Wl,-rpath,$(HOME)/libs/SDL/build # also Alicia
 
@@ -17,17 +19,17 @@ TEST_TARGET = $(BINDIR)/tests
 TEST_SOURCES = $(TESTDIR)/tests.cpp \
                $(TESTDIR)/linearTest.cpp \
                $(TESTDIR)/screenTest.cpp \
-			   $(TESTDIR)/guiFileTest.cpp \
+               $(TESTDIR)/guiFileTest.cpp \
                $(SRCDIR)/screen.cpp \
                $(SRCDIR)/matrix.cpp \
-			   $(SRCDIR)/GUIFile.cpp
+               $(SRCDIR)/GUIFile.cpp
 TEST_OBJECTS = $(OBJDIR)/tests.o \
                $(OBJDIR)/linearTest.o \
                $(OBJDIR)/screenTest.o \
-			   $(OBJDIR)/guiFileTest.o \
+               $(OBJDIR)/guiFileTest.o \
                $(OBJDIR)/screen.o \
                $(OBJDIR)/matrix.o \
-			   $(OBJDIR)/GUIFile.o
+               $(OBJDIR)/GUIFile.o
 HEADERS = $(INCDIR)/linear.hpp $(INCDIR)/screen.hpp $(INCDIR)/linearTest.hpp $(INCDIR)/screenTest.hpp $(INCDIR)/guiFileTest.hpp
 
 demo: directories $(DEMO_TARGET)
@@ -60,7 +62,8 @@ $(OBJDIR)/screen.o: $(SRCDIR)/screen.cpp $(INCDIR)/screen.hpp $(INCDIR)/linear.h
 $(OBJDIR)/matrix.o: $(SRCDIR)/matrix.cpp $(INCDIR)/matrix.hpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-$(OBJDIR)/GUIFile.o: $(SRCDIR)/GUIFile.cpp $(INCDIR)/GUIFile.hpp
+$(OBJDIR)/GUIFile.o: $(SRCDIR)/GUIFile.cpp $(INCDIR)/GUIFile.hpp $(INCDIR)/GUIElements.hpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 $(DEMO_TARGET): $(OBJDIR)/main.o $(OBJDIR)/screen.o $(OBJDIR)/matrix.o

@@ -431,7 +431,7 @@ void GUIFile::readFile(std::string fileName)
                 break;
             default:
                 return;
-            
+
         }
     }
     fp.close();
@@ -439,13 +439,7 @@ void GUIFile::readFile(std::string fileName)
 
 void GUIFile::writeFile(std::string fileName)
 {
-    std::ofstream outFile(fileName);
-
-    if (!outFile.is_open())
-    {
-        return;
-    }
-
+    std::ofstream outFile{fileName};
     outFile << "<layout>\n";
 
     for (const auto& line : lines)
