@@ -26,7 +26,16 @@ public:
         z = _z;
     }
 
-    Tvec3<T> &operator=(const Tvec3<T> &copy)
+    // conversion operator to allow implicit conversion to U type (btwn ivec3 and vec3)
+    template <typename U>
+    Tvec3(const Tvec3<U> &other) : x(components[0]), y(components[1]), z(components[2])
+    {
+        components[0] = static_cast<T>(other.x);
+        components[1] = static_cast<T>(other.y);
+        components[2] = static_cast<T>(other.z);
+    }
+
+    Tvec3<T> operator=(const Tvec3<T> &copy)
     {
         if (this == &copy)
         {
