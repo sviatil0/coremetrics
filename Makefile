@@ -30,7 +30,8 @@ TEST_SOURCES = $(TESTDIR)/tests.cpp \
                $(SRCDIR)/GUIElementFactory.cpp \
                $(SRCDIR)/image.cpp \
                $(SRCDIR)/label.cpp \
-               $(SRCDIR)/selection.cpp
+               $(SRCDIR)/selection.cpp \
+               $(SRCDIR)/button.cpp
 TEST_OBJECTS = $(OBJDIR)/tests.o \
                $(OBJDIR)/linearTest.o \
                $(OBJDIR)/screenTest.o \
@@ -43,7 +44,8 @@ TEST_OBJECTS = $(OBJDIR)/tests.o \
                $(OBJDIR)/GUIElementFactory.o \
                $(OBJDIR)/image.o \
                $(OBJDIR)/label.o \
-               $(OBJDIR)/selection.o
+               $(OBJDIR)/selection.o \
+               $(OBJDIR)/button.o
 HEADERS = $(INCDIR)/linear.hpp $(INCDIR)/screen.hpp $(INCDIR)/linearTest.hpp $(INCDIR)/screenTest.hpp $(INCDIR)/guiFileTest.hpp
 
 demo: directories $(DEMO_TARGET)
