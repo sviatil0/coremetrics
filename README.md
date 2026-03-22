@@ -44,10 +44,16 @@ One-liner example — **not allowed:**
 if (x) doSomething();
 for (...) doSomething();
 ```
-Required form:
+Required form (Allman style — opening brace on its own line):
 ```cpp
-if (x) { doSomething(); }
-for (...) { doSomething(); }
+if (x)
+{
+    doSomething();
+}
+for (...)
+{
+    doSomething();
+}
 ```
 
 ### UML Diagram Style
