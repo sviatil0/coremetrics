@@ -15,7 +15,7 @@ private:
 public:
     Label(std::string text, ivec2 position, vec3 color);
 
-    virtual ~Label();
+    virtual ~Label() = default;
 
     virtual void draw(Screen& screen) override;
 

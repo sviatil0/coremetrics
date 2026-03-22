@@ -1,6 +1,7 @@
 #include <iostream>
 #include <SDL3/SDL.h>
 #include "screen.hpp"
+#include "button.hpp"
 
 constexpr int RESX = 960;
 constexpr int RESY = 540;
@@ -45,8 +46,18 @@ int main(int argc, char** argv)
 	screen.drawLine(center, bottomLeft, lineColor);
 	screen.drawLine(center, bottomRight, lineColor);
 
+	vec3 triangleColor(0.8f, 0.2f, 0.3f);
+	vec2 triV1(center.x - BOX_HALF_WIDTH, center.y - BOX_HALF_HEIGHT);
+	vec2 triV3(center.x, center.y);
+	vec2 triV2(center.x - BOX_HALF_WIDTH, center.y + BOX_HALF_HEIGHT);
+	screen.drawTriangle(triV1, triV2, triV3, triangleColor);
+
+	Button b1(ivec2(center.x-20, center.y-20), ivec2(center.x+20, center.y+20), vec3(0.9f, 0.1f, 0.2f));
+	b1.draw(screen);
+
 	SDL_Event event;
 	bool end = false;
+	float mouseX, mouseY;
 	while (!end)
 	{
 		while (SDL_PollEvent(&event))
@@ -57,6 +68,18 @@ int main(int argc, char** argv)
 			{
 				end = true;
 				break;
+			}
+			case SDL_EVENT_MOUSE_BUTTON_DOWN:
+			{
+				SDL_GetMouseState(&mouseX, &mouseY);
+				//if left click, check if button was clicked
+				if (event.button.button == SDL_BUTTON_LEFT) {
+					// e.button.x and e.button.y contain the mouse coordinates
+					if (b1.checkToggle(mouseX, mouseY))
+					{
+						std::cout << "Button clicked!\n";
+					}
+				}
 			}
 			}
 		}

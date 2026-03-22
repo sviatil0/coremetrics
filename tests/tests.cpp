@@ -3,6 +3,7 @@
 #include "linearTest.hpp"
 #include "screenTest.hpp"
 #include "guiFileTest.hpp"
+#include "GUIElementTest.hpp"
 
 int main(int argc, char **argv)
 {
@@ -15,7 +16,7 @@ int main(int argc, char **argv)
 	linearTestSuite();
 	screenTestSuite();
 	guiFileTestSuite();
-	
+	GUIElementTestSuite();
 
 	SDL_Quit();
 
