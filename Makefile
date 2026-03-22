@@ -26,9 +26,14 @@ TEST_SOURCES = $(TESTDIR)/tests.cpp \
                $(SRCDIR)/screen.cpp \
                $(SRCDIR)/matrix.cpp \
                $(SRCDIR)/GUIFile.cpp \
+               $(SRCDIR)/Point.cpp \
+               $(SRCDIR)/Line.cpp \
+               $(SRCDIR)/Box.cpp \
+               $(SRCDIR)/GUIElementFactory.cpp \
                $(SRCDIR)/image.cpp \
                $(SRCDIR)/label.cpp \
-               $(SRCDIR)/selection.cpp
+               $(SRCDIR)/selection.cpp \
+               $(SRCDIR)/button.cpp
 TEST_OBJECTS = $(OBJDIR)/tests.o \
                $(OBJDIR)/linearTest.o \
                $(OBJDIR)/screenTest.o \
@@ -37,9 +42,12 @@ TEST_OBJECTS = $(OBJDIR)/tests.o \
                $(OBJDIR)/screen.o \
                $(OBJDIR)/matrix.o \
                $(OBJDIR)/GUIFile.o \
+               $(OBJDIR)/GUIElements.o \
+               $(OBJDIR)/GUIElementFactory.o \
                $(OBJDIR)/image.o \
                $(OBJDIR)/label.o \
-               $(OBJDIR)/selection.o
+               $(OBJDIR)/selection.o \
+               $(OBJDIR)/button.o
 HEADERS = $(INCDIR)/linear.hpp $(INCDIR)/screen.hpp $(INCDIR)/linearTest.hpp $(INCDIR)/screenTest.hpp $(INCDIR)/guiFileTest.hpp
 
 demo: directories $(DEMO_TARGET)
@@ -76,6 +84,12 @@ $(OBJDIR)/matrix.o: $(SRCDIR)/matrix.cpp $(INCDIR)/matrix.hpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 $(OBJDIR)/GUIFile.o: $(SRCDIR)/GUIFile.cpp $(INCDIR)/GUIFile.hpp $(INCDIR)/GUIElements.hpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+$(OBJDIR)/GUIElements.o: $(SRCDIR)/GUIElements.cpp $(INCDIR)/GUIElements.hpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+$(OBJDIR)/GUIElementFactory.o: $(SRCDIR)/GUIElementFactory.cpp $(INCDIR)/GUIElementFactory.hpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 $(OBJDIR)/label.o: $(SRCDIR)/label.cpp $(INCDIR)/label.hpp
