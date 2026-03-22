@@ -26,7 +26,9 @@ TEST_SOURCES = $(TESTDIR)/tests.cpp \
                $(SRCDIR)/screen.cpp \
                $(SRCDIR)/matrix.cpp \
                $(SRCDIR)/GUIFile.cpp \
-               $(SRCDIR)/GUIElements.cpp \
+               $(SRCDIR)/Point.cpp \
+               $(SRCDIR)/Line.cpp \
+               $(SRCDIR)/Box.cpp \
                $(SRCDIR)/GUIElementFactory.cpp \
                $(SRCDIR)/image.cpp \
                $(SRCDIR)/label.cpp \
