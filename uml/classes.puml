@@ -188,10 +188,10 @@ enum GUIElementType {
 }
 
 class GUIElementFactory {
-    +{static} createPoint(pos: vec2, color: vec3): GUIElement*
-    +{static} createLine(start: vec2, end: vec2, color: vec3): GUIElement*
-    +{static} createBox(minPos: vec2, maxPos: vec2, color: vec3): GUIElement*
-    +{static} create(type: GUIElementType, pos1: vec2, pos2: vec2, color: vec3): GUIElement*
+    +{static} createPoint(pos: vec2, color: vec3): unique_ptr<GUIElement>
+    +{static} createLine(start: vec2, end: vec2, color: vec3): unique_ptr<GUIElement>
+    +{static} createBox(minPos: vec2, maxPos: vec2, color: vec3): unique_ptr<GUIElement>
+    +{static} create(type: GUIElementType, pos1: vec2, pos2: vec2, color: vec3): unique_ptr<GUIElement>
 }
 
 class GUIFile {
@@ -212,14 +212,6 @@ class GUIFile {
     -splitString(str: string, delim: string): vector<string>
 }
 
-GUIElement <|-- Point
-GUIElement <|-- Line
-GUIElement <|-- Box
-GUIElement <|-- Label
-GUIElement <|-- Selection
-GUIElement <|-- Image
-GUIElement <|-- Button
-
 class "Tree<T>" {
     -data: T
     -parent: Tree<T>*
@@ -234,11 +226,6 @@ class "Tree<T>" {
     +getChildren(): vector<unique_ptr<Tree<T>>>&
     +addChild(childData: T): Tree<T>*
 }
-
-note right of "Tree<T>"
-  Template class — header only.
-  Typedef: Tree<Layout> for layout hierarchy.
-end note
 
 class Layout {
     -start: vec2
