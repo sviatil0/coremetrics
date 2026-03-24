@@ -39,6 +39,8 @@ TEST_OBJECTS = $(OBJDIR)/tests.o \
                $(OBJDIR)/screenTest.o \
                $(OBJDIR)/guiFileTest.o \
                $(OBJDIR)/GUIElementTest.o \
+               $(OBJDIR)/TreeTest.o \
+               $(OBJDIR)/LayoutManagerTest.o \
                $(OBJDIR)/screen.o \
                $(OBJDIR)/matrix.o \
                $(OBJDIR)/GUIFile.o \
@@ -47,7 +49,9 @@ TEST_OBJECTS = $(OBJDIR)/tests.o \
                $(OBJDIR)/image.o \
                $(OBJDIR)/label.o \
                $(OBJDIR)/selection.o \
-               $(OBJDIR)/button.o
+               $(OBJDIR)/button.o \
+               $(OBJDIR)/Layout.o \
+               $(OBJDIR)/LayoutManager.o
 HEADERS = $(INCDIR)/linear.hpp $(INCDIR)/screen.hpp $(INCDIR)/linearTest.hpp $(INCDIR)/screenTest.hpp $(INCDIR)/guiFileTest.hpp
 
 demo: directories $(DEMO_TARGET)
@@ -103,6 +107,18 @@ $(OBJDIR)/image.o: $(SRCDIR)/image.cpp $(INCDIR)/image.hpp
 
 $(OBJDIR)/button.o: $(SRCDIR)/button.cpp $(INCDIR)/button.hpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+$(OBJDIR)/Layout.o: $(SRCDIR)/Layout.cpp $(INCDIR)/Layout.hpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+$(OBJDIR)/LayoutManager.o: $(SRCDIR)/LayoutManager.cpp $(INCDIR)/LayoutManager.hpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@ $(LDFLAGS)
+
+$(OBJDIR)/TreeTest.o: $(TESTDIR)/TreeTest.cpp $(INCDIR)/TreeTest.hpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+$(OBJDIR)/LayoutManagerTest.o: $(TESTDIR)/LayoutManagerTest.cpp $(INCDIR)/LayoutManagerTest.hpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@ $(LDFLAGS)
 
 $(DEMO_TARGET): $(OBJDIR)/main.o $(OBJDIR)/screen.o $(OBJDIR)/matrix.o $(OBJDIR)/button.o
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)

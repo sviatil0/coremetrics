@@ -25,6 +25,7 @@ public:
     Screen(unsigned int w, unsigned int h);
     ~Screen();
 
+    void clear();
     void blitTo(SDL_Surface *target);
     void drawPixel(const Tvec2<int> &pos, const Tvec3<float> &color);
     void drawLine(const Tvec2<int> &a, const Tvec2<int> &b, const Tvec3<float> &color);

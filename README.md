@@ -218,6 +218,60 @@ Creates and returns a heap-allocated `Box` with the given corner positions and c
 ### static GUIElement* create(GUIElementType type, vec2 pos1, vec2 pos2, vec3 color)
 Generic entry point for runtime element creation, for use when the element type is determined at runtime (e.g. XML parsing). `pos2` is ignored for `POINT`. Prints to `std::cerr` and returns `nullptr` for unknown types.
 
+# Tree
+## Description
+A generic templated tree data structure. Each node holds a value of type `T`, a non-owning raw pointer to its parent, and owning `unique_ptr` children. Because it is a template, the full implementation lives in the header.
+
+## Methods
+### T& getData()
+Returns a reference to the value stored in this node.
+
+### Tree<T>* getParent()
+Returns a raw pointer to the parent node, or `nullptr` if this node is the root.
+
+### bool isRoot() const
+Returns true if this node has no parent.
+
+### bool isLeaf() const
+Returns true if this node has no children.
+
+### std::vector<std::unique_ptr<Tree<T>>>& getChildren()
+Returns a reference to the vector of child nodes.
+
+### Tree<T>* addChild(T childData)
+Constructs a new child node from the given value, appends it to the children vector, sets its parent pointer to this node, and returns a raw pointer to the new child.
+
+# Layout
+## Description
+Represents a rectangular region of the screen defined by relative coordinates (0.0–1.0) within its parent region. Layouts form a tree hierarchy managed by `LayoutManager`. Each layout holds a flat list of `GUIElement` objects that are drawn when the layout is active. The painter's algorithm is handled externally by `LayoutManager::render`, which traverses the tree and draws parent layouts before children.
+
+## Methods
+### ivec2 resolveAbsStart(ivec2 parentStart, ivec2 parentEnd) const
+Converts the layout's relative `start` (0.0–1.0) to an absolute pixel coordinate by interpolating within the parent's pixel bounds: `parentStart + start * (parentEnd - parentStart)`.
+
+### ivec2 resolveAbsEnd(ivec2 parentStart, ivec2 parentEnd) const
+Converts the layout's relative `end` (0.0–1.0) to an absolute pixel coordinate using the same interpolation as `resolveAbsStart`.
+
+### void draw(Screen& screen, ivec2 parentStart, ivec2 parentEnd) const
+Draws all elements in the layout. Returns immediately if the layout is inactive. Resolves the layout's absolute bounds from the parent bounds, then calls `draw(screen)` on each contained `GUIElement`.
+
+# LayoutManager
+## Description
+A singleton that owns the root `Tree<Layout>` and manages the full layout hierarchy. It centralizes tree construction and rendering so that `main.cpp` only needs to call `getInstance()`, populate layouts, and call `render()` each frame.
+
+## Methods
+### static LayoutManager& getInstance()
+Returns the single global instance.
+
+### Tree<Layout>& getRoot()
+Returns a reference to the root layout node.
+
+### Tree<Layout>* addChild(Tree<Layout>* parent, Layout layout)
+Adds a new child layout under the given parent node and returns a pointer to the new node.
+
+### void render(Screen& screen, ivec2 screenStart, ivec2 screenEnd) const
+Traverses the layout tree using the painter's algorithm (depth-first, parent before children) and calls `draw` on each active layout, passing the resolved absolute bounds down the call stack.
+
 # Label
 ## Description
 A UI component responsible for managing and displaying text strings. It currently utilizes a "placeholder" system that renders a proportional box for each character to verify layout, spacing, and color before a full font engine is integrated.
