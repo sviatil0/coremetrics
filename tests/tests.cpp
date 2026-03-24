@@ -4,6 +4,8 @@
 #include "screenTest.hpp"
 #include "guiFileTest.hpp"
 #include "GUIElementTest.hpp"
+#include "TreeTest.hpp"
+#include "LayoutManagerTest.hpp"
 
 int main(int argc, char **argv)
 {
@@ -17,6 +19,8 @@ int main(int argc, char **argv)
 	screenTestSuite();
 	guiFileTestSuite();
 	GUIElementTestSuite();
+	treeTestSuite();
+	layoutManagerTestSuite();
 
 	SDL_Quit();
 

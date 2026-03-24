@@ -13,8 +13,15 @@ Screen::Screen(unsigned int w, unsigned int h) : width(w), height(h), surface(nu
         std::cerr << "Failed to create surface: " << SDL_GetError() << '\n';
         return;
     }
-    SDL_FillSurfaceRect(surface, nullptr, 0);
-    SDL_SetSurfaceBlendMode(surface, SDL_BLENDMODE_NONE);
+    if (!SDL_FillSurfaceRect(surface, nullptr, 0))
+    {
+        std::cerr << "Failed to color the surface: " << SDL_GetError() << '\n';
+    }
+
+    if (!SDL_SetSurfaceBlendMode(surface, SDL_BLENDMODE_NONE))
+    {
+        std::cerr << "Failed to set the blending mode for the surface: " << SDL_GetError() << '\n';
+    }
 }
 
 Screen::~Screen()
@@ -24,6 +31,15 @@ Screen::~Screen()
         SDL_DestroySurface(surface);
         surface = nullptr;
     }
+}
+
+void Screen::clear()
+{
+    if (!surface)
+    {
+        return;
+    }
+    SDL_FillSurfaceRect(surface, nullptr, 0);
 }
 
 void Screen::blitTo(SDL_Surface *target)

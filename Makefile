@@ -26,20 +26,32 @@ TEST_SOURCES = $(TESTDIR)/tests.cpp \
                $(SRCDIR)/screen.cpp \
                $(SRCDIR)/matrix.cpp \
                $(SRCDIR)/GUIFile.cpp \
+               $(SRCDIR)/Point.cpp \
+               $(SRCDIR)/Line.cpp \
+               $(SRCDIR)/Box.cpp \
+               $(SRCDIR)/GUIElementFactory.cpp \
                $(SRCDIR)/image.cpp \
                $(SRCDIR)/label.cpp \
-               $(SRCDIR)/selection.cpp
+               $(SRCDIR)/selection.cpp \
+               $(SRCDIR)/button.cpp
 TEST_OBJECTS = $(OBJDIR)/tests.o \
                $(OBJDIR)/linearTest.o \
                $(OBJDIR)/screenTest.o \
                $(OBJDIR)/guiFileTest.o \
                $(OBJDIR)/GUIElementTest.o \
+               $(OBJDIR)/TreeTest.o \
+               $(OBJDIR)/LayoutManagerTest.o \
                $(OBJDIR)/screen.o \
                $(OBJDIR)/matrix.o \
                $(OBJDIR)/GUIFile.o \
+               $(OBJDIR)/GUIElements.o \
+               $(OBJDIR)/GUIElementFactory.o \
                $(OBJDIR)/image.o \
                $(OBJDIR)/label.o \
-               $(OBJDIR)/selection.o
+               $(OBJDIR)/selection.o \
+               $(OBJDIR)/button.o \
+               $(OBJDIR)/Layout.o \
+               $(OBJDIR)/LayoutManager.o
 HEADERS = $(INCDIR)/linear.hpp $(INCDIR)/screen.hpp $(INCDIR)/linearTest.hpp $(INCDIR)/screenTest.hpp $(INCDIR)/guiFileTest.hpp
 
 demo: directories $(DEMO_TARGET)
@@ -78,6 +90,12 @@ $(OBJDIR)/matrix.o: $(SRCDIR)/matrix.cpp $(INCDIR)/matrix.hpp
 $(OBJDIR)/GUIFile.o: $(SRCDIR)/GUIFile.cpp $(INCDIR)/GUIFile.hpp $(INCDIR)/GUIElements.hpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
+$(OBJDIR)/GUIElements.o: $(SRCDIR)/GUIElements.cpp $(INCDIR)/GUIElements.hpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+$(OBJDIR)/GUIElementFactory.o: $(SRCDIR)/GUIElementFactory.cpp $(INCDIR)/GUIElementFactory.hpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
 $(OBJDIR)/label.o: $(SRCDIR)/label.cpp $(INCDIR)/label.hpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
@@ -89,6 +107,18 @@ $(OBJDIR)/image.o: $(SRCDIR)/image.cpp $(INCDIR)/image.hpp
 
 $(OBJDIR)/button.o: $(SRCDIR)/button.cpp $(INCDIR)/button.hpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+$(OBJDIR)/Layout.o: $(SRCDIR)/Layout.cpp $(INCDIR)/Layout.hpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+$(OBJDIR)/LayoutManager.o: $(SRCDIR)/LayoutManager.cpp $(INCDIR)/LayoutManager.hpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@ $(LDFLAGS)
+
+$(OBJDIR)/TreeTest.o: $(TESTDIR)/TreeTest.cpp $(INCDIR)/TreeTest.hpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+$(OBJDIR)/LayoutManagerTest.o: $(TESTDIR)/LayoutManagerTest.cpp $(INCDIR)/LayoutManagerTest.hpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@ $(LDFLAGS)
 
 $(DEMO_TARGET): $(OBJDIR)/main.o $(OBJDIR)/screen.o $(OBJDIR)/matrix.o $(OBJDIR)/button.o
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)

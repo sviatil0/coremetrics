@@ -25,13 +25,13 @@ public:
     Screen(unsigned int w, unsigned int h);
     ~Screen();
 
+    void clear();
     void blitTo(SDL_Surface *target);
     void drawPixel(const Tvec2<int> &pos, const Tvec3<float> &color);
     void drawLine(const Tvec2<int> &a, const Tvec2<int> &b, const Tvec3<float> &color);
     void drawLine(const Tvec2<int> &a, const Tvec2<int> &b, const Tvec3<int> &color);
     void drawBox(const Tvec2<int> &a, const Tvec2<int> &b, const Tvec3<float> &color);
     void drawTriangle(const Tvec2<int> &v1, const Tvec2<int> &v2, const Tvec2<int> &v3, const Tvec3<float> &color);
-
 };
 
 #endif

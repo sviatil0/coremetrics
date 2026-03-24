@@ -28,7 +28,7 @@ static void testSetAndGetPoint()
 {
     std::cout << "GUIFile setPoint / getPoints: ";
     GUIFile f;
-    Point p = {{10.0f, 20.0f}, {255.0f, 0.0f, 0.0f}};
+    Point p(vec2(10.0f, 20.0f), vec3(255.0f, 0.0f, 0.0f));
     f.setPoint(p);
     
     auto points = f.getPoints();
@@ -40,7 +40,7 @@ static void testSetAndGetLine()
 {
     std::cout << "GUIFile setLine / getLines: ";
     GUIFile f;
-    Line l = {{0.0f, 0.0f}, {50.0f, 50.0f}, {0.0f, 255.0f, 0.0f}};
+    Line l(vec2(0.0f, 0.0f), vec2(50.0f, 50.0f), vec3(0.0f, 255.0f, 0.0f));
     f.setLine(l);
     
     auto lines = f.getLines();
@@ -52,7 +52,7 @@ static void testSetAndGetBox()
 {
     std::cout << "GUIFile setBox / getBoxes: ";
     GUIFile f;
-    Box b = {{5.0f, 5.0f}, {15.0f, 15.0f}, {0.0f, 0.0f, 255.0f}};
+    Box b(vec2(5.0f, 5.0f), vec2(15.0f, 15.0f), vec3(0.0f, 0.0f, 255.0f));
     f.setBox(b);
     
     auto boxes = f.getBoxes();
@@ -64,7 +64,7 @@ static void testGetterDataProtection()
 {
     std::cout << "GUIFile Getters (Data Protection): ";
     GUIFile f;
-    f.setPoint({{1.0f, 1.0f}, {255.0f, 255.0f, 255.0f}});
+    f.setPoint(Point(vec2(1.0f, 1.0f), vec3(255.0f, 255.0f, 255.0f)));
     
     std::vector<Point> pts = f.getPoints();
     pts.clear(); 
@@ -79,7 +79,7 @@ static void testWriteFile()
     GUIFile f;
     std::string testFile = "unit_test_output.xml";
     
-    f.setPoint({{480.0f, 270.0f}, {67.0f, 200.0f, 142.0f}});
+    f.setPoint(Point(vec2(480.0f, 270.0f), vec3(67.0f, 200.0f, 142.0f)));
     f.writeFile(testFile);
     
     bool hasLayout = fileContains(testFile, "<layout>");
