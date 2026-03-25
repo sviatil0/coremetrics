@@ -15,7 +15,9 @@ private:
     std::vector<Line> lines;
     std::vector<Box> boxes;
     std::vector<std::string> tokens;
-    std::vector<std::string> splitString(const std::string &str, const std::string &delim);
+    std::string getContent(const std::string &source, const std::string &tag, size_t &pos);
+    vec2 parseVec2(const std::string &block, size_t &p);
+    vec3 parseVec3(const std::string &block, size_t &p);
 
 public:
     GUIFile() = default;
