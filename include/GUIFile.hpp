@@ -16,6 +16,7 @@ private:
     std::vector<Box> boxes;
     std::vector<std::string> tokens;
     std::string getContent(const std::string &source, const std::string &tag, size_t &pos);
+    Layout parseLayout(const std::string &block);
     vec2 parseVec2(const std::string &block, size_t &p);
     vec3 parseVec3(const std::string &block, size_t &p);
 
