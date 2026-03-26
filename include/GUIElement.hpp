@@ -3,7 +3,7 @@
 
 #include "screen.hpp"
 
-// abstact base class for GUI elements
+// abstract base class for GUI elements
 class GUIElement
 {
 public:

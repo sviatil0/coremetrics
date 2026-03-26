@@ -1,10 +1,18 @@
 #include "GUIFile.hpp"
-#include "Layout.hpp"
-#include "LayoutManager.hpp"
+#include "GUIElementFactory.hpp"
 #include <fstream>
 #include <filesystem>
 #include <sstream>
 #include <iostream>
+#include <algorithm>
+#include <cctype>
+#include <locale>
+#include <typeinfo>
+
+GUIFile::GUIFile() : manager(LayoutManager::getInstance())
+{
+}
+
 
 void GUIFile::setPoint(Point point)
 {
@@ -44,7 +52,10 @@ std::string GUIFile::getContent(const std::string &source, const std::string &ta
     // if tag not found in string, return
     if (start == std::string::npos) return "";
 
-    start += openTag.length() + 1; 
+    size_t tagEnd = source.find(">", start);
+    if (tagEnd == std::string::npos) return "";
+    start = tagEnd + 1;
+
     size_t end = source.find(closeTag, start);
     if (end == std::string::npos) return "";
 
@@ -53,30 +64,16 @@ std::string GUIFile::getContent(const std::string &source, const std::string &ta
     return source.substr(start, end - start);
 }
 
-Layout GUIFile::parseLayout(const std::string &block)
-{
-    // assuming no spaces bewteen tag and = and value (or between tag and >)
-    size_t startXPos = block.find("sX") + 1;
-    size_t startYPos = block.find("sY") + 1;
-    size_t endXPos = block.find("eX") + 1;
-    size_t endYPos = block.find("eY") + 1;
-    size_t activePos = block.find("true");
-
-    float sx = std::stof(block.substr(startXPos));
-    float sy = std::stof(block.substr(startYPos));
-    float ex = std::stof(block.substr(endXPos));
-    float ey = std::stof(block.substr(endYPos));
-    bool active = (activePos == std::string::npos) ? false : true;
-    
-    return Layout(vec2(sx, sy), vec2(ex, ey), active);
-}
-
 vec2 GUIFile::parseVec2(const std::string &block, size_t &p)
 {
     std::string v = getContent(block, "vec2", p);
     if (v == "")
     {
         v = getContent(block, "ivec2", p);
+    }
+    if (v == "")
+    {
+        return vec2(0, 0);
     }
     size_t innerPos = 0;
     float x = std::stof(getContent(v, "x", innerPos));
@@ -91,6 +88,10 @@ vec3 GUIFile::parseVec3(const std::string &block, size_t &p)
     {
         v = getContent(block, "ivec3", p);
     }
+    if (v == "")
+    {
+        return vec3(0, 0, 0);
+    }
     size_t innerPos = 0;
     float x = std::stof(getContent(v, "x", innerPos));
     float y = std::stof(getContent(v, "y", innerPos));
@@ -98,78 +99,127 @@ vec3 GUIFile::parseVec3(const std::string &block, size_t &p)
     return vec3(x, y, z);
 }
 
-void GUIFile::readFile(const std::string fileName)
+float GUIFile::extractFloat(const std::string& block, const std::string& key)
+{
+    size_t pos = block.find(key + "=");
+    if (pos == std::string::npos) return 0.0f;
+
+    pos += key.length() + 1;
+
+    size_t end = block.find_first_of(" >", pos);
+    std::cout << "start: " << pos << " end: " << end << "\n";
+    std::cout << block.substr(pos, end - pos);
+    
+    return std::stof(block.substr(pos, end - pos));
+}
+
+Layout GUIFile::parseLayout(const std::string &block)
+{
+    // assuming no spaces bewteen tag and = and value (or between tag and >)
+    float sx = extractFloat(block, "sX");
+    float sy = extractFloat(block, "sY");
+    float ex = extractFloat(block, "eX");
+    float ey = extractFloat(block, "eY");
+    size_t activePos = block.find("true");
+    bool active = (activePos == std::string::npos) ? false : true;
+    
+    return Layout(vec2(sx, sy), vec2(ex, ey), active);
+}
+
+void GUIFile::readFile(const std::string &fileName)
 {
     // clear containers before refilling them with file elements
     lines.clear();
     boxes.clear();
     points.clear();
 
-    // update above lines to instead delete old layoutManager (if it exists) and create new one
+    // ***update above lines to instead delete old layoutManager (if it exists) and create new one***
 
     std::ifstream fp{fileName};
     if (!(fp))
     {
+        std::cout << "File " << fileName << " cannot be opened\n";
         return;
     }
 
     std::stringstream buffer;
     buffer << fp.rdbuf();
     std::string content = buffer.str();
+
     size_t currPos = 0, elemPos;
-    // need vector of trees bc layouts don't have to be in same tree
-    // what is layoutManager for then?
+    std::vector<GUIElementType> typeVec = {GUIElementType::POINT, GUIElementType::LINE, GUIElementType::BOX};
 
+    std::stack<Tree<Layout>*> layoutStack;
+    layoutStack.push(&manager.getRoot());
+    Tree<Layout> *parent = &manager.getRoot();
 
-    // for each layout, store elements
+    // for each layout, store internal layouts and elements
     while (true)
     {
         std::string layoutBlock = getContent(content, "layout", currPos);
         if (layoutBlock == "") break;
         Layout currLayout = parseLayout(layoutBlock);
 
-        elemPos = 0;
-        while (true)
+        Tree<Layout>* parent = layoutStack.top();
+        Tree<Layout>* node = manager.addChild(parent, std::move(currLayout));
+        layoutStack.push(node);
+
+        for (GUIElementType &elemType : typeVec)
         {
-            std::string lineBlock = getContent(layoutBlock, "line", elemPos);
-            if (lineBlock == "") break;
+            elemPos = 0;
+            while (true)
+            {
+                std::string innerBlock;
+                switch (elemType)
+                {
+                    case GUIElementType::POINT:
+                        innerBlock = getContent(layoutBlock, "point", elemPos);
+                        break;
+                    case GUIElementType::LINE:
+                        innerBlock = getContent(layoutBlock, "line", elemPos);
+                        break;
+                    case GUIElementType::BOX:
+                        innerBlock = getContent(layoutBlock, "box", elemPos);
+                        break;
+                }
+                if (innerBlock == "") break;
 
-            size_t vecPos = 0;
-            Line l;
-            l.start = parseVec2(lineBlock, vecPos);
-            l.end = parseVec2(lineBlock, vecPos);
-            l.color = parseVec3(lineBlock, vecPos);
-            currLayout.addElement(l);
+                size_t vecPos = 0;
+                vec2 pos1 = parseVec2(innerBlock, vecPos);
+                vec2 pos2 = parseVec2(innerBlock, vecPos);
+                vec3 color = parseVec3(innerBlock, vecPos);
+                std::cout << static_cast<int>(elemType) << ": " << pos1.x << " " << pos1.y << "\n";
+                std::unique_ptr<GUIElement> elem = GUIElementFactory::create(elemType, pos1, pos2, color);
+                currLayout.addElement(std::move(elem));
+            }
         }
+        
+        parent = manager.addChild(parent, std::move(currLayout));
 
-        elemPos = 0;
-        while (true)
-        {
-            std::string boxBlock = getContent(layoutBlock, "box", elemPos);
-            if (boxBlock == "") break;
-
-            size_t vecPos = 0;
-            Box b;
-            b.minPos = parseVec2(boxBlock, vecPos);
-            b.maxPos = parseVec2(boxBlock, vecPos);
-            b.color = parseVec3(boxBlock, vecPos);
-            currLayout.addElement(b);
-        }
-
-        elemPos = 0;
-        while (true)
-        {
-            std::string pointBlock = getContent(layoutBlock, "point", elemPos);
-            if (pointBlock == "") break;
-
-            size_t vecPos = 0;
-            Point p;
-            p.pos = parseVec2(pointBlock, vecPos);
-            p.color = parseVec3(pointBlock, vecPos);
-            currLayout.addElement(p);
-        }
     }
 
+}
+
+void GUIFile::checkRead()
+{
+    auto& children = manager.getRoot().getChildren();
+    std::cout << "# of children: " <<  children.size();
+    if (!children.empty()) {
+        const Layout& layout = children[1]->getData(); // getData() returns the Layout stored in this Tree node
+        std::cout << "layout contains: \n";
+
+        for (const auto& elemPtr : layout.elements) {
+            if (dynamic_cast<Line*>(elemPtr.get())) {
+                std::cout << "Line\n";
+            } else if (dynamic_cast<Box*>(elemPtr.get())) {
+                std::cout << "Box\n";
+            } else if (dynamic_cast<Point*>(elemPtr.get())) {
+                std::cout << "Point\n";
+            } else {
+                std::cout << "Unknown element type\n";
+            }
+        }
+    }
 }
 
 void GUIFile::writeFile(std::string fileName)

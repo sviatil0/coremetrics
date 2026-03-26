@@ -7,6 +7,10 @@
 #include <string>
 #include <fstream>
 #include "GUIElements.hpp"
+#include "GUIElementFactory.hpp"
+#include "Tree.hpp"
+#include "Layout.hpp"
+#include "LayoutManager.hpp"
 
 class GUIFile
 {
@@ -14,14 +18,17 @@ private:
     std::vector<Point> points;
     std::vector<Line> lines;
     std::vector<Box> boxes;
-    std::vector<std::string> tokens;
+
+    LayoutManager &manager;
+
     std::string getContent(const std::string &source, const std::string &tag, size_t &pos);
+    float extractFloat(const std::string& block, const std::string& key);
     Layout parseLayout(const std::string &block);
     vec2 parseVec2(const std::string &block, size_t &p);
     vec3 parseVec3(const std::string &block, size_t &p);
 
 public:
-    GUIFile() = default;
+    GUIFile();
     //setter/staging methods
     void setPoint(Point);
     void setLine(Line);
@@ -31,7 +38,9 @@ public:
     std::vector<Line> getLines();
     std::vector<Box> getBoxes();
     //file reading/parsing and writing
-    void readFile(std::string fileName);
+    void readFile(const std::string &fileName);
     void writeFile(std::string fileName);
+    
+    void checkRead();
 };
 #endif
