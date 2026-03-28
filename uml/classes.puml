@@ -1,4 +1,4 @@
-@startuml
+@startuml classes
 
 class "Tvec2<T>" {
     -components: T[2]
@@ -15,9 +15,9 @@ class "Tvec2<T>" {
     +operator+(rhs: Tvec2<T>): Tvec2<T>
     +operator-(rhs: Tvec2<T>): Tvec2<T>
     +operator*(scalar: T): Tvec2<T>
-    +operator+=(rhs: Tvec2<T>): Tvec2<T>
-    +operator-=(rhs: Tvec2<T>): Tvec2<T>
-    +operator*=(scalar: T): Tvec2<T>
+    +operator+=(rhs: Tvec2<T>): Tvec2<T>&
+    +operator-=(rhs: Tvec2<T>): Tvec2<T>&
+    +operator*=(scalar: T): Tvec2<T>&
     +operator[](index: int): T&
 
     +dot(rhs: Tvec2<T>): T
@@ -42,15 +42,16 @@ class "Tvec3<T>" {
     +Tvec3()
     +Tvec3(copy: Tvec3<T>)
     +Tvec3(_x: T, _y: T, _z: T)
+    +Tvec3(other: Tvec3<U>)
 
-    +operator=(copy: Tvec3<T>): Tvec3<T>
+    +operator=(copy: Tvec3<T>): Tvec3<T>&
     +operator==(rhs: Tvec3<T>): bool
     +operator+(rhs: Tvec3<T>): Tvec3<T>
     +operator-(rhs: Tvec3<T>): Tvec3<T>
     +operator*(scalar: T): Tvec3<T>
-    +operator+=(rhs: Tvec3<T>): Tvec3<T>
-    +operator-=(rhs: Tvec3<T>): Tvec3<T>
-    +operator*=(scalar: T): Tvec3<T>
+    +operator+=(rhs: Tvec3<T>): Tvec3<T>&
+    +operator-=(rhs: Tvec3<T>): Tvec3<T>&
+    +operator*=(scalar: T): Tvec3<T>&
     +operator[](index: int): T&
 
     +dot(rhs: Tvec3<T>): T
@@ -72,28 +73,23 @@ class Screen {
     -height: unsigned int
     -surface: SDL_Surface*
 
-    -plotLineLow(a: Tvec2<int>, b: Tvec2<int>, color: Tvec3<float>): void
-    -plotLineHigh(a: Tvec2<int>, b: Tvec2<int>, color: Tvec3<float>): void
+    -plotLineLow(a: ivec2, b: ivec2, color: vec3): void
+    -plotLineHigh(a: ivec2, b: ivec2, color: vec3): void
+    -crossEdge(a: ivec2, b: ivec2, c: ivec2): int
 
     +Screen(w: unsigned int, h: unsigned int)
     +\~Screen()
 
     +blitTo(target: SDL_Surface*): void
-
-    +drawPixel<T>(pos: Tvec2<T>, color: Tvec3<float>): void
-    +drawPixel<T>(pos: Tvec2<T>, color: Tvec3<int>): void
-    +drawLine<T,U>(a: Tvec2<T>, b: Tvec2<U>, color: Tvec3<float>): void
-    +drawLine<T,U>(a: Tvec2<T>, b: Tvec2<U>, color: Tvec3<int>): void
-    +drawBox<T,U,V>(a: Tvec2<T>, b: Tvec2<U>, color: Tvec3<V>): void
+    +drawPixel(pos: ivec2, color: vec3): void
+    +drawLine(a: ivec2, b: ivec2, color: vec3): void
+    +drawLine(a: ivec2, b: ivec2, color: ivec3): void
+    +drawBox(a: ivec2, b: ivec2, color: vec3): void
+    +drawTriangle(v1: ivec2, v2: ivec2, v3: ivec2, color: vec3): void
 }
 
-note right of Screen
-  drawPixel and drawLine are overloaded:
-  float color expects [0.0, 1.0] range
-  int color expects [0, 255] range
-end note
-
-class Matrix{
+class Matrix {
+    -{static} SIZE: int
     -components: float[3][3]
 
     +Matrix()
@@ -103,8 +99,196 @@ class Matrix{
     +operator=(copy: Matrix): Matrix&
     +operator*(rhs: Matrix): Matrix
     +operator==(rhs: Matrix): bool
-    +toTranspose(): Matrix 
-
-
+    +toTranspose(): Matrix
 }
+
+abstract class GUIElement {
+    +{abstract} draw(screen: Screen&): void
+    +\~GUIElement()
+}
+
+class Point {
+    +pos: vec2
+    +color: vec3
+
+    +Point()
+    +Point(pos: vec2, color: vec3)
+    +draw(screen: Screen&): void
+}
+
+class Line {
+    +start: vec2
+    +end: vec2
+    +color: vec3
+
+    +Line()
+    +Line(start: vec2, end: vec2, color: vec3)
+    +draw(screen: Screen&): void
+}
+
+class Box {
+    +minPos: vec2
+    +maxPos: vec2
+    +color: vec3
+
+    +Box()
+    +Box(minPos: vec2, maxPos: vec2, color: vec3)
+    +draw(screen: Screen&): void
+}
+
+class Label {
+    -m_text: string
+    -m_position: ivec2
+    -m_color: vec3
+
+    +Label(text: string, position: ivec2, color: vec3)
+    +\~Label()
+    +draw(screen: Screen&): void
+    +getText(): string
+}
+
+class Selection {
+    -m_position: ivec2
+    -m_label: string
+    -m_isSelected: bool
+    -{static} m_boxSize: int
+
+    +Selection(position: ivec2, label: string, checked: bool)
+    +\~Selection()
+    +draw(screen: Screen&): void
+    +toggle(): void
+    +isSelected(): bool
+}
+
+class Image {
+    -m_filePath: string
+    -m_position: ivec2
+
+    +Image(filePath: string, position: ivec2)
+    +\~Image()
+    +draw(screen: Screen&): void
+    +getFilePath(): string
+}
+
+class Button {
+    -minPos: ivec2
+    -maxPos: ivec2
+    -color: vec3
+
+    +Button(minP: ivec2, maxP: ivec2, col: vec3)
+    +\~Button()
+    +draw(screen: Screen&): void
+    +checkToggle(mouseX: int, mouseY: int): bool
+}
+
+enum GUIElementType {
+    POINT
+    LINE
+    BOX
+}
+
+class GUIElementFactory {
+    +{static} createPoint(pos: vec2, color: vec3): unique_ptr<GUIElement>
+    +{static} createLine(start: vec2, end: vec2, color: vec3): unique_ptr<GUIElement>
+    +{static} createBox(minPos: vec2, maxPos: vec2, color: vec3): unique_ptr<GUIElement>
+    +{static} create(type: GUIElementType, pos1: vec2, pos2: vec2, color: vec3): unique_ptr<GUIElement>
+}
+
+class GUIFile {
+    -points: vector<Point>
+    -lines: vector<Line>
+    -boxes: vector<Box>
+    -tokens: vector<string>
+
+    +GUIFile()
+    +setPoint(point: Point): void
+    +setLine(line: Line): void
+    +setBox(box: Box): void
+    +getPoints(): vector<Point>
+    +getLines(): vector<Line>
+    +getBoxes(): vector<Box>
+    +readFile(fileName: string): void
+    +writeFile(fileName: string): void
+    -splitString(str: string, delim: string): vector<string>
+}
+
+class "Tree<T>" {
+    -data: T
+    -parent: Tree<T>*
+    -children: vector<unique_ptr<Tree<T>>>
+
+    +Tree(data: T)
+
+    +getData(): T&
+    +getParent(): Tree<T>*
+    +isRoot(): bool
+    +isLeaf(): bool
+    +getChildren(): vector<unique_ptr<Tree<T>>>&
+    +addChild(childData: T): Tree<T>*
+}
+
+class Layout {
+    -start: vec2
+    -end: vec2
+    -active: bool
+    -elements: vector<unique_ptr<GUIElement>>
+
+    +Layout(start: vec2, end: vec2, active: bool)
+
+    +addElement(element: unique_ptr<GUIElement>): void
+    +setActive(active: bool): void
+    +isActive(): bool
+    +getStart(): vec2
+    +getEnd(): vec2
+
+    +resolveAbsStart(parentStart: ivec2, parentEnd: ivec2): ivec2
+    +resolveAbsEnd(parentStart: ivec2, parentEnd: ivec2): ivec2
+    +draw(screen: Screen&, parentStart: ivec2, parentEnd: ivec2): void
+}
+
+note right of Layout
+  start/end are relative (0.0–1.0) to parent.
+  draw() is a no-op when active == false.
+end note
+
+class LayoutManager {
+    -root: Tree<Layout>
+
+    -LayoutManager()
+    -{static} renderTree(node: Tree<Layout>&, screen: Screen&, parentStart: ivec2, parentEnd: ivec2): void
+
+    +{static} getInstance(): LayoutManager&
+    +getRoot(): Tree<Layout>&
+    +addChild(parent: Tree<Layout>*, layout: Layout): Tree<Layout>*
+    +render(screen: Screen&, screenStart: ivec2, screenEnd: ivec2): void
+}
+
+note right of LayoutManager
+  Singleton. Owns the root Tree<Layout>.
+  render() traverses the tree using
+  painter's algorithm (parent before children).
+end note
+
+GUIElement <|-- Point
+GUIElement <|-- Line
+GUIElement <|-- Box
+GUIElement <|-- Label
+GUIElement <|-- Selection
+GUIElement <|-- Image
+GUIElement <|-- Button
+
+GUIElementFactory ..> GUIElement : creates
+GUIElementFactory ..> GUIElementType : uses
+
+GUIFile *-- Point
+GUIFile *-- Line
+GUIFile *-- Box
+
+Layout o-- GUIElement : contains
+"Tree<T>" *-- "Tree<T>" : children
+
+LayoutManager *-- "Tree<T>" : root
+LayoutManager ..> Layout : manages
+LayoutManager ..> Screen : renders to
+
 @enduml

@@ -24,7 +24,15 @@ public:
 		y = _y;
 	}
 
-	Tvec2<T>& operator=(const Tvec2<T> &copy)
+	// conversion operator to allow implicit conversion to U type (btwn ivec2 and vec2)
+	template <typename U>
+	Tvec2(const Tvec2<U> &other) : x(components[0]), y(components[1])
+	{
+		components[0] = static_cast<T>(other.x);
+		components[1] = static_cast<T>(other.y);
+	}
+
+	Tvec2<T> &operator=(const Tvec2<T> &copy)
 	{
 		if (this == &copy)
 		{
@@ -72,22 +80,22 @@ public:
 		return Tvec2(x / mag, y / mag);
 	}
 
-	T& operator[](int index) 
+	T &operator[](int index)
 	{
 		return components[index];
 	}
 
-	Tvec2<T> operator+=(const Tvec2<T> &rhs)
+	Tvec2<T> &operator+=(const Tvec2<T> &rhs)
 	{
 		*this = *this + rhs;
 		return *this;
 	}
-	Tvec2<T> operator-=(const Tvec2<T> &rhs)
+	Tvec2<T> &operator-=(const Tvec2<T> &rhs)
 	{
 		*this = *this - rhs;
 		return *this;
 	}
-	Tvec2<T> operator*=(T scalar)
+	Tvec2<T> &operator*=(T scalar)
 	{
 		*this = *this * scalar;
 		return *this;

@@ -1,53 +1,42 @@
 #include "Layout.hpp"
 
-Layout::Layout(ivec2 start, ivec2 end) : m_start(start), m_end(end), m_active(true)
+Layout::Layout(vec2 start, vec2 end, bool active) : start(start), end(end), active(active)
 {
 }
 
-void Layout::addElement(GUIElement* element)
+ivec2 Layout::resolveAbsStart(ivec2 parentStart, ivec2 parentEnd) const
 {
-    m_elements.push_back(element);
+    ivec2 cont = parentEnd - parentStart;
+    return ivec2(
+        parentStart.x + static_cast<int>(start.x * static_cast<float>(cont.x)),
+        parentStart.y + static_cast<int>(start.y * static_cast<float>(cont.y))
+    );
 }
 
-void Layout::setActive(bool active)
+ivec2 Layout::resolveAbsEnd(ivec2 parentStart, ivec2 parentEnd) const
 {
-    m_active = active;
+    ivec2 cont = parentEnd - parentStart;
+    return ivec2(
+        parentStart.x + static_cast<int>(end.x * static_cast<float>(cont.x)),
+        parentStart.y + static_cast<int>(end.y * static_cast<float>(cont.y))
+    );
 }
 
-bool Layout::isActive() const
+void Layout::draw(Screen& screen, ivec2 parentStart, ivec2 parentEnd) const
 {
-    return m_active;
-}
-
-ivec2 Layout::getStart() const
-{
-    return m_start;
-}
-
-ivec2 Layout::getEnd() const
-{
-    return m_end;
-}
-
-ivec2 Layout::resolveAbsStart(ivec2 offset) const
-{
-    return m_start + offset;
-}
-
-ivec2 Layout::resolveAbsEnd(ivec2 offset) const
-{
-    return m_end + offset;
-}
-
-void Layout::draw(Screen& screen)
-{
-    if (!m_active)
+    if (!active)
     {
         return;
     }
-
-    for (GUIElement* element : m_elements)
+    ivec2 absStart = resolveAbsStart(parentStart, parentEnd);
+    ivec2 absEnd = resolveAbsEnd(parentStart, parentEnd);
+    for (const auto& element : elements)
     {
         element->draw(screen);
     }
+}
+
+void Layout::addElement(std::unique_ptr<GUIElement> element)
+{
+    elements.push_back(std::move(element));
 }

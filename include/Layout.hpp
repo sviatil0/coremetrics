@@ -1,32 +1,35 @@
 #ifndef __LAYOUT_HPP__
 #define __LAYOUT_HPP__
 
-#include "GUIElement.hpp"
-#include "linear.hpp"
 #include <vector>
+#include <memory>
+#include "GUIElement.hpp"
+#include "screen.hpp"
+#include "vec2.hpp"
 
-class Layout : public GUIElement
+class Layout
 {
 private:
-    ivec2 m_start;
-    ivec2 m_end;
-    bool m_active;
-    std::vector<GUIElement*> m_elements;
+    vec2 start;
+    vec2 end;
+    bool active;
+    
 
 public:
-    Layout(ivec2 start, ivec2 end);
+    Layout(vec2 start, vec2 end, bool active = true);
 
-    virtual ~Layout() = default;
-
-    virtual void draw(Screen& screen) override;
-
-    void addElement(GUIElement* element);
+    void addElement(std::unique_ptr<GUIElement> element);
     void setActive(bool active);
     bool isActive() const;
-    ivec2 getStart() const;
-    ivec2 getEnd() const;
-    ivec2 resolveAbsStart(ivec2 offset) const;
-    ivec2 resolveAbsEnd(ivec2 offset) const;
+    vec2 getStart() const;
+    vec2 getEnd() const;
+
+    std::vector<std::unique_ptr<GUIElement>> elements; // MADE THIS PUBLIC FOR TESTING PURPOSES, SHOULD ADD getElements METHOD
+
+    ivec2 resolveAbsStart(ivec2 parentStart, ivec2 parentEnd) const;
+    ivec2 resolveAbsEnd(ivec2 parentStart, ivec2 parentEnd) const;
+
+    void draw(Screen& screen, ivec2 parentStart, ivec2 parentEnd) const;
 };
 
 #endif
