@@ -123,6 +123,35 @@ Inverts the current selection state (flips between true and false).
 ### bool isSelected() const
 Returns the current boolean value of the checkbox state.
 
+# Layout
+## Description
+A container that groups GUIElements into a bounded screen region with an active/inactive visibility state.
+
+## Methods
+### void addElement(GUIElement* element)
+Adds a child element to the layout's internal list.
+
+### void setActive(bool active)
+Sets the active state. When inactive, the layout and its children are skipped during rendering.
+
+### bool isActive() const
+Returns the current active state.
+
+### ivec2 getStart() const
+Returns the top-left corner of the layout's bounding box.
+
+### ivec2 getEnd() const
+Returns the bottom-right corner of the layout's bounding box.
+
+### ivec2 resolveAbsStart(ivec2 offset) const
+Returns the layout's start position offset by a parent position.
+
+### ivec2 resolveAbsEnd(ivec2 offset) const
+Returns the layout's end position offset by a parent position.
+
+### void draw(Screen& screen) override
+Draws all child elements in order. Returns immediately if inactive.
+
 # Image
 ## Description
 A component designed to render bitmap (BMP) assets. Following a "reductionist" approach, this class avoids high-level SDL blitting functions and instead manually iterates through raw pixel buffers to plot images coordinate-by-coordinate.
