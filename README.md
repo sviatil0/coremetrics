@@ -252,6 +252,21 @@ Converts the layout's relative `start` (0.0–1.0) to an absolute pixel coordina
 ### ivec2 resolveAbsEnd(ivec2 parentStart, ivec2 parentEnd) const
 Converts the layout's relative `end` (0.0–1.0) to an absolute pixel coordinate using the same interpolation as `resolveAbsStart`.
 
+### void addElement(std::unique_ptr<GUIElement> element)
+Appends a GUIElement to the layout's internal list. The layout takes ownership via unique_ptr.
+
+### void setActive(bool active)
+Sets the active state. When inactive, the layout skips rendering entirely.
+
+### bool isActive() const
+Returns the current active state.
+
+### vec2 getStart() const
+Returns the layout's relative start coordinate (0.0–1.0).
+
+### vec2 getEnd() const
+Returns the layout's relative end coordinate (0.0–1.0).
+
 ### void draw(Screen& screen, ivec2 parentStart, ivec2 parentEnd) const
 Draws all elements in the layout. Returns immediately if the layout is inactive. Resolves the layout's absolute bounds from the parent bounds, then calls `draw(screen)` on each contained `GUIElement`.
 
@@ -296,35 +311,6 @@ Inverts the current selection state (flips between true and false).
 
 ### bool isSelected() const
 Returns the current boolean value of the checkbox state.
-
-# Layout
-## Description
-A container that groups GUIElements into a bounded screen region with an active/inactive visibility state.
-
-## Methods
-### void addElement(GUIElement* element)
-Adds a child element to the layout's internal list.
-
-### void setActive(bool active)
-Sets the active state. When inactive, the layout and its children are skipped during rendering.
-
-### bool isActive() const
-Returns the current active state.
-
-### ivec2 getStart() const
-Returns the top-left corner of the layout's bounding box.
-
-### ivec2 getEnd() const
-Returns the bottom-right corner of the layout's bounding box.
-
-### ivec2 resolveAbsStart(ivec2 offset) const
-Returns the layout's start position offset by a parent position.
-
-### ivec2 resolveAbsEnd(ivec2 offset) const
-Returns the layout's end position offset by a parent position.
-
-### void draw(Screen& screen) override
-Draws all child elements in order. Returns immediately if inactive.
 
 # Image
 ## Description

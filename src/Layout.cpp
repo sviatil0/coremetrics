@@ -40,3 +40,23 @@ void Layout::addElement(std::unique_ptr<GUIElement> element)
 {
     elements.push_back(std::move(element));
 }
+
+void Layout::setActive(bool active)
+{
+    this->active = active;
+}
+
+bool Layout::isActive() const
+{
+    return active;
+}
+
+vec2 Layout::getStart() const
+{
+    return start;
+}
+
+vec2 Layout::getEnd() const
+{
+    return end;
+}

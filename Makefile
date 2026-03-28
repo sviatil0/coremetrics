@@ -23,6 +23,7 @@ TEST_SOURCES = $(TESTDIR)/tests.cpp \
                $(TESTDIR)/screenTest.cpp \
                $(TESTDIR)/guiFileTest.cpp \
                $(TESTDIR)/GUIElementTest.cpp \
+               $(TESTDIR)/layoutTest.cpp \
                $(SRCDIR)/screen.cpp \
                $(SRCDIR)/matrix.cpp \
                $(SRCDIR)/GUIFile.cpp \
@@ -39,6 +40,7 @@ TEST_OBJECTS = $(OBJDIR)/tests.o \
                $(OBJDIR)/screenTest.o \
                $(OBJDIR)/guiFileTest.o \
                $(OBJDIR)/GUIElementTest.o \
+               $(OBJDIR)/layoutTest.o \
                $(OBJDIR)/TreeTest.o \
                $(OBJDIR)/LayoutManagerTest.o \
                $(OBJDIR)/screen.o \
@@ -52,7 +54,7 @@ TEST_OBJECTS = $(OBJDIR)/tests.o \
                $(OBJDIR)/button.o \
                $(OBJDIR)/Layout.o \
                $(OBJDIR)/LayoutManager.o
-HEADERS = $(INCDIR)/linear.hpp $(INCDIR)/screen.hpp $(INCDIR)/linearTest.hpp $(INCDIR)/screenTest.hpp $(INCDIR)/guiFileTest.hpp
+HEADERS = $(INCDIR)/linear.hpp $(INCDIR)/screen.hpp $(INCDIR)/linearTest.hpp $(INCDIR)/screenTest.hpp $(INCDIR)/guiFileTest.hpp $(INCDIR)/layoutTest.hpp
 
 demo: directories $(DEMO_TARGET)
 	./$(DEMO_TARGET)
@@ -80,6 +82,9 @@ $(OBJDIR)/guiFileTest.o: $(TESTDIR)/guiFileTest.cpp $(HEADERS)
 
 $(OBJDIR)/GUIElementTest.o: $(TESTDIR)/GUIElementTest.cpp $(HEADERS)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+$(OBJDIR)/layoutTest.o: $(TESTDIR)/layoutTest.cpp $(HEADERS)
+	$(CXX) $(CXXFLAGS) -c $< -o $@ $(LDFLAGS)
 
 $(OBJDIR)/screen.o: $(SRCDIR)/screen.cpp $(INCDIR)/screen.hpp $(INCDIR)/linear.hpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@ $(LDFLAGS)
