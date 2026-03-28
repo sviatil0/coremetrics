@@ -35,3 +35,8 @@ void Layout::draw(Screen& screen, ivec2 parentStart, ivec2 parentEnd) const
         element->draw(screen);
     }
 }
+
+void Layout::addElement(std::unique_ptr<GUIElement> element)
+{
+    elements.push_back(std::move(element));
+}
