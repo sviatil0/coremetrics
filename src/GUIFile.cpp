@@ -222,64 +222,62 @@ void GUIFile::checkRead()
     }
 }
 
+static void writeNode(std::ofstream& outFile, const Tree<Layout>& node, int depth)
+{
+    const Layout& layout = node.getData();
+    std::string indent(depth * 2, ' ');
+    std::string inner(depth * 2 + 2, ' ');
+
+    outFile << indent << "<layout>"
+            << "sX=" << layout.getStart().x
+            << " sY=" << layout.getStart().y
+            << " eX=" << layout.getEnd().x
+            << " eY=" << layout.getEnd().y
+            << " active=" << (layout.isActive() ? "true" : "false") << "\n";
+
+    for (const auto& elemPtr : layout.elements)
+    {
+        if (const Line* line = dynamic_cast<const Line*>(elemPtr.get()))
+        {
+            outFile << inner << "<line>\n";
+            outFile << inner << "  <vec2><x>" << line->start.x << "</x><y>" << line->start.y << "</y></vec2>\n";
+            outFile << inner << "  <vec2><x>" << line->end.x << "</x><y>" << line->end.y << "</y></vec2>\n";
+            outFile << inner << "  <vec3><x>" << line->color.x << "</x><y>" << line->color.y << "</y><z>" << line->color.z << "</z></vec3>\n";
+            outFile << inner << "</line>\n";
+        }
+        else if (const Box* box = dynamic_cast<const Box*>(elemPtr.get()))
+        {
+            outFile << inner << "<box>\n";
+            outFile << inner << "  <vec2><x>" << box->minPos.x << "</x><y>" << box->minPos.y << "</y></vec2>\n";
+            outFile << inner << "  <vec2><x>" << box->maxPos.x << "</x><y>" << box->maxPos.y << "</y></vec2>\n";
+            outFile << inner << "  <vec3><x>" << box->color.x << "</x><y>" << box->color.y << "</y><z>" << box->color.z << "</z></vec3>\n";
+            outFile << inner << "</box>\n";
+        }
+        else if (const Point* pt = dynamic_cast<const Point*>(elemPtr.get()))
+        {
+            outFile << inner << "<point>\n";
+            outFile << inner << "  <vec2><x>" << pt->pos.x << "</x><y>" << pt->pos.y << "</y></vec2>\n";
+            outFile << inner << "  <vec3><x>" << pt->color.x << "</x><y>" << pt->color.y << "</y><z>" << pt->color.z << "</z></vec3>\n";
+            outFile << inner << "</point>\n";
+        }
+    }
+
+    for (const auto& child : node.getChildren())
+    {
+        writeNode(outFile, *child, depth + 1);
+    }
+
+    outFile << indent << "</layout>\n";
+}
+
 void GUIFile::writeFile(std::string fileName)
 {
     std::ofstream outFile{fileName};
-    outFile << "<layout>\n";
 
-    for (const auto &line : lines)
+    for (const auto& child : manager.getRoot().getChildren())
     {
-        outFile << "  <line>\n";
-        outFile << "    <vec2>\n";
-        outFile << "      <x>" << line.start.x << "</x>\n";
-        outFile << "      <y>" << line.start.y << "</y>\n";
-        outFile << "    </vec2>\n";
-        outFile << "    <vec2>\n";
-        outFile << "      <x>" << line.end.x << "</x>\n";
-        outFile << "      <y>" << line.end.y << "</y>\n";
-        outFile << "    </vec2>\n";
-        outFile << "    <vec3>\n"; // Fixed: Was </vec3>
-        outFile << "      <x>" << line.color.x << "</x>\n";
-        outFile << "      <y>" << line.color.y << "</y>\n";
-        outFile << "      <z>" << line.color.z << "</z>\n";
-        outFile << "    </vec3>\n";
-        outFile << "  </line>\n";
+        writeNode(outFile, *child, 0);
     }
 
-    for (const auto &box : boxes)
-    {
-        outFile << "  <box>\n";
-        outFile << "    <vec2>\n";
-        outFile << "      <x>" << box.minPos.x << "</x>\n";
-        outFile << "      <y>" << box.minPos.y << "</y>\n";
-        outFile << "    </vec2>\n";
-        outFile << "    <vec2>\n";
-        outFile << "      <x>" << box.maxPos.x << "</x>\n";
-        outFile << "      <y>" << box.maxPos.y << "</y>\n";
-        outFile << "    </vec2>\n";
-        outFile << "    <vec3>\n"; // Fixed: Was </vec3>
-        outFile << "      <x>" << box.color.x << "</x>\n";
-        outFile << "      <y>" << box.color.y << "</y>\n";
-        outFile << "      <z>" << box.color.z << "</z>\n";
-        outFile << "    </vec3>\n";
-        outFile << "  </box>\n";
-    }
-
-    for (const auto &pt : points)
-    {
-        outFile << "  <point>\n";
-        outFile << "    <vec2>\n";
-        outFile << "      <x>" << pt.pos.x << "</x>\n";
-        outFile << "      <y>" << pt.pos.y << "</y>\n";
-        outFile << "    </vec2>\n";
-        outFile << "    <vec3>\n";
-        outFile << "      <x>" << pt.color.x << "</x>\n";
-        outFile << "      <y>" << pt.color.y << "</y>\n";
-        outFile << "      <z>" << pt.color.z << "</z>\n";
-        outFile << "    </vec3>\n";
-        outFile << "  </point>\n";
-    }
-
-    outFile << "</layout>\n";
     outFile.close();
 }

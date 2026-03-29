@@ -252,6 +252,21 @@ Converts the layout's relative `start` (0.0–1.0) to an absolute pixel coordina
 ### ivec2 resolveAbsEnd(ivec2 parentStart, ivec2 parentEnd) const
 Converts the layout's relative `end` (0.0–1.0) to an absolute pixel coordinate using the same interpolation as `resolveAbsStart`.
 
+### void addElement(std::unique_ptr<GUIElement> element)
+Appends a GUIElement to the layout's internal list. The layout takes ownership via unique_ptr.
+
+### void setActive(bool active)
+Sets the active state. When inactive, the layout skips rendering entirely.
+
+### bool isActive() const
+Returns the current active state.
+
+### vec2 getStart() const
+Returns the layout's relative start coordinate (0.0–1.0).
+
+### vec2 getEnd() const
+Returns the layout's relative end coordinate (0.0–1.0).
+
 ### void draw(Screen& screen, ivec2 parentStart, ivec2 parentEnd) const
 Draws all elements in the layout. Returns immediately if the layout is inactive. Resolves the layout's absolute bounds from the parent bounds, then calls `draw(screen)` on each contained `GUIElement`.
 
