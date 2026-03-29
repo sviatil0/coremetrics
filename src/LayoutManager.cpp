@@ -36,3 +36,8 @@ void LayoutManager::render(Screen& screen, ivec2 screenStart, ivec2 screenEnd) c
 {
     renderTree(root, screen, screenStart, screenEnd);
 }
+
+void LayoutManager::clear()
+{
+    root.getChildren().clear();
+}

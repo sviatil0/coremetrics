@@ -5,6 +5,11 @@
 #include <filesystem>
 #include "GUIFile.hpp"
 #include "guiFileTest.hpp"
+#include "GUIElements.hpp"
+#include "GUIElementFactory.hpp"
+#include "Tree.hpp"
+#include "Layout.hpp"
+#include "LayoutManager.hpp"
 
 static bool fileContains(const std::string& fileName, const std::string& search)
 {
@@ -89,10 +94,10 @@ static void testWriteFile()
     bool passed = hasLayout && hasPoint && hasValueOnOneLine;
     std::cout << (passed ? "PASS" : "FAIL") << '\n';
 
-    if (std::filesystem::exists(testFile)) 
+    /*if (std::filesystem::exists(testFile)) 
     {
         std::filesystem::remove(testFile);
-    }
+    }*/
 }
 
 static void testFileRead()
@@ -100,11 +105,28 @@ static void testFileRead()
     std::cout << "GUIFile readFile: ";
     GUIFile g;
     g.readFile("tests/ex1.xml");
-    // CHANGE THIS TEST TO WORK AGAIN AFTER FUNC FINISHED **************************************8
-    bool passed = g.getPoints().size() == 0
-               && g.getLines().size() == 0
-               && g.getBoxes().size() == 0;
-    g.checkRead();
+
+    LayoutManager &manager = LayoutManager::getInstance();
+    std::vector<std::unique_ptr<Tree<Layout>>>& children = manager.getRoot().getChildren();
+    size_t totalChildren = children.size();
+    for (auto& child : children)
+    {
+        if (!(child->isLeaf())) totalChildren++;
+    }
+    size_t numLine = 0, numBox = 0, numPoint = 0;
+    if (!children.empty()) {
+        const Layout& layout = children[0]->getData();
+        for (const auto& elemPtr : layout.elements) {
+            if (dynamic_cast<Line*>(elemPtr.get())) {
+                numLine++;
+            } else if (dynamic_cast<Box*>(elemPtr.get())) {
+                numBox++;
+            } else if (dynamic_cast<Point*>(elemPtr.get())) {
+                numPoint++;
+            }
+        }
+    }
+    bool passed = ((totalChildren == 2) && (numLine == 1) && (numBox == 1) && (numPoint == 1));
     std::cout << (passed ? "PASS" : "FAIL") << '\n';
 }
 
