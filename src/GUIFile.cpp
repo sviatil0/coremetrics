@@ -229,28 +229,6 @@ void GUIFile::readFile(const std::string &fileName)
 
 }
 
-void GUIFile::checkRead()
-{
-    auto& children = manager.getRoot().getChildren();
-    std::cout << "# of children: " <<  children.size();
-    if (!children.empty()) {
-        const Layout& layout = children[1]->getData(); // getData() returns the Layout stored in this Tree node
-        std::cout << "layout contains: \n";
-
-        for (const auto& elemPtr : layout.elements) {
-            if (dynamic_cast<Line*>(elemPtr.get())) {
-                std::cout << "Line\n";
-            } else if (dynamic_cast<Box*>(elemPtr.get())) {
-                std::cout << "Box\n";
-            } else if (dynamic_cast<Point*>(elemPtr.get())) {
-                std::cout << "Point\n";
-            } else {
-                std::cout << "Unknown element type\n";
-            }
-        }
-    }
-}
-
 static void writeNode(std::ofstream& outFile, const Tree<Layout>& node, int depth)
 {
     const Layout& layout = node.getData();
