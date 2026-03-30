@@ -94,10 +94,10 @@ static void testWriteFile()
     bool passed = hasLayout && hasPoint && hasValueOnOneLine;
     std::cout << (passed ? "PASS" : "FAIL") << '\n';
 
-    if (std::filesystem::exists(testFile)) 
+    /*if (std::filesystem::exists(testFile)) 
     {
         std::filesystem::remove(testFile);
-    }
+    }*/
 }
 
 static void testFileRead()
@@ -114,8 +114,11 @@ static void testFileRead()
         if (!(child->isLeaf())) totalChildren++;
     }
     size_t numLine = 0, numBox = 0, numPoint = 0;
+    bool layoutPassed = false;
     if (!children.empty()) {
         const Layout& layout = children[0]->getData();
+        layoutPassed = (layout.getStart().x == 0.25) && (layout.getStart().y == 0.25) && 
+                        (layout.getEnd().x == 0.75) && (layout.getEnd().y == 0.75) && (layout.isActive());
         for (const auto& elemPtr : layout.elements) {
             if (dynamic_cast<Line*>(elemPtr.get())) {
                 numLine++;
@@ -126,7 +129,7 @@ static void testFileRead()
             }
         }
     }
-    bool passed = ((totalChildren == 2) && (numLine == 1) && (numBox == 1) && (numPoint == 1));
+    bool passed = ((totalChildren == 2) && (numLine == 1) && (numBox == 1) && (numPoint == 1) && layoutPassed);
     std::cout << (passed ? "PASS" : "FAIL") << '\n';
 }
 
