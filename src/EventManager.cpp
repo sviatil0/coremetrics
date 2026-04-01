@@ -48,18 +48,9 @@ bool EventManager::trickleEvent(Tree<Layout>& node, Event* event, ivec2 parentSt
 
 Tree<Layout>* EventManager::findLayoutByName(Tree<Layout>& node, const std::string& name)
 {
-    if (node.getData().getName() == name)
-    {
-        return &node;
-    }
-    for (auto& child : node.getChildren())
-    {
-        Tree<Layout>* found = findLayoutByName(*child, name);
-        if (found != nullptr)
-        {
-            return found;
-        }
-    }
+    // TODO: requires Layout::getName() — Alicia's task
+    (void)node;
+    (void)name;
     return nullptr;
 }
 
