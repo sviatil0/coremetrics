@@ -52,7 +52,7 @@ public:
         return children;
     }
 
-    Tree<T>* addChild(T childData)
+    Tree<T>* addChild(T&& childData)
     {
         children.push_back(std::make_unique<Tree<T>>(std::move(childData)));
         children.back()->parent = this;

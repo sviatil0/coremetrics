@@ -1,7 +1,18 @@
 #include "GUIFile.hpp"
+#include "GUIElementFactory.hpp"
 #include <fstream>
 #include <filesystem>
+#include <sstream>
 #include <iostream>
+#include <algorithm>
+#include <cctype>
+#include <locale>
+#include <typeinfo>
+
+GUIFile::GUIFile() : manager(LayoutManager::getInstance())
+{
+}
+
 
 void GUIFile::setPoint(Point point)
 {
@@ -31,493 +42,249 @@ std::vector<Box> GUIFile::getBoxes()
     return boxes;
 }
 
-std::vector<std::string> GUIFile::splitString(const std::string &str, const std::string &delim)
+std::string GUIFile::getContent(const std::string &source, const std::string &tag, size_t &pos)
 {
-    std::vector<std::string> tokens;
-    std::size_t prev = 0;
-    std::size_t pos = 0;
-    // given set of delimiters as a string delim, search through string
-    // until first occurence of any delimiter is found, then update substring to search rest of string
-    // continues until entire string has been processed/split by delims
-    while ((pos = str.find_first_of(delim, prev)) != std::string::npos)
+    // attributes contained within opening tag for layouts, so ignore closing >
+    std::string openTag = "<" + tag;
+    std::string closeTag = "</" + tag + ">";
+
+    size_t start = source.find(openTag, pos);
+    // if tag not found in string, return
+    if (start == std::string::npos) return "";
+
+    size_t tagEnd = source.find(">", start);
+    if (tagEnd == std::string::npos) return "";
+    start = tagEnd + 1;
+
+    size_t end, tempEnd;
+    if (tag == "layout")
     {
-        if (pos > prev)
+        tempEnd = source.find(closeTag, start);
+        while (true)
         {
-            tokens.push_back(str.substr(prev, pos - prev));
+            size_t next = source.find(closeTag, tempEnd + closeTag.length());
+            if (next == std::string::npos) break;
+            tempEnd = next;
         }
-        prev = pos + 1;
+        end = tempEnd;
     }
-    if (prev < str.length())
+    else
     {
-        tokens.push_back(str.substr(prev, std::string::npos));
+        end = source.find(closeTag, start);
     }
-    return tokens;
+    if (end == std::string::npos) return "";
+
+    // update reference to pos and return content btwn tags
+    pos = end + closeTag.length();
+    return source.substr(start, end - start);
 }
 
-void GUIFile::readFile(std::string fileName)
+vec2 GUIFile::parseVec2(const std::string &block, size_t &p)
 {
+    std::string v = getContent(block, "vec2", p);
+    if (v == "")
+    {
+        v = getContent(block, "ivec2", p);
+    }
+    if (v == "")
+    {
+        return vec2(0, 0);
+    }
+    size_t innerPos = 0;
+    float x = std::stof(getContent(v, "x", innerPos));
+    float y = std::stof(getContent(v, "y", innerPos));
+    return vec2(x, y);
+}
+
+vec3 GUIFile::parseVec3(const std::string &block, size_t &p)
+{
+    std::string v = getContent(block, "vec3", p);
+    if (v == "")
+    {
+        v = getContent(block, "ivec3", p);
+    }
+    if (v == "")
+    {
+        return vec3(0, 0, 0);
+    }
+    size_t innerPos = 0;
+    float x = std::stof(getContent(v, "x", innerPos));
+    float y = std::stof(getContent(v, "y", innerPos));
+    float z = std::stof(getContent(v, "z", innerPos));
+    return vec3(x, y, z);
+}
+
+float GUIFile::extractFloat(const std::string& block, const std::string& key)
+{
+    size_t pos = block.find(key + "=");
+    if (pos == std::string::npos) return 0.0f;
+
+    pos += key.length() + 1;
+
+    size_t end = block.find_first_of(" >", pos);
+    
+    return std::stof(block.substr(pos, end - pos));
+}
+
+Layout GUIFile::parseLayout(const std::string &block)
+{
+    // assuming no spaces bewteen tag and = and value (or between tag and >)
+    float sx = extractFloat(block, "sX");
+    float sy = extractFloat(block, "sY");
+    float ex = extractFloat(block, "eX");
+    float ey = extractFloat(block, "eY");
+    size_t activePos = block.find("true");
+    bool active = (activePos == std::string::npos) ? false : true;
+    
+    return Layout(vec2(sx, sy), vec2(ex, ey), active);
+}
+
+Tree<Layout>* GUIFile::recurseLayout(const std::string& block, Tree<Layout>* parent, int i)
+{
+    Layout currLayout = parseLayout(block);
+    Tree<Layout>* node = manager.addChild(parent, std::move(currLayout));
+
+    size_t elemPos;
+    std::vector<GUIElementType> typeVec = {GUIElementType::POINT, GUIElementType::LINE, GUIElementType::BOX};
+
+    // parse nested layouts
+    std::string workingBlock = block;
+    size_t layoutPos = 0;
+    while (true)
+    {
+        size_t startPos = workingBlock.find("<layout", layoutPos);
+        std::string childBlock = getContent(workingBlock, "layout", layoutPos);
+        if (childBlock == "") 
+        {
+            break;
+        }
+
+        recurseLayout(childBlock, node, i+1);
+
+        workingBlock.erase(startPos, layoutPos - startPos);
+        layoutPos = startPos;
+    }
+
+    // parse elements
+    for (GUIElementType &elemType : typeVec)
+    {
+        elemPos = 0;
+        while (true)
+        {
+            std::string innerBlock;
+            switch (elemType)
+            {
+                case GUIElementType::POINT:
+                    innerBlock = getContent(workingBlock, "point", elemPos);
+                    break;
+                case GUIElementType::LINE:
+                    innerBlock = getContent(workingBlock, "line", elemPos);
+                    break;
+                case GUIElementType::BOX:
+                    innerBlock = getContent(workingBlock, "box", elemPos);
+                    break;
+            }
+            if (innerBlock == "") break;
+
+            size_t vecPos = 0;
+            vec2 pos1 = parseVec2(innerBlock, vecPos);
+            vec2 pos2 = parseVec2(innerBlock, vecPos);
+            vec3 color = parseVec3(innerBlock, vecPos);
+            std::unique_ptr<GUIElement> elem = GUIElementFactory::create(elemType, pos1, pos2, color);
+            node->getData().addElement(std::move(elem));
+        }
+    }
+
+    return node;
+}
+
+void GUIFile::readFile(const std::string &fileName)
+{
+    manager.clear();
+
     std::ifstream fp{fileName};
     if (!(fp))
     {
+        std::cout << "File " << fileName << " cannot be opened\n";
         return;
     }
-    // while reading file, split each line by < and > symbols to interpret what is supposed to be added to the object
-    // parse all data in the file into tokens vector, split by the < and > chars
-    std::string data;
-    std::vector<std::string> curLine;
-    while (fp >> data)
+
+    std::stringstream buffer;
+    buffer << fp.rdbuf();
+    std::string content = buffer.str();
+    size_t currPos = 0;
+    
+    std::stack<Tree<Layout>*> layoutStack;
+    layoutStack.push(&manager.getRoot());
+    Tree<Layout> *root = &manager.getRoot();
+
+    // for each layout, store internal layouts and elements
+    while (true)
     {
-        curLine = splitString(data, "<>");
-        tokens.insert(tokens.end(), curLine.begin(), curLine.end());
+        std::string layoutBlock = getContent(content, "layout", currPos);
+        if (layoutBlock == "") break;
+        
+        recurseLayout(layoutBlock, root, 0);
     }
 
-    // declare/initialize temporary containers to hold whatever is currently being read
-    std::map<std::string, float> fVec = {{"x", -1}, {"y", -1}, {"z", -1}};
-    std::map<std::string, int> iVec = {{"x", -1}, {"y", -1}, {"z", -1}};
-    size_t vecCount = 0, colorVec = 0;
-    float fNum;
-    int iNum;
-    Line tempContainer;
+}
 
-    // treat tags as scopes, track them using a stack
-    // to use a switch case, make enum of possible modes/identifier tags
-    enum modeTypes
+static void writeNode(std::ofstream& outFile, const Tree<Layout>& node, int depth)
+{
+    const Layout& layout = node.getData();
+    std::string indent(depth * 2, ' ');
+    std::string inner(depth * 2 + 2, ' ');
+
+    outFile << indent << "<layout>"
+            << "sX=" << layout.getStart().x
+            << " sY=" << layout.getStart().y
+            << " eX=" << layout.getEnd().x
+            << " eY=" << layout.getEnd().y
+            << " active=" << (layout.isActive() ? "true" : "false") << "\n";
+
+    for (const auto& elemPtr : layout.elements)
     {
-        START,
-        LAYOUT,
-        LINE,
-        BOX,
-        POINT,
-        VEC2,
-        VEC3,
-        IVEC2,
-        IVEC3,
-        X,
-        Y,
-        Z,
-        IX,
-        IY,
-        IZ,
-        END_LAYOUT,
-        END_LINE,
-        END_BOX,
-        END_POINT,
-        END_VEC2,
-        END_VEC3,
-        END_IVEC2,
-        END_IVEC3,
-        END_X,
-        END_Y,
-        END_Z
-    };
-    std::map<std::string, modeTypes> modeMap = {{"layout", LAYOUT}, {"line", LINE}, {"box", BOX}, {"point", POINT}, {"vec2", VEC2}, {"vec3", VEC3}, {"ivec2", IVEC2}, {"ivec3", IVEC3}, {"x", X}, {"y", Y}, {"z", Z}, {"/layout", END_LAYOUT}, {"/line", END_LINE}, {"/box", END_BOX}, {"/point", END_POINT}, {"/vec2", END_VEC2}, {"/vec3", END_VEC3}, {"/ivec2", END_IVEC2}, {"/ivec3", END_IVEC3}, {"/x", END_X}, {"/y", END_Y}, {"/z", END_Z}};
-    std::stack<modeTypes> modes;
-    modes.push(START);
-    modeTypes nextMode;
-    for (auto token : tokens)
-    {
-        nextMode = modeMap[token];
-        switch (modes.top())
+        if (const Line* line = dynamic_cast<const Line*>(elemPtr.get()))
         {
-        case START:
-            if (token != "layout")
-            {
-                return;
-            }
-            modes.push(LAYOUT);
-            break;
-        case LAYOUT:
-            switch (nextMode)
-            {
-            case LINE:
-            case BOX:
-            case POINT:
-                modes.push(nextMode);
-                break;
-            case END_LAYOUT:
-                modes.pop();
-                modes.push(START);
-                break;
-            default:
-                return; // clear containers when invalid structure encountered?
-            }
-            break;
-        case LINE:
-            switch (nextMode)
-            {
-            case VEC2:
-            case IVEC2:
-                if (vecCount < 2)
-                {
-                    vecCount++;
-                }
-                else
-                {
-                    return;
-                }
-                modes.push(nextMode);
-                break;
-            case VEC3:
-            case IVEC3:
-                if (colorVec == 0)
-                {
-                    colorVec = 1;
-                }
-                else
-                {
-                    return;
-                }
-                modes.push(nextMode);
-                break;
-            case END_LINE:
-                lines.push_back(Line(tempContainer.start, tempContainer.end, tempContainer.color));
-                modes.pop();
-                vecCount = 0;
-                colorVec = 0;
-                break;
-            default:
-                return; // clear containers when invalid structure encountered?
-            }
-            break;
-        case BOX:
-            switch (nextMode)
-            {
-            case VEC2:
-            case IVEC2:
-                if (vecCount < 2)
-                {
-                    vecCount++;
-                }
-                else
-                {
-                    return;
-                }
-                modes.push(nextMode);
-                break;
-            case VEC3:
-            case IVEC3:
-                if (colorVec == 0)
-                {
-                    colorVec = 1;
-                }
-                else
-                {
-                    return;
-                }
-                modes.push(nextMode);
-                break;
-            case END_BOX:
-                boxes.push_back(Box(tempContainer.start, tempContainer.end, tempContainer.color));
-                modes.pop();
-                vecCount = 0;
-                colorVec = 0;
-                break;
-            default:
-                return; // clear containers when invalid structure encountered?
-            }
-            break;
-        case POINT:
-            switch (nextMode)
-            {
-            case VEC2:
-            case IVEC2:
-                if (vecCount < 1)
-                {
-                    vecCount++;
-                }
-                else
-                {
-                    return;
-                }
-                modes.push(nextMode);
-                break;
-            case VEC3:
-            case IVEC3:
-                if (colorVec == 0)
-                {
-                    colorVec = 1;
-                }
-                else
-                {
-                    return;
-                }
-                modes.push(nextMode);
-                break;
-            case END_POINT:
-                points.push_back(Point(tempContainer.start, tempContainer.color));
-                modes.pop();
-                vecCount = 0;
-                colorVec = 0;
-                break;
-            default:
-                return; // clear containers when invalid structure encountered?
-            }
-            break;
-        case VEC2:
-            switch (nextMode)
-            {
-            case X:
-            case Y:
-                if (fVec[token] != -1)
-                {
-                    return;
-                }
-                modes.push(nextMode);
-                break;
-            case END_X:
-            case END_Y:
-                break;
-            case END_VEC2:
-                if (vecCount == 1)
-                {
-                    tempContainer.start = vec2(fVec["x"], fVec["y"]);
-                }
-                else
-                {
-                    tempContainer.end = vec2(iVec["x"], fVec["y"]);
-                }
-                fVec = {{"x", -1}, {"y", -1}, {"z", -1}};
-                modes.pop();
-                break;
-            default:
-                return; // clear containers when invalid structure encountered?
-            }
-            break;
-        case VEC3:
-            switch (nextMode)
-            {
-            case X:
-            case Y:
-            case Z:
-                if (fVec[token] != -1)
-                {
-                    return;
-                }
-                modes.push(nextMode);
-                break;
-            case END_X:
-            case END_Y:
-            case END_Z:
-                break;
-            case END_VEC3:
-                tempContainer.color = vec3(fVec["x"], fVec["y"], fVec["z"]);
-                fVec = {{"x", -1}, {"y", -1}, {"z", -1}};
-                modes.pop();
-                break;
-            default:
-                return; // clear containers when invalid structure encountered?
-            }
-            break;
-        case IVEC2:
-            switch (nextMode)
-            {
-            case X:
-                if (iVec[token] != -1)
-                {
-                    return;
-                }
-                modes.push(IX);
-                break;
-            case Y:
-                if (iVec[token] != -1)
-                {
-                    return;
-                }
-                modes.push(IY);
-                break;
-            case END_X:
-            case END_Y:
-                break;
-            case END_IVEC2:
-                if (vecCount == 1)
-                {
-                    tempContainer.start = vec2(iVec["x"], iVec["y"]);
-                }
-                else
-                {
-                    tempContainer.end = vec2(iVec["x"], iVec["y"]);
-                }
-                iVec = {{"x", -1}, {"y", -1}, {"z", -1}};
-                modes.pop();
-                break;
-            default:
-                return; // clear containers when invalid structure encountered?
-            }
-            break;
-        case IVEC3:
-            switch (nextMode)
-            {
-            case X:
-                if (iVec[token] != -1)
-                {
-                    return;
-                }
-                modes.push(IX);
-                break;
-            case Y:
-                if (iVec[token] != -1)
-                {
-                    return;
-                }
-                modes.push(IY);
-                break;
-            case Z:
-                if (iVec[token] != -1)
-                {
-                    return;
-                }
-                modes.push(IZ);
-                break;
-            case END_X:
-            case END_Y:
-            case END_Z:
-                break;
-            case END_IVEC3:
-                tempContainer.color = vec3(iVec["x"], iVec["y"], iVec["z"]);
-                iVec = {{"x", -1}, {"y", -1}, {"z", -1}};
-                modes.pop();
-                break;
-            default:
-                return; // clear containers when invalid structure encountered?
-            }
-            break;
-        case X:
-            try
-            {
-                fNum = std::stof(token);
-            }
-            catch (const std::invalid_argument &ia)
-            {
-                return;
-            }
-            fVec["x"] = fNum;
-            modes.pop();
-            break;
-        case Y:
-            try
-            {
-                fNum = std::stof(token);
-            }
-            catch (const std::invalid_argument &ia)
-            {
-                return;
-            }
-            fVec["y"] = fNum;
-            modes.pop();
-            break;
-        case Z:
-            try
-            {
-                fNum = std::stof(token);
-            }
-            catch (const std::invalid_argument &ia)
-            {
-                return;
-            }
-            fVec["z"] = fNum;
-            modes.pop();
-            break;
-        case IX:
-            try
-            {
-                iNum = std::stoi(token);
-            }
-            catch (const std::invalid_argument &ia)
-            {
-                return;
-            }
-            iVec["x"] = iNum;
-            modes.pop();
-            break;
-        case IY:
-            try
-            {
-                iNum = std::stoi(token);
-            }
-            catch (const std::invalid_argument &ia)
-            {
-                return;
-            }
-            iVec["y"] = iNum;
-            modes.pop();
-            break;
-        case IZ:
-            try
-            {
-                iNum = std::stoi(token);
-            }
-            catch (const std::invalid_argument &ia)
-            {
-                return;
-            }
-            iVec["z"] = iNum;
-            modes.pop();
-            break;
-        default:
-            return;
+            outFile << inner << "<line>\n";
+            outFile << inner << "  <vec2><x>" << line->start.x << "</x><y>" << line->start.y << "</y></vec2>\n";
+            outFile << inner << "  <vec2><x>" << line->end.x << "</x><y>" << line->end.y << "</y></vec2>\n";
+            outFile << inner << "  <vec3><x>" << line->color.x << "</x><y>" << line->color.y << "</y><z>" << line->color.z << "</z></vec3>\n";
+            outFile << inner << "</line>\n";
+        }
+        else if (const Box* box = dynamic_cast<const Box*>(elemPtr.get()))
+        {
+            outFile << inner << "<box>\n";
+            outFile << inner << "  <vec2><x>" << box->minPos.x << "</x><y>" << box->minPos.y << "</y></vec2>\n";
+            outFile << inner << "  <vec2><x>" << box->maxPos.x << "</x><y>" << box->maxPos.y << "</y></vec2>\n";
+            outFile << inner << "  <vec3><x>" << box->color.x << "</x><y>" << box->color.y << "</y><z>" << box->color.z << "</z></vec3>\n";
+            outFile << inner << "</box>\n";
+        }
+        else if (const Point* pt = dynamic_cast<const Point*>(elemPtr.get()))
+        {
+            outFile << inner << "<point>\n";
+            outFile << inner << "  <vec2><x>" << pt->pos.x << "</x><y>" << pt->pos.y << "</y></vec2>\n";
+            outFile << inner << "  <vec3><x>" << pt->color.x << "</x><y>" << pt->color.y << "</y><z>" << pt->color.z << "</z></vec3>\n";
+            outFile << inner << "</point>\n";
         }
     }
-    fp.close();
+
+    for (const auto& child : node.getChildren())
+    {
+        writeNode(outFile, *child, depth + 1);
+    }
+
+    outFile << indent << "</layout>\n";
 }
 
 void GUIFile::writeFile(std::string fileName)
 {
     std::ofstream outFile{fileName};
-    outFile << "<layout>\n";
 
-    for (const auto &line : lines)
+    for (const auto& child : manager.getRoot().getChildren())
     {
-        outFile << "  <line>\n";
-        outFile << "    <vec2>\n";
-        outFile << "      <x>" << line.start.x << "</x>\n";
-        outFile << "      <y>" << line.start.y << "</y>\n";
-        outFile << "    </vec2>\n";
-        outFile << "    <vec2>\n";
-        outFile << "      <x>" << line.end.x << "</x>\n";
-        outFile << "      <y>" << line.end.y << "</y>\n";
-        outFile << "    </vec2>\n";
-        outFile << "    <vec3>\n"; // Fixed: Was </vec3>
-        outFile << "      <x>" << line.color.x << "</x>\n";
-        outFile << "      <y>" << line.color.y << "</y>\n";
-        outFile << "      <z>" << line.color.z << "</z>\n";
-        outFile << "    </vec3>\n";
-        outFile << "  </line>\n";
+        writeNode(outFile, *child, 0);
     }
 
-    for (const auto &box : boxes)
-    {
-        outFile << "  <box>\n";
-        outFile << "    <vec2>\n";
-        outFile << "      <x>" << box.minPos.x << "</x>\n";
-        outFile << "      <y>" << box.minPos.y << "</y>\n";
-        outFile << "    </vec2>\n";
-        outFile << "    <vec2>\n";
-        outFile << "      <x>" << box.maxPos.x << "</x>\n";
-        outFile << "      <y>" << box.maxPos.y << "</y>\n";
-        outFile << "    </vec2>\n";
-        outFile << "    <vec3>\n"; // Fixed: Was </vec3>
-        outFile << "      <x>" << box.color.x << "</x>\n";
-        outFile << "      <y>" << box.color.y << "</y>\n";
-        outFile << "      <z>" << box.color.z << "</z>\n";
-        outFile << "    </vec3>\n";
-        outFile << "  </box>\n";
-    }
-
-    for (const auto &pt : points)
-    {
-        outFile << "  <point>\n";
-        outFile << "    <vec2>\n";
-        outFile << "      <x>" << pt.pos.x << "</x>\n";
-        outFile << "      <y>" << pt.pos.y << "</y>\n";
-        outFile << "    </vec2>\n";
-        outFile << "    <vec3>\n";
-        outFile << "      <x>" << pt.color.x << "</x>\n";
-        outFile << "      <y>" << pt.color.y << "</y>\n";
-        outFile << "      <z>" << pt.color.z << "</z>\n";
-        outFile << "    </vec3>\n";
-        outFile << "  </point>\n";
-    }
-
-    outFile << "</layout>\n";
     outFile.close();
 }

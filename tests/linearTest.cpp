@@ -212,6 +212,18 @@ void testVec2()
         std::cout << "vec2 reference fields (x, y): FAIL" << '\n';
     }
 
+    // Test implicit conversion to ivec2
+    vec2 v13(2.6, 3.1);
+    ivec2 iv13 = v13;
+    if (iv13.x == 2 && iv13.y == 3)
+    {
+        std::cout << "vec2 implicit conversion to ivec2: PASS" << '\n';
+    }
+    else
+    {
+        std::cout << "vec2 implicit conversion to ivec2: FAIL" << '\n';
+    }
+
     std::cout << '\n';
 }
 
@@ -428,6 +440,18 @@ void testIvec2()
     else
     {
         std::cout << "ivec2 unit (zero vector): FAIL" << '\n';
+    }
+
+    // Test implicit conversion to vec2
+    ivec2 v14(2, 3);
+    vec2 fv14 = v14;
+    if (fv14.x == 2.0f && fv14.y == 3.0f)
+    {
+        std::cout << "ivec2 implicit conversion to vec2: PASS" << '\n';
+    }
+    else
+    {
+        std::cout << "ivec2 implicit conversion to vec2: FAIL" << '\n';
     }
 
     std::cout << '\n';
@@ -675,6 +699,18 @@ void testVec3()
         std::cout << "vec3 reference fields (x, y, z): FAIL" << '\n';
     }
 
+    // Test implicit conversion to ivec3
+    vec3 v13(2.7, 3.0, 4.25);
+    ivec3 iv13 = v13;
+    if (iv13.x == 2 && iv13.y == 3 && iv13.z == 4)
+    {
+        std::cout << "vec3 implicit conversion to ivec3: PASS" << '\n';
+    }
+    else
+    {
+        std::cout << "vec3 implicit conversion to ivec3: FAIL" << '\n';
+    }
+
     std::cout << '\n';
 }
 
@@ -917,6 +953,18 @@ void testIvec3()
     else
     {
         std::cout << "ivec3 cross product (j x k = i): FAIL" << '\n';
+    }
+
+    // Test implicit conversion to vec3
+    ivec3 v14(2, 3, 4);
+    vec3 fv14 = v14;
+    if (fv14.x == 2 && fv14.y == 3 && fv14.z == 4)
+    {
+        std::cout << "ivec3 implicit conversion to vec3: PASS" << '\n';
+    }
+    else
+    {
+        std::cout << "ivec3 implicit conversion to vec3: FAIL" << '\n';
     }
 
     std::cout << '\n';

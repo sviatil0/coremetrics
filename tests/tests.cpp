@@ -7,6 +7,7 @@
 #include "TreeTest.hpp"
 #include "LayoutManagerTest.hpp"
 #include "EventManagerTest.hpp"
+#include "layoutTest.hpp"
 
 int main(int argc, char **argv)
 {
@@ -23,6 +24,7 @@ int main(int argc, char **argv)
 	treeTestSuite();
 	layoutManagerTestSuite();
 	eventManagerTestSuite();
+	layoutTestSuite();
 
 	SDL_Quit();
 
