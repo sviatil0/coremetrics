@@ -3,9 +3,12 @@
 #include <SDL3/SDL.h>
 #include "screen.hpp"
 #include "LayoutManager.hpp"
+#include "EventManager.hpp"
+#include "ClickEvent.hpp"
 #include "Box.hpp"
 #include "Line.hpp"
 #include "Point.hpp"
+#include "button.hpp"
 
 constexpr int RESX = 960;
 constexpr int RESY = 540;
@@ -31,7 +34,7 @@ bool pointInTriangle(ivec2 p, ivec2 v1, ivec2 v2, ivec2 v3)
 
 int main(int argc, char **argv)
 {
-    if (!SDL_Init(SDL_INIT_VIDEO))
+    if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO))
     {
         std::cerr << "Failed to init SDL: " << SDL_GetError() << '\n';
         return -1;
@@ -83,6 +86,16 @@ int main(int argc, char **argv)
         vec2(static_cast<float>(HALF_W + QUARTER_W), static_cast<float>(HALF_H)),
         vec3(1.0f, 1.0f, 0.0f)));
 
+    constexpr int BTN_MIN_X = HALF_W + QUARTER_W + 20;
+    constexpr int BTN_MIN_Y = HALF_H - 20;
+    constexpr int BTN_MAX_X = HALF_W + QUARTER_W + 100;
+    constexpr int BTN_MAX_Y = HALF_H + 20;
+
+    manager.getRoot().getData().addElement(std::make_unique<Button>(
+        ivec2(BTN_MIN_X, BTN_MIN_Y),
+        ivec2(BTN_MAX_X, BTN_MAX_Y),
+        vec3(0.2f, 0.8f, 0.2f)));
+
     vec3 triangleColor(0.8f, 0.2f, 0.3f);
 
     SDL_Event event;
@@ -109,8 +122,19 @@ int main(int argc, char **argv)
                 overlay->getData().setActive(inTriangle);
                 break;
             }
+            case SDL_EVENT_MOUSE_BUTTON_DOWN:
+            {
+                float clickX = 0.0f;
+                float clickY = 0.0f;
+                SDL_GetMouseState(&clickX, &clickY);
+                EventManager::getInstance().pushEvent(
+                    std::make_unique<ClickEvent>(static_cast<int>(clickX), static_cast<int>(clickY)));
+                break;
+            }
             }
         }
+
+        EventManager::getInstance().processEvents(ivec2(0, 0), ivec2(RESX - 1, RESY - 1));
 
         screen.clear();
         manager.render(screen, ivec2(0, 0), ivec2(RESX - 1, RESY - 1));

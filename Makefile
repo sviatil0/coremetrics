@@ -51,7 +51,13 @@ TEST_OBJECTS = $(OBJDIR)/tests.o \
                $(OBJDIR)/selection.o \
                $(OBJDIR)/button.o \
                $(OBJDIR)/Layout.o \
-               $(OBJDIR)/LayoutManager.o
+               $(OBJDIR)/LayoutManager.o \
+               $(OBJDIR)/Event.o \
+               $(OBJDIR)/ClickEvent.o \
+               $(OBJDIR)/ShowEvent.o \
+               $(OBJDIR)/SoundEvent.o \
+               $(OBJDIR)/EventManager.o \
+               $(OBJDIR)/SoundPlayer.o
 HEADERS = $(INCDIR)/linear.hpp $(INCDIR)/screen.hpp $(INCDIR)/linearTest.hpp $(INCDIR)/screenTest.hpp $(INCDIR)/guiFileTest.hpp
 
 demo: directories $(DEMO_TARGET)
@@ -120,7 +126,25 @@ $(OBJDIR)/TreeTest.o: $(TESTDIR)/TreeTest.cpp $(INCDIR)/TreeTest.hpp
 $(OBJDIR)/LayoutManagerTest.o: $(TESTDIR)/LayoutManagerTest.cpp $(INCDIR)/LayoutManagerTest.hpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@ $(LDFLAGS)
 
-$(DEMO_TARGET): $(OBJDIR)/main.o $(OBJDIR)/screen.o $(OBJDIR)/matrix.o $(OBJDIR)/button.o
+$(OBJDIR)/Event.o: $(SRCDIR)/Event.cpp $(INCDIR)/Event.hpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+$(OBJDIR)/ClickEvent.o: $(SRCDIR)/ClickEvent.cpp $(INCDIR)/ClickEvent.hpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+$(OBJDIR)/ShowEvent.o: $(SRCDIR)/ShowEvent.cpp $(INCDIR)/ShowEvent.hpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+$(OBJDIR)/SoundEvent.o: $(SRCDIR)/SoundEvent.cpp $(INCDIR)/SoundEvent.hpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+$(OBJDIR)/EventManager.o: $(SRCDIR)/EventManager.cpp $(INCDIR)/EventManager.hpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+$(OBJDIR)/SoundPlayer.o: $(SRCDIR)/SoundPlayer.cpp $(INCDIR)/SoundPlayer.hpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@ $(LDFLAGS)
+
+$(DEMO_TARGET): $(OBJDIR)/main.o $(OBJDIR)/screen.o $(OBJDIR)/matrix.o $(OBJDIR)/button.o $(OBJDIR)/Layout.o $(OBJDIR)/LayoutManager.o $(OBJDIR)/Event.o $(OBJDIR)/ClickEvent.o $(OBJDIR)/ShowEvent.o $(OBJDIR)/SoundEvent.o $(OBJDIR)/EventManager.o $(OBJDIR)/SoundPlayer.o
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
 
 $(OBJDIR)/main.o: main.cpp $(INCDIR)/screen.hpp $(INCDIR)/linear.hpp
