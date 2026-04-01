@@ -56,7 +56,22 @@ std::string GUIFile::getContent(const std::string &source, const std::string &ta
     if (tagEnd == std::string::npos) return "";
     start = tagEnd + 1;
 
-    size_t end = source.find(closeTag, start);
+    size_t end, tempEnd;
+    if (tag == "layout")
+    {
+        tempEnd = source.find(closeTag, start);
+        while (true)
+        {
+            size_t next = source.find(closeTag, tempEnd + closeTag.length());
+            if (next == std::string::npos) break;
+            tempEnd = next;
+        }
+        end = tempEnd;
+    }
+    else
+    {
+        end = source.find(closeTag, start);
+    }
     if (end == std::string::npos) return "";
 
     // update reference to pos and return content btwn tags
@@ -107,8 +122,6 @@ float GUIFile::extractFloat(const std::string& block, const std::string& key)
     pos += key.length() + 1;
 
     size_t end = block.find_first_of(" >", pos);
-    std::cout << "start: " << pos << " end: " << end << "\n";
-    std::cout << block.substr(pos, end - pos);
     
     return std::stof(block.substr(pos, end - pos));
 }
@@ -126,14 +139,68 @@ Layout GUIFile::parseLayout(const std::string &block)
     return Layout(vec2(sx, sy), vec2(ex, ey), active);
 }
 
+Tree<Layout>* GUIFile::recurseLayout(const std::string& block, Tree<Layout>* parent, int i)
+{
+    Layout currLayout = parseLayout(block);
+    Tree<Layout>* node = manager.addChild(parent, std::move(currLayout));
+
+    size_t elemPos;
+    std::vector<GUIElementType> typeVec = {GUIElementType::POINT, GUIElementType::LINE, GUIElementType::BOX};
+
+    // parse nested layouts
+    std::string workingBlock = block;
+    size_t layoutPos = 0;
+    while (true)
+    {
+        size_t startPos = workingBlock.find("<layout", layoutPos);
+        std::string childBlock = getContent(workingBlock, "layout", layoutPos);
+        if (childBlock == "") 
+        {
+            break;
+        }
+
+        recurseLayout(childBlock, node, i+1);
+
+        workingBlock.erase(startPos, layoutPos - startPos);
+        layoutPos = startPos;
+    }
+
+    // parse elements
+    for (GUIElementType &elemType : typeVec)
+    {
+        elemPos = 0;
+        while (true)
+        {
+            std::string innerBlock;
+            switch (elemType)
+            {
+                case GUIElementType::POINT:
+                    innerBlock = getContent(workingBlock, "point", elemPos);
+                    break;
+                case GUIElementType::LINE:
+                    innerBlock = getContent(workingBlock, "line", elemPos);
+                    break;
+                case GUIElementType::BOX:
+                    innerBlock = getContent(workingBlock, "box", elemPos);
+                    break;
+            }
+            if (innerBlock == "") break;
+
+            size_t vecPos = 0;
+            vec2 pos1 = parseVec2(innerBlock, vecPos);
+            vec2 pos2 = parseVec2(innerBlock, vecPos);
+            vec3 color = parseVec3(innerBlock, vecPos);
+            std::unique_ptr<GUIElement> elem = GUIElementFactory::create(elemType, pos1, pos2, color);
+            node->getData().addElement(std::move(elem));
+        }
+    }
+
+    return node;
+}
+
 void GUIFile::readFile(const std::string &fileName)
 {
-    // clear containers before refilling them with file elements
-    lines.clear();
-    boxes.clear();
-    points.clear();
-
-    // ***update above lines to instead delete old layoutManager (if it exists) and create new one***
+    manager.clear();
 
     std::ifstream fp{fileName};
     if (!(fp))
@@ -145,81 +212,21 @@ void GUIFile::readFile(const std::string &fileName)
     std::stringstream buffer;
     buffer << fp.rdbuf();
     std::string content = buffer.str();
-
-    size_t currPos = 0, elemPos;
-    std::vector<GUIElementType> typeVec = {GUIElementType::POINT, GUIElementType::LINE, GUIElementType::BOX};
-
+    size_t currPos = 0;
+    
     std::stack<Tree<Layout>*> layoutStack;
     layoutStack.push(&manager.getRoot());
-    Tree<Layout> *parent = &manager.getRoot();
+    Tree<Layout> *root = &manager.getRoot();
 
     // for each layout, store internal layouts and elements
     while (true)
     {
         std::string layoutBlock = getContent(content, "layout", currPos);
         if (layoutBlock == "") break;
-        Layout currLayout = parseLayout(layoutBlock);
-
-        Tree<Layout>* parent = layoutStack.top();
-        Tree<Layout>* node = manager.addChild(parent, std::move(currLayout));
-        layoutStack.push(node);
-
-        for (GUIElementType &elemType : typeVec)
-        {
-            elemPos = 0;
-            while (true)
-            {
-                std::string innerBlock;
-                switch (elemType)
-                {
-                    case GUIElementType::POINT:
-                        innerBlock = getContent(layoutBlock, "point", elemPos);
-                        break;
-                    case GUIElementType::LINE:
-                        innerBlock = getContent(layoutBlock, "line", elemPos);
-                        break;
-                    case GUIElementType::BOX:
-                        innerBlock = getContent(layoutBlock, "box", elemPos);
-                        break;
-                }
-                if (innerBlock == "") break;
-
-                size_t vecPos = 0;
-                vec2 pos1 = parseVec2(innerBlock, vecPos);
-                vec2 pos2 = parseVec2(innerBlock, vecPos);
-                vec3 color = parseVec3(innerBlock, vecPos);
-                std::cout << static_cast<int>(elemType) << ": " << pos1.x << " " << pos1.y << "\n";
-                std::unique_ptr<GUIElement> elem = GUIElementFactory::create(elemType, pos1, pos2, color);
-                currLayout.addElement(std::move(elem));
-            }
-        }
         
-        parent = manager.addChild(parent, std::move(currLayout));
-
+        recurseLayout(layoutBlock, root, 0);
     }
 
-}
-
-void GUIFile::checkRead()
-{
-    auto& children = manager.getRoot().getChildren();
-    std::cout << "# of children: " <<  children.size();
-    if (!children.empty()) {
-        const Layout& layout = children[1]->getData(); // getData() returns the Layout stored in this Tree node
-        std::cout << "layout contains: \n";
-
-        for (const auto& elemPtr : layout.elements) {
-            if (dynamic_cast<Line*>(elemPtr.get())) {
-                std::cout << "Line\n";
-            } else if (dynamic_cast<Box*>(elemPtr.get())) {
-                std::cout << "Box\n";
-            } else if (dynamic_cast<Point*>(elemPtr.get())) {
-                std::cout << "Point\n";
-            } else {
-                std::cout << "Unknown element type\n";
-            }
-        }
-    }
 }
 
 static void writeNode(std::ofstream& outFile, const Tree<Layout>& node, int depth)

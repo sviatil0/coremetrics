@@ -23,6 +23,8 @@ public:
     Tree<Layout>& getRoot();
     Tree<Layout>* addChild(Tree<Layout>* parent, Layout layout);
     void render(Screen& screen, ivec2 screenStart, ivec2 screenEnd) const;
+
+    void clear();
 };
 
 #endif

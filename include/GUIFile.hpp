@@ -23,9 +23,11 @@ private:
 
     std::string getContent(const std::string &source, const std::string &tag, size_t &pos);
     float extractFloat(const std::string& block, const std::string& key);
-    Layout parseLayout(const std::string &block);
     vec2 parseVec2(const std::string &block, size_t &p);
     vec3 parseVec3(const std::string &block, size_t &p);
+    Layout parseLayout(const std::string &block);
+    Tree<Layout>* recurseLayout(const std::string& block, Tree<Layout>* parent, int i);
+
 
 public:
     GUIFile();
@@ -40,7 +42,5 @@ public:
     //file reading/parsing and writing
     void readFile(const std::string &fileName);
     void writeFile(std::string fileName);
-    
-    void checkRead();
 };
 #endif
