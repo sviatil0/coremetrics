@@ -94,10 +94,10 @@ static void testWriteFile()
     bool passed = hasLayout && hasPoint && hasValueOnOneLine;
     std::cout << (passed ? "PASS" : "FAIL") << '\n';
 
-    /*if (std::filesystem::exists(testFile)) 
+    if (std::filesystem::exists(testFile)) 
     {
         std::filesystem::remove(testFile);
-    }*/
+    }
 }
 
 static void testFileRead()
