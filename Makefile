@@ -57,7 +57,8 @@ TEST_OBJECTS = $(OBJDIR)/tests.o \
                $(OBJDIR)/ShowEvent.o \
                $(OBJDIR)/SoundEvent.o \
                $(OBJDIR)/EventManager.o \
-               $(OBJDIR)/SoundPlayer.o
+               $(OBJDIR)/SoundPlayer.o \
+               $(OBJDIR)/EventManagerTest.o
 HEADERS = $(INCDIR)/linear.hpp $(INCDIR)/screen.hpp $(INCDIR)/linearTest.hpp $(INCDIR)/screenTest.hpp $(INCDIR)/guiFileTest.hpp
 
 demo: directories $(DEMO_TARGET)
@@ -143,6 +144,9 @@ $(OBJDIR)/EventManager.o: $(SRCDIR)/EventManager.cpp $(INCDIR)/EventManager.hpp
 
 $(OBJDIR)/SoundPlayer.o: $(SRCDIR)/SoundPlayer.cpp $(INCDIR)/SoundPlayer.hpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@ $(LDFLAGS)
+
+$(OBJDIR)/EventManagerTest.o: $(TESTDIR)/EventManagerTest.cpp $(INCDIR)/EventManagerTest.hpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 $(DEMO_TARGET): $(OBJDIR)/main.o $(OBJDIR)/screen.o $(OBJDIR)/matrix.o $(OBJDIR)/button.o $(OBJDIR)/Layout.o $(OBJDIR)/LayoutManager.o $(OBJDIR)/Event.o $(OBJDIR)/ClickEvent.o $(OBJDIR)/ShowEvent.o $(OBJDIR)/SoundEvent.o $(OBJDIR)/EventManager.o $(OBJDIR)/SoundPlayer.o
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
