@@ -319,3 +319,66 @@ Using the screen class'`drawBox` function, draws a box between the button's min 
 
 ### bool checkToggle(int mouseX, int mouseY)
 Checks if the mouse coordinates are within the bounds of the button component.
+
+# Event
+## Description
+An abstract base class representing a message that can be pushed into the event queue and propagated through the layout tree. Each event carries an `EventType` enum value so handlers can identify the event without downcasting. Derived classes hold event-specific data.
+
+## Methods
+### EventType getType() const
+Returns the type of this event (EVENT_CLICK, EVENT_SHOW, or EVENT_SOUND).
+
+# ClickEvent
+## Description
+An event representing a mouse click. Carries the pixel coordinates of the click.
+
+## Methods
+### int getMouseX() const
+Returns the x-coordinate of the click.
+
+### int getMouseY() const
+Returns the y-coordinate of the click.
+
+# ShowEvent
+## Description
+An event that targets a named Layout to show or hide it.
+
+## Methods
+### const std::string& getLayoutName() const
+Returns the name of the Layout this event targets.
+
+### bool getShow() const
+Returns true if the Layout should be shown, false if hidden.
+
+# SoundEvent
+## Description
+An event requesting playback of a WAV audio file.
+
+## Methods
+### const std::string& getFilePath() const
+Returns the file path of the WAV file to play.
+
+# EventManager
+## Description
+A singleton that owns an event queue and dispatches events through the layout tree. Click events use trickle (top-down) propagation, calling `operator()` on each element until one consumes it. Show events find a Layout by name and toggle its active state. Sound events delegate to `SoundPlayer`.
+
+## Methods
+### static EventManager& getInstance()
+Returns the single global instance.
+
+### void pushEvent(std::unique_ptr<Event> event)
+Adds an event to the back of the queue.
+
+### void processEvents(ivec2 screenStart, ivec2 screenEnd)
+Drains the queue, dispatching each event by type. Click events are trickled through the layout tree. Show events find and toggle the target layout. Sound events trigger WAV playback.
+
+# SoundPlayer
+## Description
+A singleton that handles WAV audio playback through SDL3. Loads a WAV file and pushes the audio data into an SDL audio stream for playback at 44.1 kHz, mono, float 32-bit format.
+
+## Methods
+### static SoundPlayer& getInstance()
+Returns the single global instance.
+
+### void play(const std::string& filePath)
+Loads the specified WAV file and plays it through the default audio device.
