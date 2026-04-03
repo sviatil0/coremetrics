@@ -61,6 +61,11 @@ vec2 Layout::getEnd() const
     return end;
 }
 
+void Layout::setName(std::string name)
+{
+    this->name = name;
+} 
+
 std::string Layout::getName() const
 {
     return name;

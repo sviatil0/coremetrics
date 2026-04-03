@@ -25,6 +25,7 @@ public:
     bool isActive() const;
     vec2 getStart() const;
     vec2 getEnd() const;
+    void setName(std::string name);
     std::string getName() const;
 
     std::vector<std::unique_ptr<GUIElement>> elements; // MADE THIS PUBLIC FOR TESTING PURPOSES, SHOULD ADD getElements METHOD
