@@ -2,14 +2,14 @@
 #define __GUIELEMENT_HPP__
 
 #include "screen.hpp"
+#include "Event.hpp"
 
-// abstract base class for GUI elements
 class GUIElement
 {
 public:
     virtual ~GUIElement() {}
     virtual void draw(Screen& screen) = 0;
+    virtual bool operator()(Event* event) { return false; }
 };
-
 
 #endif
