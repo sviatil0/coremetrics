@@ -1,4 +1,4 @@
-<layout sX=0.25 sY=0.25 eX=0.75 eY=0.75 active=true>
+<layout sX=0.25 sY=0.25 eX=0.75 eY=0.75 active=true name=outer>
     <line>
         <vec2>
             <x>

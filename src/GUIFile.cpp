@@ -51,10 +51,10 @@ std::string GUIFile::getContent(const std::string &source, const std::string &ta
     size_t start = source.find(openTag, pos);
     // if tag not found in string, return
     if (start == std::string::npos) return "";
-
-    size_t tagEnd = source.find(">", start);
-    if (tagEnd == std::string::npos) return "";
-    start = tagEnd + 1;
+    
+    //size_t tagEnd = source.find(">", start);
+    //if (tagEnd == std::string::npos) return "";
+    start += openTag.length() + 1;
 
     size_t end, tempEnd;
     if (tag == "layout")
@@ -135,8 +135,22 @@ Layout GUIFile::parseLayout(const std::string &block)
     float ey = extractFloat(block, "eY");
     size_t activePos = block.find("true");
     bool active = (activePos == std::string::npos) ? false : true;
+
+    std::string nameTag = "name";
+    size_t nameStart = block.find(nameTag);
+    std::string name = "";
+    if (nameStart != std::string::npos)
+    {
+        nameStart += nameTag.length() + 1;
+        size_t nameEnd = nameStart;
+        while ((nameEnd < block.length()) && (block[nameEnd] != '>') && (block[nameEnd != ' ']))
+        {
+            nameEnd++;
+        }
+        name = block.substr(nameStart, nameEnd - nameStart);
+    }
     
-    return Layout(vec2(sx, sy), vec2(ex, ey), active);
+    return Layout(vec2(sx, sy), vec2(ex, ey), active, name);
 }
 
 Tree<Layout>* GUIFile::recurseLayout(const std::string& block, Tree<Layout>* parent, int i)
