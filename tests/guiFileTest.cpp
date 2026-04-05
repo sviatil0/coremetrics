@@ -83,21 +83,29 @@ static void testWriteFile()
     std::cout << "GUIFile writeFile: ";
     GUIFile f;
     std::string testFile = "unit_test_output.xml";
-    
-    f.setPoint(Point(vec2(480.0f, 270.0f), vec3(67.0f, 200.0f, 142.0f)));
+
+    LayoutManager& manager = LayoutManager::getInstance();
+    manager.clear();
+
+    Layout layout(vec2(0.0f, 0.0f), vec2(1.0f, 1.0f), true);
+    layout.addElement(GUIElementFactory::createPoint(vec2(480.0f, 270.0f), vec3(67.0f, 200.0f, 142.0f)));
+    manager.addChild(&manager.getRoot(), std::move(layout));
+
     f.writeFile(testFile);
-    
+
     bool hasLayout = fileContains(testFile, "<layout>");
-    bool hasPoint = fileContains(testFile, "  <point>");
+    bool hasPoint = fileContains(testFile, "<point>");
     bool hasValueOnOneLine = fileContains(testFile, "<x>480</x>");
-    
+
     bool passed = hasLayout && hasPoint && hasValueOnOneLine;
     std::cout << (passed ? "PASS" : "FAIL") << '\n';
 
-    if (std::filesystem::exists(testFile)) 
+    if (std::filesystem::exists(testFile))
     {
         std::filesystem::remove(testFile);
     }
+
+    manager.clear();
 }
 
 static void testFileRead()
