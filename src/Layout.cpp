@@ -1,6 +1,6 @@
 #include "Layout.hpp"
 
-Layout::Layout(vec2 start, vec2 end, bool active) : start(start), end(end), active(active)
+Layout::Layout(vec2 start, vec2 end, bool active, std::string name) : start(start), end(end), active(active), name(name)
 {
 }
 
@@ -59,4 +59,14 @@ vec2 Layout::getStart() const
 vec2 Layout::getEnd() const
 {
     return end;
+}
+
+void Layout::setName(std::string name)
+{
+    this->name = name;
+} 
+
+std::string Layout::getName() const
+{
+    return name;
 }

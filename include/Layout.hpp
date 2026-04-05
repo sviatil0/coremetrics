@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <memory>
+#include <string>
 #include "GUIElement.hpp"
 #include "screen.hpp"
 #include "vec2.hpp"
@@ -13,16 +14,19 @@ private:
     vec2 start;
     vec2 end;
     bool active;
-    
+    std::string name;
 
 public:
-    Layout(vec2 start, vec2 end, bool active = true);
+    //Layout(vec2 start, vec2 end, bool active = true);
+    Layout(vec2 start, vec2 end, bool active = true, std::string name = "");
 
     void addElement(std::unique_ptr<GUIElement> element);
     void setActive(bool active);
     bool isActive() const;
     vec2 getStart() const;
     vec2 getEnd() const;
+    void setName(std::string name);
+    std::string getName() const;
 
     std::vector<std::unique_ptr<GUIElement>> elements; // MADE THIS PUBLIC FOR TESTING PURPOSES, SHOULD ADD getElements METHOD
 

@@ -75,6 +75,29 @@ void testSoundEventCreation()
     std::cout << (passed ? "PASS" : "FAIL") << '\n';
 }
 
+void testFindLayoutByName()
+{
+    std::cout << "EventManager : find layout by name: ";
+    LayoutManager &manager = LayoutManager::getInstance();
+    Tree<Layout> *child1 = manager.addChild(
+        &manager.getRoot(),
+        Layout(vec2(0.5f, 0.5f), vec2(1.0f, 1.0f), true, "first"));
+    Tree<Layout> *child2 = manager.addChild(
+        &manager.getRoot(),
+        Layout(vec2(0.5f, 1.0f), vec2(1.0f, 1.0f), true, "second"));
+    Tree<Layout> *child3 = manager.addChild(
+        child1,
+        Layout(vec2(0.5f, 1.0f), vec2(1.0f, 1.0f), true, "third"));
+    Tree<Layout> *child4 = manager.addChild(
+        child2,
+        Layout(vec2(0.5f, 1.0f), vec2(1.0f, 1.0f), true, "fourth"));
+
+    std::string name = "third";
+    Tree<Layout> *found = EventManager::findLayoutByName(manager.getRoot(), name);
+    bool passed = (child3 == found);
+    std::cout << (passed ? "PASS" : "FAIL") << '\n';
+}
+
 void eventManagerTestSuite()
 {
     std::cout << "=============================================" << '\n';
@@ -90,6 +113,7 @@ void eventManagerTestSuite()
     testClickEventCreation();
     testShowEventCreation();
     testSoundEventCreation();
+    testFindLayoutByName();
 
     std::cout << '\n';
     std::cout << "=============================================" << '\n';

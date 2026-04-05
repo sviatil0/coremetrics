@@ -83,33 +83,48 @@ main.cpp is a demonstration program that utilizes the Screen and GUIFile classes
 
 # Matrix
 ## Description
-Class description
+A Matrix object is a 3x3 matrix of floats stored as a 2d array.
 
 ## Methods
-### return identifier(parameter list)
-Description of method
+### Matrix operator*(const Matrix &rhs) const
+Performs matrix multiplication between this matrix and the given right hand side matrix, returning the resulting matrix.
 
-etc..
+### bool operator==(const Matrix &rhs) const;
+Checks if this matrix is equal to the rhs matrix.
+
+### Matrix toTranspose() const;
+Returns a transposed version of the current matrix.
 
 # vec2
 ## Description
-Class description
+A linear algebra class for a templated (int or float) vector with two components. It includes a conversion operator for implicit conversion between int and float vectors. It also overrides the ==, +, -, *, +=, -=, *=, and [] operators to perform operations on each component of the vector object.
 
 ## Methods
-### return identifier(parameter list)
-Description of method
+### T dot(const Tvec2<T> &rhs) const
+Returns the dot product of this vector with rhs as whichever type the vector is templated to be.
 
-etc..
+### T magnitude() const
+Returns the magnitude of this vector. If it is a float vec2, it gives the sqrt of x^2 + y^2. If it is an int vec2, it gives the Manhattan distance (L1 norm) as the abs of each component added together.
+
+### Tvec2<T> unit() const
+Returns a new vector as the unit vector of the current one, with each component divided by the magnitude as given by the above magnitude() method.
 
 # vec3
 ## Description
-Class description
+A linear algebra class for a templated (int or float) vector with three components. It includes a conversion operator for implicit conversion between int and float vectors. It also overrides the ==, +, -, *, +=, -=, *=, and [] operators to perform operations on each component of the vector object.
 
 ## Methods
-### return identifier(parameter list)
-Description of methods
+### T dot(const Tvec3<T> &rhs) const
+Returns the dot product of this vector with rhs as whichever type the vector is templated to be.
 
-etc..
+### T magnitude() const
+Returns the magnitude of this vector. If it is a float vec3, it gives the sqrt of x^2 + y^2 + z^2. If it is an int vec3, it gives the Manhattan distance (L1 norm) as the abs of each component added together.
+
+### Tvec3<T> unit() const
+Returns a new vector as the unit vector of the current one, with each component divided by the magnitude as given by the above magnitude() method.
+
+### Tvec3<T> cross(const Tvec3<T> &rhs) const
+Returns a new vector of the cross product between this vector object and the given rhs.
 
 # Screen
 ## Description
@@ -159,9 +174,6 @@ Returns a copy of the internal lines vector to provide read-only access to stage
 
 ### std::vector<Box> getBoxes()
 Returns a copy of the internal boxes vector to provide read-only access to staged data.
-
-### splitString(const std::string &str, const std::string &delim)
-This method takes in a string to split and a set of delimiters as a string to split it by. A string vector stores the substrings. Once the find method does not find anymore delimiters, the method returns the populated vector with the separated tokens.
 
 ### void readFile(std::string fileName)
 Parses a specified XML file into GUI elements. The method clears all internal containers before parsing to ensure no data overlap.
@@ -266,6 +278,12 @@ Returns the layout's relative start coordinate (0.0–1.0).
 
 ### vec2 getEnd() const
 Returns the layout's relative end coordinate (0.0–1.0).
+
+### void setName(std::string name) const
+Sets the layout's name.
+
+### std::string getName() const
+Returns the layout's name.
 
 ### void draw(Screen& screen, ivec2 parentStart, ivec2 parentEnd) const
 Draws all elements in the layout. Returns immediately if the layout is inactive. Resolves the layout's absolute bounds from the parent bounds, then calls `draw(screen)` on each contained `GUIElement`.

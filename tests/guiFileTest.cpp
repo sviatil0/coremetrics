@@ -117,8 +117,11 @@ static void testFileRead()
     bool layoutPassed = false;
     if (!children.empty()) {
         const Layout& layout = children[0]->getData();
-        layoutPassed = (layout.getStart().x == 0.25) && (layout.getStart().y == 0.25) && 
-                        (layout.getEnd().x == 0.75) && (layout.getEnd().y == 0.75) && (layout.isActive());
+        bool layoutPos = (layout.getStart().x == 0.25) && (layout.getStart().y == 0.25) && 
+                        (layout.getEnd().x == 0.75) && (layout.getEnd().y == 0.75);
+        bool layoutAttr = (layout.isActive()) && (layout.getName() == "outer");
+        layoutPassed = layoutPos && layoutAttr;
+
         for (const auto& elemPtr : layout.elements) {
             if (dynamic_cast<Line*>(elemPtr.get())) {
                 numLine++;
