@@ -189,6 +189,9 @@ An abstract base class (ABC) that serves as the foundation for all renderable UI
 ### virtual void draw(Screen& screen) = 0
 A pure virtual method that subclasses must implement. By receiving a `Screen` reference as a parameter, the element remains decoupled from the specific rendering target, allowing for better memory efficiency and flexibility.
 
+### virtual bool operator()(Event* event)
+Called by `EventManager` during trickle propagation. Returns `false` by default. Subclasses override this to handle an incoming event. Returns `true` if the event was consumed and propagation should stop.
+
 # Point
 ## Description
 A concrete GUIElement that represents a single colored pixel. Stores a 2D position and a color.
@@ -344,14 +347,17 @@ Returns the file path of the image asset associated with this object.
 
 # Button
 ## Description
-A component designed to render a box which recognizes when it is clicked. 
+A component designed to render a box which recognizes when it is clicked. Optionally accepts a `soundFile` path and a `targetLayout` name. When clicked, it pushes a `SoundEvent` and/or a `ShowEvent` to the `EventManager` based on which of those fields are set.
 
 ## Methods
 ### void draw(Screen& screen) override
-Using the screen class'`drawBox` function, draws a box between the button's min and max boundaries, filled in with the given color and a one pixel thick white border.
+Using the screen class' `drawBox` function, draws a box between the button's min and max boundaries, filled in with the given color and a one pixel thick white border.
 
 ### bool checkToggle(int mouseX, int mouseY)
 Checks if the mouse coordinates are within the bounds of the button component.
+
+### bool operator()(Event* event) override
+Handles an incoming event. If the event is a `ClickEvent` and the click coordinates fall within the button's bounds, pushes a `SoundEvent` (if `soundFile` is set) and a `ShowEvent` (if `targetLayout` is set) to the `EventManager`, then returns `true`. Returns `false` for a click miss or any non-click event type.
 
 # Event
 ## Description

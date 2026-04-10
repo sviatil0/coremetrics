@@ -7,6 +7,8 @@
 #include "button.hpp"
 #include "GUIElements.hpp"
 #include "GUIElementFactory.hpp"
+#include "ClickEvent.hpp"
+#include "ShowEvent.hpp"
 
 bool checkPixel(SDL_Surface *surface, int x, int y, Uint8 expectedR, Uint8 expectedG, Uint8 expectedB)
 {
@@ -228,6 +230,33 @@ void testFactoryCreate()
     std::cout << (passed ? "PASS" : "FAIL") << '\n';
 }
 
+void testButtonOperatorHit()
+{
+    std::cout << "Button - operator() hit returns true: ";
+    Button btn(ivec2(10, 10), ivec2(20, 20), vec3(1.0f, 0.0f, 0.0f));
+    ClickEvent event(15, 15);
+    bool passed = btn(&event);
+    std::cout << (passed ? "PASS" : "FAIL") << '\n';
+}
+
+void testButtonOperatorMiss()
+{
+    std::cout << "Button - operator() miss returns false: ";
+    Button btn(ivec2(10, 10), ivec2(20, 20), vec3(1.0f, 0.0f, 0.0f));
+    ClickEvent event(5, 5);
+    bool passed = !btn(&event);
+    std::cout << (passed ? "PASS" : "FAIL") << '\n';
+}
+
+void testButtonOperatorWrongType()
+{
+    std::cout << "Button - operator() wrong event type returns false: ";
+    Button btn(ivec2(10, 10), ivec2(20, 20), vec3(1.0f, 0.0f, 0.0f));
+    ShowEvent event("someLayout", true);
+    bool passed = !btn(&event);
+    std::cout << (passed ? "PASS" : "FAIL") << '\n';
+}
+
 void GUIElementTestSuite()
 {
     std::cout << "=============================================" << '\n';
@@ -241,6 +270,9 @@ void GUIElementTestSuite()
     testImageMissingFile();
     testButtonDraw();
     testButtonCheckToggle();
+    testButtonOperatorHit();
+    testButtonOperatorMiss();
+    testButtonOperatorWrongType();
     testPointDraw();
     testLineDraw();
     testBoxDraw();
