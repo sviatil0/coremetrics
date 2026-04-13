@@ -1,4 +1,4 @@
-<layout>
+<layout sX=0.25 sY=0.25 eX=0.75 eY=0.75 active=true name=outer>
     <line>
         <vec2>
             <x>
@@ -15,6 +15,23 @@
         <vec3><x>244.0</x> <y>245.0</y> <z>103.3</z>
     </vec3>
 </line>
+        <layout sX=0.25 sY=0.25 eX=0.75 eY=0.75 active=true>
+        <line>
+            <vec2>
+                <x>
+                    13.2
+                </x>
+                <y>
+                    21
+                </y>
+            </vec2>
+                    <vec2>
+        <x>75.6</x>
+    <y>1024.6</y>
+        </vec2>
+            <vec3><x>244.0</x> <y>245.0</y> <z>103.3</z>
+        </vec3>
+    </line></layout>
     <box>
 <vec2>
     <x>250.3</x>

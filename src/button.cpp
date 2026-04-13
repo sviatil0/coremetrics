@@ -1,7 +1,11 @@
 #include "button.hpp"
+#include "EventManager.hpp"
+#include "ClickEvent.hpp"
+#include "SoundEvent.hpp"
+#include "ShowEvent.hpp"
 
-Button::Button(ivec2 minP, ivec2 maxP, vec3 col)
-    : minPos(minP), maxPos(maxP), color(col)
+Button::Button(ivec2 minP, ivec2 maxP, vec3 col, std::string soundFile, std::string targetLayout)
+    : minPos(minP), maxPos(maxP), color(col), soundFile(soundFile), targetLayout(targetLayout)
 {
 }
 
@@ -26,4 +30,29 @@ bool Button::checkToggle(int mouseX, int mouseY)
         return true;
     }
     return false;
+}
+
+bool Button::operator()(Event* event)
+{
+    if (event->getType() != EVENT_CLICK)
+    {
+        return false;
+    }
+
+    ClickEvent* click = static_cast<ClickEvent*>(event);
+    if (!checkToggle(click->getMouseX(), click->getMouseY()))
+    {
+        return false;
+    }
+
+    if (!soundFile.empty())
+    {
+        EventManager::getInstance().pushEvent(std::make_unique<SoundEvent>(soundFile));
+    }
+    if (!targetLayout.empty())
+    {
+        EventManager::getInstance().pushEvent(std::make_unique<ShowEvent>(targetLayout, true));
+    }
+
+    return true;
 }

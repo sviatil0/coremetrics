@@ -33,6 +33,15 @@ Screen::~Screen()
     }
 }
 
+void Screen::clear()
+{
+    if (!surface)
+    {
+        return;
+    }
+    SDL_FillSurfaceRect(surface, nullptr, 0);
+}
+
 void Screen::blitTo(SDL_Surface *target)
 {
     if (!surface || !target)

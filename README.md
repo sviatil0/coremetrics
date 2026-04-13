@@ -83,33 +83,48 @@ main.cpp is a demonstration program that utilizes the Screen and GUIFile classes
 
 # Matrix
 ## Description
-Class description
+A Matrix object is a 3x3 matrix of floats stored as a 2d array.
 
 ## Methods
-### return identifier(parameter list)
-Description of method
+### Matrix operator*(const Matrix &rhs) const
+Performs matrix multiplication between this matrix and the given right hand side matrix, returning the resulting matrix.
 
-etc..
+### bool operator==(const Matrix &rhs) const;
+Checks if this matrix is equal to the rhs matrix.
+
+### Matrix toTranspose() const;
+Returns a transposed version of the current matrix.
 
 # vec2
 ## Description
-Class description
+A linear algebra class for a templated (int or float) vector with two components. It includes a conversion operator for implicit conversion between int and float vectors. It also overrides the ==, +, -, *, +=, -=, *=, and [] operators to perform operations on each component of the vector object.
 
 ## Methods
-### return identifier(parameter list)
-Description of method
+### T dot(const Tvec2<T> &rhs) const
+Returns the dot product of this vector with rhs as whichever type the vector is templated to be.
 
-etc..
+### T magnitude() const
+Returns the magnitude of this vector. If it is a float vec2, it gives the sqrt of x^2 + y^2. If it is an int vec2, it gives the Manhattan distance (L1 norm) as the abs of each component added together.
+
+### Tvec2<T> unit() const
+Returns a new vector as the unit vector of the current one, with each component divided by the magnitude as given by the above magnitude() method.
 
 # vec3
 ## Description
-Class description
+A linear algebra class for a templated (int or float) vector with three components. It includes a conversion operator for implicit conversion between int and float vectors. It also overrides the ==, +, -, *, +=, -=, *=, and [] operators to perform operations on each component of the vector object.
 
 ## Methods
-### return identifier(parameter list)
-Description of methods
+### T dot(const Tvec3<T> &rhs) const
+Returns the dot product of this vector with rhs as whichever type the vector is templated to be.
 
-etc..
+### T magnitude() const
+Returns the magnitude of this vector. If it is a float vec3, it gives the sqrt of x^2 + y^2 + z^2. If it is an int vec3, it gives the Manhattan distance (L1 norm) as the abs of each component added together.
+
+### Tvec3<T> unit() const
+Returns a new vector as the unit vector of the current one, with each component divided by the magnitude as given by the above magnitude() method.
+
+### Tvec3<T> cross(const Tvec3<T> &rhs) const
+Returns a new vector of the cross product between this vector object and the given rhs.
 
 # Screen
 ## Description
@@ -160,9 +175,6 @@ Returns a copy of the internal lines vector to provide read-only access to stage
 ### std::vector<Box> getBoxes()
 Returns a copy of the internal boxes vector to provide read-only access to staged data.
 
-### splitString(const std::string &str, const std::string &delim)
-This method takes in a string to split and a set of delimiters as a string to split it by. A string vector stores the substrings. Once the find method does not find anymore delimiters, the method returns the populated vector with the separated tokens.
-
 ### void readFile(std::string fileName)
 Parses a specified XML file into GUI elements. The method clears all internal containers before parsing to ensure no data overlap.
 
@@ -176,6 +188,9 @@ An abstract base class (ABC) that serves as the foundation for all renderable UI
 ## Methods
 ### virtual void draw(Screen& screen) = 0
 A pure virtual method that subclasses must implement. By receiving a `Screen` reference as a parameter, the element remains decoupled from the specific rendering target, allowing for better memory efficiency and flexibility.
+
+### virtual bool operator()(Event* event)
+Called by `EventManager` during trickle propagation. Returns `false` by default. Subclasses override this to handle an incoming event. Returns `true` if the event was consumed and propagation should stop.
 
 # Point
 ## Description
@@ -218,6 +233,81 @@ Creates and returns a heap-allocated `Box` with the given corner positions and c
 ### static GUIElement* create(GUIElementType type, vec2 pos1, vec2 pos2, vec3 color)
 Generic entry point for runtime element creation, for use when the element type is determined at runtime (e.g. XML parsing). `pos2` is ignored for `POINT`. Prints to `std::cerr` and returns `nullptr` for unknown types.
 
+# Tree
+## Description
+A generic templated tree data structure. Each node holds a value of type `T`, a non-owning raw pointer to its parent, and owning `unique_ptr` children. Because it is a template, the full implementation lives in the header.
+
+## Methods
+### T& getData()
+Returns a reference to the value stored in this node.
+
+### Tree<T>* getParent()
+Returns a raw pointer to the parent node, or `nullptr` if this node is the root.
+
+### bool isRoot() const
+Returns true if this node has no parent.
+
+### bool isLeaf() const
+Returns true if this node has no children.
+
+### std::vector<std::unique_ptr<Tree<T>>>& getChildren()
+Returns a reference to the vector of child nodes.
+
+### Tree<T>* addChild(T childData)
+Constructs a new child node from the given value, appends it to the children vector, sets its parent pointer to this node, and returns a raw pointer to the new child.
+
+# Layout
+## Description
+Represents a rectangular region of the screen defined by relative coordinates (0.0–1.0) within its parent region. Layouts form a tree hierarchy managed by `LayoutManager`. Each layout holds a flat list of `GUIElement` objects that are drawn when the layout is active. The painter's algorithm is handled externally by `LayoutManager::render`, which traverses the tree and draws parent layouts before children.
+
+## Methods
+### ivec2 resolveAbsStart(ivec2 parentStart, ivec2 parentEnd) const
+Converts the layout's relative `start` (0.0–1.0) to an absolute pixel coordinate by interpolating within the parent's pixel bounds: `parentStart + start * (parentEnd - parentStart)`.
+
+### ivec2 resolveAbsEnd(ivec2 parentStart, ivec2 parentEnd) const
+Converts the layout's relative `end` (0.0–1.0) to an absolute pixel coordinate using the same interpolation as `resolveAbsStart`.
+
+### void addElement(std::unique_ptr<GUIElement> element)
+Appends a GUIElement to the layout's internal list. The layout takes ownership via unique_ptr.
+
+### void setActive(bool active)
+Sets the active state. When inactive, the layout skips rendering entirely.
+
+### bool isActive() const
+Returns the current active state.
+
+### vec2 getStart() const
+Returns the layout's relative start coordinate (0.0–1.0).
+
+### vec2 getEnd() const
+Returns the layout's relative end coordinate (0.0–1.0).
+
+### void setName(std::string name) const
+Sets the layout's name.
+
+### std::string getName() const
+Returns the layout's name.
+
+### void draw(Screen& screen, ivec2 parentStart, ivec2 parentEnd) const
+Draws all elements in the layout. Returns immediately if the layout is inactive. Resolves the layout's absolute bounds from the parent bounds, then calls `draw(screen)` on each contained `GUIElement`.
+
+# LayoutManager
+## Description
+A singleton that owns the root `Tree<Layout>` and manages the full layout hierarchy. It centralizes tree construction and rendering so that `main.cpp` only needs to call `getInstance()`, populate layouts, and call `render()` each frame.
+
+## Methods
+### static LayoutManager& getInstance()
+Returns the single global instance.
+
+### Tree<Layout>& getRoot()
+Returns a reference to the root layout node.
+
+### Tree<Layout>* addChild(Tree<Layout>* parent, Layout layout)
+Adds a new child layout under the given parent node and returns a pointer to the new node.
+
+### void render(Screen& screen, ivec2 screenStart, ivec2 screenEnd) const
+Traverses the layout tree using the painter's algorithm (depth-first, parent before children) and calls `draw` on each active layout, passing the resolved absolute bounds down the call stack.
+
 # Label
 ## Description
 A UI component responsible for managing and displaying text strings. It currently utilizes a "placeholder" system that renders a proportional box for each character to verify layout, spacing, and color before a full font engine is integrated.
@@ -257,11 +347,77 @@ Returns the file path of the image asset associated with this object.
 
 # Button
 ## Description
-A component designed to render a box which recognizes when it is clicked. 
+A component designed to render a box which recognizes when it is clicked. Optionally accepts a `soundFile` path and a `targetLayout` name. When clicked, it pushes a `SoundEvent` and/or a `ShowEvent` to the `EventManager` based on which of those fields are set.
 
 ## Methods
 ### void draw(Screen& screen) override
-Using the screen class'`drawBox` function, draws a box between the button's min and max boundaries, filled in with the given color and a one pixel thick white border.
+Using the screen class' `drawBox` function, draws a box between the button's min and max boundaries, filled in with the given color and a one pixel thick white border.
 
 ### bool checkToggle(int mouseX, int mouseY)
 Checks if the mouse coordinates are within the bounds of the button component.
+
+### bool operator()(Event* event) override
+Handles an incoming event. If the event is a `ClickEvent` and the click coordinates fall within the button's bounds, pushes a `SoundEvent` (if `soundFile` is set) and a `ShowEvent` (if `targetLayout` is set) to the `EventManager`, then returns `true`. Returns `false` for a click miss or any non-click event type.
+
+# Event
+## Description
+An abstract base class representing a message that can be pushed into the event queue and propagated through the layout tree. Each event carries an `EventType` enum value so handlers can identify the event without downcasting. Derived classes hold event-specific data.
+
+## Methods
+### EventType getType() const
+Returns the type of this event (EVENT_CLICK, EVENT_SHOW, or EVENT_SOUND).
+
+# ClickEvent
+## Description
+An event representing a mouse click. Carries the pixel coordinates of the click.
+
+## Methods
+### int getMouseX() const
+Returns the x-coordinate of the click.
+
+### int getMouseY() const
+Returns the y-coordinate of the click.
+
+# ShowEvent
+## Description
+An event that targets a named Layout to show or hide it.
+
+## Methods
+### const std::string& getLayoutName() const
+Returns the name of the Layout this event targets.
+
+### bool getShow() const
+Returns true if the Layout should be shown, false if hidden.
+
+# SoundEvent
+## Description
+An event requesting playback of a WAV audio file.
+
+## Methods
+### const std::string& getFilePath() const
+Returns the file path of the WAV file to play.
+
+# EventManager
+## Description
+A singleton that owns an event queue and dispatches events through the layout tree. Click events use trickle (top-down) propagation, calling `operator()` on each element until one consumes it. Show events find a Layout by name and toggle its active state. Sound events delegate to `SoundPlayer`.
+
+## Methods
+### static EventManager& getInstance()
+Returns the single global instance.
+
+### void pushEvent(std::unique_ptr<Event> event)
+Adds an event to the back of the queue.
+
+### void processEvents(ivec2 screenStart, ivec2 screenEnd)
+Drains the queue, dispatching each event by type. Click events are trickled through the layout tree. Show events find and toggle the target layout. Sound events trigger WAV playback.
+
+# SoundPlayer
+## Description
+A singleton that handles WAV audio playback through SDL3. Loads a WAV file and pushes the audio data into an SDL audio stream for playback at 44.1 kHz, mono, float 32-bit format.
+
+## Methods
+### static SoundPlayer& getInstance()
+Returns the single global instance.
+
+### void play(const std::string& filePath)
+Loads the specified WAV file and plays it through the default audio device.
