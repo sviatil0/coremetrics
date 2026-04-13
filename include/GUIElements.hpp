@@ -4,6 +4,8 @@
 #include "Point.hpp"
 #include "Line.hpp"
 #include "Box.hpp"
+#include "Label.hpp"
+#include "Button.hpp"
 
 enum class GUIElementType
 {

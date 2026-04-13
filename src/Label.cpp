@@ -1,4 +1,4 @@
-#include "label.hpp"
+#include "Label.hpp"
 
 Label::Label(std::string text, ivec2 pos, vec3 col) : m_text(text), m_position(pos), m_color(col) 
 {
@@ -9,7 +9,12 @@ std::string Label::getText() const
     return m_text;
 }
 
-void Label::draw(Screen& screen) 
+void Label::setText(std::string text)
+{
+    this->m_text = text;
+}
+
+/*void Label::draw(Screen& screen) 
 {
     int charWidth = 8; 
     int charHeight = 12;
@@ -22,4 +27,9 @@ void Label::draw(Screen& screen)
 
         screen.drawBox(charPos, charMax, m_color); // ask how to implement font
     }
+}*/
+
+void Label::draw(Screen& screen)
+{
+    screen.drawText(this->m_position, this->m_color, this->m_text);
 }

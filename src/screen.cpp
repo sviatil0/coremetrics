@@ -22,6 +22,13 @@ Screen::Screen(unsigned int w, unsigned int h) : width(w), height(h), surface(nu
     {
         std::cerr << "Failed to set the blending mode for the surface: " << SDL_GetError() << '\n';
     }
+
+    renderer = SDL_CreateSoftwareRenderer(surface);
+    if (!renderer)
+    {
+        std::cerr << "Failed to create renderer: " << SDL_GetError() << '\n';
+        return;
+    }
 }
 
 Screen::~Screen()
@@ -30,6 +37,11 @@ Screen::~Screen()
     {
         SDL_DestroySurface(surface);
         surface = nullptr;
+    }
+    if (renderer)
+    {
+        SDL_DestroyRenderer(renderer);
+        renderer  = nullptr;
     }
 }
 
@@ -208,4 +220,13 @@ void Screen::drawTriangle(const Tvec2<int> &v1, const Tvec2<int> &v2, const Tvec
             }
         }
     }
+}
+
+void Screen::drawText(const Tvec2<int> &pos, const Tvec3<float> &color, std::string text)
+{
+    SDL_SetRenderDrawColor(this->renderer, static_cast<Uint8>(color.x * 255),
+                                            static_cast<Uint8>(color.y * 255),
+                                            static_cast<Uint8>(color.z * 255), 255);
+    SDL_RenderDebugText(this->renderer, pos.x, pos.y, text.c_str());
+    SDL_RenderPresent(this->renderer);
 }

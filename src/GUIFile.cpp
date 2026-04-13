@@ -13,35 +13,6 @@ GUIFile::GUIFile() : manager(LayoutManager::getInstance())
 {
 }
 
-
-void GUIFile::setPoint(Point point)
-{
-    points.push_back(point);
-}
-
-void GUIFile::setLine(Line line)
-{
-    lines.push_back(line);
-}
-
-void GUIFile::setBox(Box box)
-{
-    boxes.push_back(box);
-}
-
-std::vector<Point> GUIFile::getPoints()
-{
-    return points;
-}
-std::vector<Line> GUIFile::getLines()
-{
-    return lines;
-}
-std::vector<Box> GUIFile::getBoxes()
-{
-    return boxes;
-}
-
 std::string GUIFile::getContent(const std::string &source, const std::string &tag, size_t &pos)
 {
     // attributes contained within opening tag for layouts, so ignore closing >

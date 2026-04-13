@@ -20,6 +20,7 @@ public:
     virtual void draw(Screen& screen) override;
 
     std::string getText() const;
+    void setText(std::string text);
 };
 
 #endif

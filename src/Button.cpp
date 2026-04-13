@@ -1,4 +1,4 @@
-#include "button.hpp"
+#include "Button.hpp"
 
 Button::Button(ivec2 minP, ivec2 maxP, vec3 col)
     : minPos(minP), maxPos(maxP), color(col)
