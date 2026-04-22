@@ -73,23 +73,12 @@ gpu_burn()
         PIDS+=("$!")
         return
     fi
-    if [ "$(uname)" = "Darwin" ] && command -v python3 >/dev/null 2>&1; then
-        # macOS fallback: hammer Metal via Python + Quartz drawing loop
-        echo "[stress] GPU: python Quartz fallback (weak)"
-        python3 -c "
-import time, sys
-try:
-    from Quartz import CGDisplayCreateImageForRect, CGMainDisplayID, CGRectMake
-    end = time.time() + ${DURATION}
-    while time.time() < end:
-        CGDisplayCreateImageForRect(CGMainDisplayID(), CGRectMake(0, 0, 256, 256))
-except Exception as e:
-    sys.stderr.write(str(e))
-" &
-        PIDS+=("$!")
+    if [ "$(uname)" = "Darwin" ]; then
+        echo "[stress] GPU: opening WebGL aquarium in browser"
+        open "https://webglsamples.org/aquarium/aquarium.html"
         return
     fi
-    echo "[stress] GPU: no stress tool found (install glmark2 or stress-ng)"
+    echo "[stress] GPU: no stress tool found (install glmark2 or stress-ng, or open a WebGL page manually)"
 }
 
 for i in $(seq 1 "$WORKERS"); do
