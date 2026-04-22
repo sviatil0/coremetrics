@@ -10,10 +10,13 @@
 #include "ClickEvent.hpp"
 #include "SoundEvent.hpp"
 #include "SoundPlayer.hpp"
+#include "font.hpp"
 #include "Bar.hpp"
+#include "Box.hpp"
 #include "Row.hpp"
 #include "label.hpp"
 #include "button.hpp"
+#include "image.hpp"
 #include "SystemMetrics.hpp"
 
 constexpr int RESX = 960;
@@ -30,6 +33,21 @@ constexpr Uint64 POLL_INTERVAL_MS = 500;
 
 constexpr float ALARM_THRESHOLD = 80.0f;
 constexpr const char *ALARM_SOUND_PATH = "assets/click.wav";
+
+static const vec3 COLOR_ACCENT_GREEN(0.871f, 1.0f, 0.608f);
+static const vec3 COLOR_WHITE(1.0f, 1.0f, 1.0f);
+static const vec3 COLOR_FRAME(0.85f, 0.85f, 0.85f);
+
+static const vec3 COLOR_TAB_ACTIVE(0.10f, 0.10f, 0.10f);
+static const vec3 COLOR_MUTE_BTN(0.08f, 0.08f, 0.08f);
+static const vec3 COLOR_EXIT_BTN(0.18f, 0.05f, 0.05f);
+static const vec3 COLOR_TEXT_PRIMARY(1.0f, 1.0f, 1.0f);
+static const vec3 COLOR_TEXT_ACCENT(0.871f, 1.0f, 0.608f);
+static const vec3 COLOR_BAR_CPU_FILL(0.871f, 1.0f, 0.608f);
+static const vec3 COLOR_BAR_RAM_FILL(0.871f, 1.0f, 0.608f);
+static const vec3 COLOR_BAR_BG(0.12f, 0.12f, 0.12f);
+static const vec3 COLOR_ROW_TEXT(1.0f, 1.0f, 1.0f);
+static const vec3 COLOR_ROW_HEADER(0.871f, 1.0f, 0.608f);
 
 static Bar *g_cpuBar = nullptr;
 static Bar *g_ramBar = nullptr;
@@ -144,24 +162,24 @@ static void buildScene()
     tabbar->getData().addElement(std::make_unique<Button>(
         ivec2(TAB_BTN_PAD, btnY),
         ivec2(TAB_BTN_PAD + btnWidth, btnMaxY),
-        vec3(0.2f, 0.4f, 0.7f),
+        COLOR_TAB_ACTIVE,
         "",
         "system",
         "processes"));
     tabbar->getData().addElement(std::make_unique<Label>("System",
         ivec2(TAB_BTN_PAD + 12, btnY + 6),
-        vec3(1.0f, 1.0f, 1.0f)));
+        COLOR_TEXT_PRIMARY));
 
     tabbar->getData().addElement(std::make_unique<Button>(
         ivec2(TAB_BTN_PAD * 2 + btnWidth, btnY),
         ivec2(TAB_BTN_PAD * 2 + btnWidth * 2, btnMaxY),
-        vec3(0.2f, 0.4f, 0.7f),
+        COLOR_TAB_ACTIVE,
         "",
         "processes",
         "system"));
     tabbar->getData().addElement(std::make_unique<Label>("Processes",
         ivec2(TAB_BTN_PAD * 2 + btnWidth + 12, btnY + 6),
-        vec3(1.0f, 1.0f, 1.0f)));
+        COLOR_TEXT_PRIMARY));
 
     g_muteBtnMin = ivec2(TAB_BTN_PAD * 3 + btnWidth * 2, btnY);
     g_muteBtnMax = ivec2(g_muteBtnMin.x + muteBtnWidth, btnMaxY);
@@ -169,11 +187,11 @@ static void buildScene()
     tabbar->getData().addElement(std::make_unique<Button>(
         g_muteBtnMin,
         g_muteBtnMax,
-        vec3(0.4f, 0.4f, 0.4f),
+        COLOR_MUTE_BTN,
         "", "", ""));
     tabbar->getData().addElement(std::make_unique<Label>("SOUND ON",
         ivec2(g_muteBtnMin.x + 6, btnY + 6),
-        vec3(1.0f, 1.0f, 1.0f)));
+        COLOR_TEXT_PRIMARY));
 
     int exitBtnSize = 64;
     int exitBtnPad = 16;
@@ -182,11 +200,24 @@ static void buildScene()
     root.getData().addElement(std::make_unique<Button>(
         g_exitBtnMin,
         g_exitBtnMax,
-        vec3(0.7f, 0.2f, 0.2f),
+        COLOR_EXIT_BTN,
         "", "", ""));
     root.getData().addElement(std::make_unique<Label>("EXIT",
         ivec2(g_exitBtnMin.x + 16, g_exitBtnMin.y + 22),
-        vec3(1.0f, 1.0f, 1.0f)));
+        COLOR_TEXT_PRIMARY));
+
+    int logoX = BAR_MARGIN;
+    int logoY = RESY - 48 - exitBtnPad;
+    root.getData().addElement(std::make_unique<Box>(
+        vec2(static_cast<float>(logoX), static_cast<float>(logoY + 28)),
+        vec2(static_cast<float>(logoX + 180), static_cast<float>(logoY + 32)),
+        COLOR_ACCENT_GREEN));
+    root.getData().addElement(std::make_unique<Label>("CoreMetrics",
+        ivec2(logoX, logoY),
+        COLOR_WHITE));
+    root.getData().addElement(std::make_unique<Label>("v1.0",
+        ivec2(logoX + 160, logoY + 4),
+        COLOR_ACCENT_GREEN));
 
     float tabContentStartY = static_cast<float>(TAB_BAR_HEIGHT) / static_cast<float>(RESY);
 
@@ -201,29 +232,29 @@ static void buildScene()
 
     system->getData().addElement(std::make_unique<Label>("CPU",
         ivec2(BAR_MARGIN, cpuY + 4),
-        vec3(1.0f, 1.0f, 1.0f)));
+        COLOR_TEXT_PRIMARY));
     system->getData().addElement(std::make_unique<Bar>(
         ivec2(BAR_MARGIN + BAR_LABEL_WIDTH, cpuY),
         ivec2(barMaxX, cpuY + BAR_HEIGHT),
-        vec3(0.2f, 0.8f, 0.2f),
-        vec3(0.15f, 0.15f, 0.15f),
+        COLOR_BAR_CPU_FILL,
+        COLOR_BAR_BG,
         0.0f, 100.0f, "cpu"));
     system->getData().addElement(std::make_unique<Label>("0.0%",
         ivec2(barMaxX + 8, cpuY + 4),
-        vec3(1.0f, 1.0f, 1.0f)));
+        COLOR_TEXT_ACCENT));
 
     system->getData().addElement(std::make_unique<Label>("RAM",
         ivec2(BAR_MARGIN, ramY + 4),
-        vec3(1.0f, 1.0f, 1.0f)));
+        COLOR_TEXT_PRIMARY));
     system->getData().addElement(std::make_unique<Bar>(
         ivec2(BAR_MARGIN + BAR_LABEL_WIDTH, ramY),
         ivec2(barMaxX, ramY + BAR_HEIGHT),
-        vec3(0.8f, 0.6f, 0.2f),
-        vec3(0.15f, 0.15f, 0.15f),
+        COLOR_BAR_RAM_FILL,
+        COLOR_BAR_BG,
         0.0f, 100.0f, "ram"));
     system->getData().addElement(std::make_unique<Label>("0.0%",
         ivec2(barMaxX + 8, ramY + 4),
-        vec3(1.0f, 1.0f, 1.0f)));
+        COLOR_TEXT_ACCENT));
 
     Tree<Layout> *processes = manager.addChild(&root,
         Layout(vec2(0.0f, tabContentStartY), vec2(1.0f, 1.0f), false, "processes"));
@@ -234,7 +265,7 @@ static void buildScene()
     processes->getData().addElement(std::make_unique<Row>(
         ivec2(BAR_MARGIN, rowY),
         ivec2(RESX - BAR_MARGIN, rowY + PROCESS_ROW_HEIGHT),
-        header, weights, vec3(1.0f, 1.0f, 0.4f)));
+        header, weights, COLOR_ROW_HEADER));
 
     for (std::size_t i = 0; i < PROCESS_ROW_COUNT; ++i)
     {
@@ -243,7 +274,7 @@ static void buildScene()
         processes->getData().addElement(std::make_unique<Row>(
             ivec2(BAR_MARGIN, y),
             ivec2(RESX - BAR_MARGIN, y + PROCESS_ROW_HEIGHT),
-            emptyCells, weights, vec3(0.9f, 0.9f, 0.9f)));
+            emptyCells, weights, COLOR_ROW_TEXT));
     }
 }
 
@@ -468,6 +499,7 @@ int main(int argc, char **argv)
     }
 
     SoundPlayer::getInstance().shutdown();
+    Font::shutdown();
     SDL_DestroyWindow(window);
     SDL_Quit();
     return 0;

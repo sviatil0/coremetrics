@@ -64,11 +64,11 @@ void Bar::draw(Screen &screen)
     vec3 activeFill = fillColor;
     if (ratio > 0.8f)
     {
-        activeFill = vec3(0.85f, 0.2f, 0.2f);
+        activeFill = vec3(0.95f, 0.35f, 0.35f);
     }
     else if (ratio > 0.6f)
     {
-        activeFill = vec3(0.85f, 0.75f, 0.2f);
+        activeFill = vec3(0.95f, 0.82f, 0.40f);
     }
 
     ivec2 fillMax(minPos.x + fillWidth, maxPos.y);
