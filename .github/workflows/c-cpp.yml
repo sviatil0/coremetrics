@@ -2,26 +2,54 @@ name: C/C++ CI
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "dev" ]
   pull_request:
     branches: [ "main", "dev" ]
 
 jobs:
   build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
 
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
 
     steps:
     - uses: actions/checkout@v4
-    - name: SDL3 Dependencies
+
+    - name: Install dependencies (Linux)
+      if: runner.os == 'Linux'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential pkg-config libfreetype-dev libharfbuzz-dev
+
+    - name: Install dependencies (macOS)
+      if: runner.os == 'macOS'
+      run: |
+        brew update
+        brew install sdl3 sdl3_ttf sdl3_image
+
+    - name: Setup SDL3 (Linux)
+      if: runner.os == 'Linux'
       uses: libsdl-org/setup-sdl@main
-      id: sdl3
       with:
         install-linux-dependencies: true
         version: 3-latest
         version-sdl-ttf: 3-latest
-    - name: Build and Test
+        version-sdl-image: 3-latest
+
+    - name: Build tests (Linux)
+      if: runner.os == 'Linux'
+      env:
+        SDL_VIDEO_DRIVER: dummy
       run: |
-        export SDL_VIDEO_DRIVER=dummy
-        export LD_LIBRARY_PATH=${SDL3_ROOT}/lib:$LD_LIBRARY_PATH
-        make CXXFLAGS="-std=c++23 -Wall -I ./include $(pkg-config --cflags sdl3)" LDFLAGS="$(pkg-config --libs sdl3)" test
+        make CXXFLAGS="-std=c++23 -Wall -I ./include $(pkg-config --cflags sdl3 sdl3-ttf sdl3-image)" \
+             LDFLAGS="$(pkg-config --libs sdl3 sdl3-ttf sdl3-image)" test
+
+    - name: Build tests (macOS)
+      if: runner.os == 'macOS'
+      env:
+        SDL_VIDEO_DRIVER: dummy
+      run: |
+        make test

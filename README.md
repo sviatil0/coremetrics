@@ -25,6 +25,42 @@
   - **Layer 2 (GUI/layout):** Arranges and styles UI elements (buttons, text, etc.) and handles user interaction.
 - Vertex buffer layout: all attributes (position, color, UV, etc.) are packed into one buffer. The **stride** is how many bytes to jump to get from one vertex to the next. The **offset** for each attribute is where inside each vertex's bytes that attribute starts.
 
+### Build and install
+
+Dependencies: SDL3, SDL3_ttf, SDL3_image.
+
+**macOS (Homebrew)**
+```
+brew install sdl3 sdl3_ttf sdl3_image
+```
+
+**Linux (Debian/Ubuntu)**
+```
+sudo apt install libsdl3-dev libsdl3-ttf-dev libsdl3-image-dev
+```
+If SDL3 packages are not yet available, build from source:
+https://github.com/libsdl-org/SDL/releases
+https://github.com/libsdl-org/SDL_ttf/releases
+https://github.com/libsdl-org/SDL_image/releases
+
+**Windows**
+
+Download dev libraries from the SDL release pages above, extract to a known path, and update `CXXFLAGS` / `LDFLAGS` in the Makefile to point at your include/lib directories.
+
+**Targets**
+```
+make test          # run unit tests
+make coremetrics   # run the CoreMetrics demo
+make demo          # run the Milestone 005 event demo
+```
+
+### Cross-platform notes
+
+- `SystemMetrics` is split into `src/SystemMetrics_linux.cpp`, `src/SystemMetrics_mac.cpp`, and `src/SystemMetrics_win.cpp`. Only the file matching the build target emits symbols (guarded by `#ifdef __linux__` / `__APPLE__` / `_WIN32`).
+- On Mac, the Makefile links `-framework IOKit -framework CoreFoundation` to support GPU utilization via `IOServiceMatching("IOAccelerator")`.
+- On Linux, GPU usage is read from `/sys/class/drm/card0/device/gpu_busy_percent` (AMD). NVIDIA support via NVML is a backlog item.
+- On Windows, GPU is currently stubbed. PDH counters are a backlog item.
+
 ### Style
 
 | Category | Convention |
