@@ -8,6 +8,7 @@
 #include "LayoutManager.hpp"
 #include "EventManager.hpp"
 #include "ClickEvent.hpp"
+#include "SoundEvent.hpp"
 #include "Bar.hpp"
 #include "Row.hpp"
 #include "label.hpp"
@@ -26,11 +27,21 @@ constexpr int PROCESS_TOP_PADDING = 16;
 constexpr std::size_t PROCESS_ROW_COUNT = 15;
 constexpr Uint64 POLL_INTERVAL_MS = 500;
 
+constexpr float ALARM_THRESHOLD = 80.0f;
+constexpr const char *ALARM_SOUND_PATH = "assets/click.wav";
+
 static Bar *g_cpuBar = nullptr;
 static Bar *g_ramBar = nullptr;
 static Label *g_cpuReadout = nullptr;
 static Label *g_ramReadout = nullptr;
+static Label *g_muteLabel = nullptr;
 static std::vector<Row *> g_processRows;
+
+static bool g_alarmEnabled = true;
+static bool g_cpuAlarmActive = false;
+static bool g_ramAlarmActive = false;
+static ivec2 g_muteBtnMin;
+static ivec2 g_muteBtnMax;
 
 static Bar *findBarByMetric(Tree<Layout> &node, const std::string &metric)
 {
@@ -121,7 +132,9 @@ static void buildScene()
     Tree<Layout> *tabbar = manager.addChild(&root,
         Layout(vec2(0.0f, 0.0f), vec2(1.0f, static_cast<float>(TAB_BAR_HEIGHT) / static_cast<float>(RESY)), true, "tabbar"));
 
-    int btnWidth = (RESX / 2) - (TAB_BTN_PAD * 2);
+    int muteBtnWidth = 96;
+    int tabsTotalWidth = RESX - (TAB_BTN_PAD * 4) - muteBtnWidth;
+    int btnWidth = tabsTotalWidth / 2;
     int btnY = TAB_BTN_PAD;
     int btnMaxY = TAB_BAR_HEIGHT - TAB_BTN_PAD;
 
@@ -137,14 +150,26 @@ static void buildScene()
         vec3(1.0f, 1.0f, 1.0f)));
 
     tabbar->getData().addElement(std::make_unique<Button>(
-        ivec2(TAB_BTN_PAD + btnWidth + TAB_BTN_PAD * 2, btnY),
-        ivec2(RESX - TAB_BTN_PAD, btnMaxY),
+        ivec2(TAB_BTN_PAD * 2 + btnWidth, btnY),
+        ivec2(TAB_BTN_PAD * 2 + btnWidth * 2, btnMaxY),
         vec3(0.2f, 0.4f, 0.7f),
         "",
         "processes",
         "system"));
     tabbar->getData().addElement(std::make_unique<Label>("Processes",
-        ivec2(TAB_BTN_PAD + btnWidth + TAB_BTN_PAD * 2 + 12, btnY + 6),
+        ivec2(TAB_BTN_PAD * 2 + btnWidth + 12, btnY + 6),
+        vec3(1.0f, 1.0f, 1.0f)));
+
+    g_muteBtnMin = ivec2(TAB_BTN_PAD * 3 + btnWidth * 2, btnY);
+    g_muteBtnMax = ivec2(g_muteBtnMin.x + muteBtnWidth, btnMaxY);
+
+    tabbar->getData().addElement(std::make_unique<Button>(
+        g_muteBtnMin,
+        g_muteBtnMax,
+        vec3(0.4f, 0.4f, 0.4f),
+        "", "", ""));
+    tabbar->getData().addElement(std::make_unique<Label>("SOUND ON",
+        ivec2(g_muteBtnMin.x + 6, btnY + 6),
         vec3(1.0f, 1.0f, 1.0f)));
 
     float tabContentStartY = static_cast<float>(TAB_BAR_HEIGHT) / static_cast<float>(RESY);
@@ -219,6 +244,12 @@ static void cacheElementPointers()
         g_ramReadout = nthLabelInLayout(*systemNode, 3);
     }
 
+    Tree<Layout> *tabbarNode = findLayoutNode(root, "tabbar");
+    if (tabbarNode != nullptr)
+    {
+        g_muteLabel = nthLabelInLayout(*tabbarNode, 2);
+    }
+
     g_processRows.clear();
     collectRows(root, g_processRows);
 }
@@ -244,6 +275,22 @@ static void pollMetrics()
     {
         g_ramReadout->setText(formatPct(memPct) + "%");
     }
+
+    bool cpuNowAlarm = cpuPct >= ALARM_THRESHOLD;
+    bool ramNowAlarm = memPct >= ALARM_THRESHOLD;
+    if (g_alarmEnabled)
+    {
+        if (cpuNowAlarm && !g_cpuAlarmActive)
+        {
+            EventManager::getInstance().pushEvent(std::make_unique<SoundEvent>(ALARM_SOUND_PATH));
+        }
+        if (ramNowAlarm && !g_ramAlarmActive)
+        {
+            EventManager::getInstance().pushEvent(std::make_unique<SoundEvent>(ALARM_SOUND_PATH));
+        }
+    }
+    g_cpuAlarmActive = cpuNowAlarm;
+    g_ramAlarmActive = ramNowAlarm;
 
     if (g_processRows.size() <= 1)
     {
@@ -323,8 +370,22 @@ int main(int argc, char **argv)
                 float clickX = 0.0f;
                 float clickY = 0.0f;
                 SDL_GetMouseState(&clickX, &clickY);
-                EventManager::getInstance().pushEvent(std::make_unique<ClickEvent>(
-                    static_cast<int>(clickX), static_cast<int>(clickY)));
+                int mx = static_cast<int>(clickX);
+                int my = static_cast<int>(clickY);
+
+                if (mx >= g_muteBtnMin.x && mx <= g_muteBtnMax.x
+                    && my >= g_muteBtnMin.y && my <= g_muteBtnMax.y)
+                {
+                    g_alarmEnabled = !g_alarmEnabled;
+                    if (g_muteLabel != nullptr)
+                    {
+                        g_muteLabel->setText(g_alarmEnabled ? "SOUND ON" : "SOUND OFF");
+                    }
+                }
+                else
+                {
+                    EventManager::getInstance().pushEvent(std::make_unique<ClickEvent>(mx, my));
+                }
                 break;
             }
             }

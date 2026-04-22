@@ -2,6 +2,7 @@
 
 #include "SystemMetrics.hpp"
 #include <algorithm>
+#include <chrono>
 #include <cstring>
 #include <libproc.h>
 #include <mach/mach.h>
@@ -10,11 +11,15 @@
 #include <sys/sysctl.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <unordered_map>
 
 extern bool systemMetricsCompareByMemDesc(const ProcessInfo &a, const ProcessInfo &b);
 
 static uint64_t g_lastTotal = 0;
 static uint64_t g_lastIdle = 0;
+
+static std::unordered_map<pid_t, uint64_t> g_lastProcCpuNs;
+static uint64_t g_lastSampleNs = 0;
 
 float SystemMetrics::readCpuPercent()
 {
@@ -86,6 +91,17 @@ std::vector<ProcessInfo> SystemMetrics::topProcesses(std::size_t n)
 {
     std::vector<ProcessInfo> result;
 
+    uint64_t nowNs = static_cast<uint64_t>(
+        std::chrono::duration_cast<std::chrono::nanoseconds>(
+            std::chrono::steady_clock::now().time_since_epoch()).count());
+    uint64_t wallDiffNs = 0;
+    if (g_lastSampleNs != 0 && nowNs > g_lastSampleNs)
+    {
+        wallDiffNs = nowNs - g_lastSampleNs;
+    }
+
+    std::unordered_map<pid_t, uint64_t> currentProcCpuNs;
+
     int pidCount = proc_listpids(PROC_ALL_PIDS, 0, nullptr, 0);
     if (pidCount <= 0)
     {
@@ -124,10 +140,21 @@ std::vector<ProcessInfo> SystemMetrics::topProcesses(std::size_t n)
         {
             continue;
         }
+        uint64_t procCpuNs = taskInfo.pti_total_user + taskInfo.pti_total_system;
+        currentProcCpuNs[pid] = procCpuNs;
+
+        float cpuPct = 0.0f;
+        auto it = g_lastProcCpuNs.find(pid);
+        if (it != g_lastProcCpuNs.end() && wallDiffNs > 0 && procCpuNs >= it->second)
+        {
+            uint64_t procDiffNs = procCpuNs - it->second;
+            cpuPct = (static_cast<float>(procDiffNs) / static_cast<float>(wallDiffNs)) * 100.0f;
+        }
+
         ProcessInfo info;
         info.pid = pid;
         info.name = name;
-        info.cpuPct = static_cast<float>(taskInfo.pti_total_user + taskInfo.pti_total_system);
+        info.cpuPct = cpuPct;
         if (memSize > 0)
         {
             info.memPct = (static_cast<float>(taskInfo.pti_resident_size) / static_cast<float>(memSize)) * 100.0f;
@@ -138,6 +165,9 @@ std::vector<ProcessInfo> SystemMetrics::topProcesses(std::size_t n)
         }
         result.push_back(info);
     }
+
+    g_lastProcCpuNs = std::move(currentProcCpuNs);
+    g_lastSampleNs = nowNs;
 
     std::sort(result.begin(), result.end(), systemMetricsCompareByMemDesc);
     if (result.size() > n)
