@@ -159,23 +159,18 @@ static void collectRows(Tree<Layout> &node, std::vector<Row *> &out)
 
 static bool compareProcesses(const ProcessInfo &a, const ProcessInfo &b)
 {
-    bool lt = false;
     switch (g_sortColumn)
     {
     case SORT_PID:
-        lt = a.pid < b.pid;
-        break;
+        return g_sortAscending ? (a.pid < b.pid) : (a.pid > b.pid);
     case SORT_NAME:
-        lt = a.name < b.name;
-        break;
+        return g_sortAscending ? (a.name < b.name) : (a.name > b.name);
     case SORT_CPU:
-        lt = a.cpuPct < b.cpuPct;
-        break;
+        return g_sortAscending ? (a.cpuPct < b.cpuPct) : (a.cpuPct > b.cpuPct);
     case SORT_MEM:
-        lt = a.memPct < b.memPct;
-        break;
+        return g_sortAscending ? (a.memPct < b.memPct) : (a.memPct > b.memPct);
     }
-    return g_sortAscending ? lt : !lt;
+    return false;
 }
 
 static std::string formatPct(float value)
