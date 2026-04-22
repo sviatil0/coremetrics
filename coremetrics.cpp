@@ -1,3 +1,5 @@
+#include <algorithm>
+#include <fstream>
 #include <iostream>
 #include <memory>
 #include <sstream>
@@ -63,6 +65,20 @@ static bool g_alarmEnabled = true;
 static bool g_cpuAlarmActive = false;
 static bool g_ramAlarmActive = false;
 static bool g_gpuAlarmActive = false;
+
+enum SortColumn
+{
+    SORT_PID = 0,
+    SORT_NAME = 1,
+    SORT_CPU = 2,
+    SORT_MEM = 3
+};
+
+static SortColumn g_sortColumn = SORT_MEM;
+static bool g_sortAscending = false;
+static Row *g_headerRow = nullptr;
+static ivec2 g_headerColMin[4];
+static ivec2 g_headerColMax[4];
 static ivec2 g_muteBtnMin;
 static ivec2 g_muteBtnMax;
 static ivec2 g_exitBtnMin;
@@ -139,6 +155,27 @@ static void collectRows(Tree<Layout> &node, std::vector<Row *> &out)
     {
         collectRows(*child, out);
     }
+}
+
+static bool compareProcesses(const ProcessInfo &a, const ProcessInfo &b)
+{
+    bool lt = false;
+    switch (g_sortColumn)
+    {
+    case SORT_PID:
+        lt = a.pid < b.pid;
+        break;
+    case SORT_NAME:
+        lt = a.name < b.name;
+        break;
+    case SORT_CPU:
+        lt = a.cpuPct < b.cpuPct;
+        break;
+    case SORT_MEM:
+        lt = a.memPct < b.memPct;
+        break;
+    }
+    return g_sortAscending ? lt : !lt;
 }
 
 static std::string formatPct(float value)
@@ -280,6 +317,17 @@ static void buildScene()
     std::vector<float> weights = {0.15f, 0.5f, 0.175f, 0.175f};
     std::vector<std::string> header = {"PID", "NAME", "CPU%", "MEM%"};
     int rowY = TAB_BAR_HEIGHT + PROCESS_TOP_PADDING;
+
+    int headerRowWidth = (RESX - BAR_MARGIN) - BAR_MARGIN;
+    int colX = BAR_MARGIN;
+    for (int c = 0; c < 4; ++c)
+    {
+        int colW = static_cast<int>(weights[c] * static_cast<float>(headerRowWidth));
+        g_headerColMin[c] = ivec2(colX, rowY);
+        g_headerColMax[c] = ivec2(colX + colW, rowY + PROCESS_ROW_HEIGHT);
+        colX += colW;
+    }
+
     processes->getData().addElement(std::make_unique<Row>(
         ivec2(BAR_MARGIN, rowY),
         ivec2(RESX - BAR_MARGIN, rowY + PROCESS_ROW_HEIGHT),
@@ -319,6 +367,11 @@ static void cacheElementPointers()
 
     g_processRows.clear();
     collectRows(root, g_processRows);
+
+    if (!g_processRows.empty())
+    {
+        g_headerRow = g_processRows.front();
+    }
 }
 
 static void pollMetrics()
@@ -380,7 +433,12 @@ static void pollMetrics()
     }
 
     std::size_t dataRowCount = g_processRows.size() - 1;
-    std::vector<ProcessInfo> procs = SystemMetrics::topProcesses(dataRowCount);
+    std::vector<ProcessInfo> procs = SystemMetrics::topProcesses(dataRowCount * 3);
+    std::sort(procs.begin(), procs.end(), compareProcesses);
+    if (procs.size() > dataRowCount)
+    {
+        procs.resize(dataRowCount);
+    }
 
     for (std::size_t i = 0; i < dataRowCount; ++i)
     {
@@ -518,7 +576,37 @@ int main(int argc, char **argv)
                 }
                 else
                 {
-                    EventManager::getInstance().pushEvent(std::make_unique<ClickEvent>(mx, my));
+                    bool headerHit = false;
+                    for (int c = 0; c < 4; ++c)
+                    {
+                        if (mx >= g_headerColMin[c].x && mx <= g_headerColMax[c].x
+                            && my >= g_headerColMin[c].y && my <= g_headerColMax[c].y)
+                        {
+                            SortColumn clicked = static_cast<SortColumn>(c);
+                            if (g_sortColumn == clicked)
+                            {
+                                g_sortAscending = !g_sortAscending;
+                            }
+                            else
+                            {
+                                g_sortColumn = clicked;
+                                g_sortAscending = false;
+                            }
+                            if (g_headerRow != nullptr)
+                            {
+                                const char *arrow = g_sortAscending ? " ↑" : " ↓";
+                                std::vector<std::string> hdr = {"PID", "NAME", "CPU%", "MEM%"};
+                                hdr[clicked] += arrow;
+                                g_headerRow->setCells(hdr);
+                            }
+                            headerHit = true;
+                            break;
+                        }
+                    }
+                    if (!headerHit)
+                    {
+                        EventManager::getInstance().pushEvent(std::make_unique<ClickEvent>(mx, my));
+                    }
                 }
                 break;
             }
