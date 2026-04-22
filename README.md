@@ -54,6 +54,22 @@ make coremetrics   # run the CoreMetrics demo
 make demo          # run the Milestone 005 event demo
 ```
 
+### Demo stress test
+
+`stress.sh` spikes CPU, RAM, and (optionally) GPU so the CoreMetrics bars visibly spike during demos.
+
+```
+./stress.sh              # defaults: 30s duration, 4 CPU workers, 512MB RAM
+./stress.sh 60 8 1024    # custom: duration(sec), cpu workers, ram MB
+```
+
+Optional dependencies for GPU stress:
+- `glmark2` (Linux: `apt install glmark2`)
+- `stress-ng --gpu` (Linux: `apt install stress-ng`)
+- macOS: the script calls `open` on a WebGL demo page and lets the browser drive the GPU. No install needed.
+
+If none are available the CPU and RAM stress still work; GPU stress is skipped with a log line.
+
 ### Cross-platform notes
 
 - `SystemMetrics` is split into `src/SystemMetrics_linux.cpp`, `src/SystemMetrics_mac.cpp`, and `src/SystemMetrics_win.cpp`. Only the file matching the build target emits symbols (guarded by `#ifdef __linux__` / `__APPLE__` / `_WIN32`).
