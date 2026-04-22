@@ -153,43 +153,35 @@ static void buildScene()
     Tree<Layout> *tabbar = manager.addChild(&root,
         Layout(vec2(0.0f, 0.0f), vec2(1.0f, static_cast<float>(TAB_BAR_HEIGHT) / static_cast<float>(RESY)), true, "tabbar"));
 
-    int iconSize = 32;
-    int iconX = TAB_BTN_PAD;
-    int iconY = (TAB_BAR_HEIGHT - iconSize) / 2;
-    tabbar->getData().addElement(std::make_unique<Image>("assets/logo.png",
-        ivec2(iconX, iconY)));
-
-    int tabsStartX = TAB_BTN_PAD * 2 + iconSize;
     int muteBtnWidth = 140;
-    int tabsTotalWidth = RESX - tabsStartX - TAB_BTN_PAD * 3 - muteBtnWidth;
+    int tabsTotalWidth = RESX - (TAB_BTN_PAD * 4) - muteBtnWidth;
     int btnWidth = tabsTotalWidth / 2;
     int btnY = TAB_BTN_PAD;
     int btnMaxY = TAB_BAR_HEIGHT - TAB_BTN_PAD;
 
     tabbar->getData().addElement(std::make_unique<Button>(
-        ivec2(tabsStartX, btnY),
-        ivec2(tabsStartX + btnWidth, btnMaxY),
+        ivec2(TAB_BTN_PAD, btnY),
+        ivec2(TAB_BTN_PAD + btnWidth, btnMaxY),
         COLOR_TAB_ACTIVE,
         "",
         "system",
         "processes"));
     tabbar->getData().addElement(std::make_unique<Label>("System",
-        ivec2(tabsStartX + 12, btnY + 6),
+        ivec2(TAB_BTN_PAD + 12, btnY + 6),
         COLOR_TEXT_PRIMARY));
 
-    int procBtnX = tabsStartX + btnWidth + TAB_BTN_PAD;
     tabbar->getData().addElement(std::make_unique<Button>(
-        ivec2(procBtnX, btnY),
-        ivec2(procBtnX + btnWidth, btnMaxY),
+        ivec2(TAB_BTN_PAD * 2 + btnWidth, btnY),
+        ivec2(TAB_BTN_PAD * 2 + btnWidth * 2, btnMaxY),
         COLOR_TAB_ACTIVE,
         "",
         "processes",
         "system"));
     tabbar->getData().addElement(std::make_unique<Label>("Processes",
-        ivec2(procBtnX + 12, btnY + 6),
+        ivec2(TAB_BTN_PAD * 2 + btnWidth + 12, btnY + 6),
         COLOR_TEXT_PRIMARY));
 
-    g_muteBtnMin = ivec2(procBtnX + btnWidth + TAB_BTN_PAD, btnY);
+    g_muteBtnMin = ivec2(TAB_BTN_PAD * 3 + btnWidth * 2, btnY);
     g_muteBtnMax = ivec2(g_muteBtnMin.x + muteBtnWidth, btnMaxY);
 
     tabbar->getData().addElement(std::make_unique<Button>(
@@ -214,11 +206,18 @@ static void buildScene()
         ivec2(g_exitBtnMin.x + 16, g_exitBtnMin.y + 22),
         COLOR_TEXT_PRIMARY));
 
-    int logoIconSize = 32;
-    int logoIconX = TAB_BTN_PAD / 2;
-    int logoIconY = (TAB_BAR_HEIGHT - logoIconSize) / 2;
-    tabbar->getData().addElement(std::make_unique<Image>("assets/logo.png",
-        ivec2(logoIconX, logoIconY)));
+    int logoX = BAR_MARGIN;
+    int logoY = RESY - 48 - exitBtnPad;
+    root.getData().addElement(std::make_unique<Box>(
+        vec2(static_cast<float>(logoX), static_cast<float>(logoY + 28)),
+        vec2(static_cast<float>(logoX + 180), static_cast<float>(logoY + 32)),
+        COLOR_ACCENT_GREEN));
+    root.getData().addElement(std::make_unique<Label>("CoreMetrics",
+        ivec2(logoX, logoY),
+        COLOR_WHITE));
+    root.getData().addElement(std::make_unique<Label>("v1.0",
+        ivec2(logoX + 160, logoY + 4),
+        COLOR_ACCENT_GREEN));
 
     float tabContentStartY = static_cast<float>(TAB_BAR_HEIGHT) / static_cast<float>(RESY);
 
