@@ -594,7 +594,7 @@ int main(int argc, char **argv)
                             }
                             if (g_headerRow != nullptr)
                             {
-                                const char *arrow = g_sortAscending ? " ↑" : " ↓";
+                                const char *arrow = g_sortAscending ? " ^" : " v";
                                 std::vector<std::string> hdr = {"PID", "NAME", "CPU%", "MEM%"};
                                 hdr[clicked] += arrow;
                                 g_headerRow->setCells(hdr);
