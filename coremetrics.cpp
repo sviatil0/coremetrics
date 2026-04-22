@@ -9,6 +9,7 @@
 #include "EventManager.hpp"
 #include "ClickEvent.hpp"
 #include "SoundEvent.hpp"
+#include "SoundPlayer.hpp"
 #include "Bar.hpp"
 #include "Row.hpp"
 #include "label.hpp"
@@ -393,8 +394,38 @@ int main(int argc, char **argv)
                     winW = RESX;
                     winH = RESY;
                 }
-                int mx = static_cast<int>(clickX * static_cast<float>(RESX) / static_cast<float>(winW));
-                int my = static_cast<int>(clickY * static_cast<float>(RESY) / static_cast<float>(winH));
+
+                float srcAspect = static_cast<float>(RESX) / static_cast<float>(RESY);
+                float dstAspect = static_cast<float>(winW) / static_cast<float>(winH);
+                int viewW = winW;
+                int viewH = winH;
+                int viewX = 0;
+                int viewY = 0;
+                if (dstAspect > srcAspect)
+                {
+                    viewH = winH;
+                    viewW = static_cast<int>(static_cast<float>(winH) * srcAspect);
+                    viewX = (winW - viewW) / 2;
+                }
+                else
+                {
+                    viewW = winW;
+                    viewH = static_cast<int>(static_cast<float>(winW) / srcAspect);
+                    viewY = (winH - viewH) / 2;
+                }
+
+                float relX = clickX - static_cast<float>(viewX);
+                float relY = clickY - static_cast<float>(viewY);
+                if (viewW <= 0 || viewH <= 0)
+                {
+                    break;
+                }
+                int mx = static_cast<int>(relX * static_cast<float>(RESX) / static_cast<float>(viewW));
+                int my = static_cast<int>(relY * static_cast<float>(RESY) / static_cast<float>(viewH));
+                if (mx < 0 || my < 0 || mx >= RESX || my >= RESY)
+                {
+                    break;
+                }
 
                 if (mx >= g_exitBtnMin.x && mx <= g_exitBtnMax.x
                     && my >= g_exitBtnMin.y && my <= g_exitBtnMax.y)
@@ -434,6 +465,7 @@ int main(int argc, char **argv)
         SDL_UpdateWindowSurface(window);
     }
 
+    SoundPlayer::getInstance().shutdown();
     SDL_DestroyWindow(window);
     SDL_Quit();
     return 0;

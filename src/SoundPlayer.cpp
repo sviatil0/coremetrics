@@ -10,6 +10,11 @@ SoundPlayer::SoundPlayer() : stream(nullptr)
 
 SoundPlayer::~SoundPlayer()
 {
+    shutdown();
+}
+
+void SoundPlayer::shutdown()
+{
     if (stream != nullptr)
     {
         SDL_DestroyAudioStream(stream);
