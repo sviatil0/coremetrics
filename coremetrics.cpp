@@ -42,6 +42,8 @@ static bool g_cpuAlarmActive = false;
 static bool g_ramAlarmActive = false;
 static ivec2 g_muteBtnMin;
 static ivec2 g_muteBtnMax;
+static ivec2 g_exitBtnMin;
+static ivec2 g_exitBtnMax;
 
 static Bar *findBarByMetric(Tree<Layout> &node, const std::string &metric)
 {
@@ -170,6 +172,19 @@ static void buildScene()
         "", "", ""));
     tabbar->getData().addElement(std::make_unique<Label>("SOUND ON",
         ivec2(g_muteBtnMin.x + 6, btnY + 6),
+        vec3(1.0f, 1.0f, 1.0f)));
+
+    int exitBtnSize = 64;
+    int exitBtnPad = 16;
+    g_exitBtnMin = ivec2(RESX - exitBtnSize - exitBtnPad, RESY - exitBtnSize - exitBtnPad);
+    g_exitBtnMax = ivec2(g_exitBtnMin.x + exitBtnSize, g_exitBtnMin.y + exitBtnSize);
+    root.getData().addElement(std::make_unique<Button>(
+        g_exitBtnMin,
+        g_exitBtnMax,
+        vec3(0.7f, 0.2f, 0.2f),
+        "", "", ""));
+    root.getData().addElement(std::make_unique<Label>("EXIT",
+        ivec2(g_exitBtnMin.x + 16, g_exitBtnMin.y + 22),
         vec3(1.0f, 1.0f, 1.0f)));
 
     float tabContentStartY = static_cast<float>(TAB_BAR_HEIGHT) / static_cast<float>(RESY);
@@ -381,8 +396,13 @@ int main(int argc, char **argv)
                 int mx = static_cast<int>(clickX * static_cast<float>(RESX) / static_cast<float>(winW));
                 int my = static_cast<int>(clickY * static_cast<float>(RESY) / static_cast<float>(winH));
 
-                if (mx >= g_muteBtnMin.x && mx <= g_muteBtnMax.x
-                    && my >= g_muteBtnMin.y && my <= g_muteBtnMax.y)
+                if (mx >= g_exitBtnMin.x && mx <= g_exitBtnMax.x
+                    && my >= g_exitBtnMin.y && my <= g_exitBtnMax.y)
+                {
+                    end = true;
+                }
+                else if (mx >= g_muteBtnMin.x && mx <= g_muteBtnMax.x
+                         && my >= g_muteBtnMin.y && my <= g_muteBtnMax.y)
                 {
                     g_alarmEnabled = !g_alarmEnabled;
                     if (g_muteLabel != nullptr)
