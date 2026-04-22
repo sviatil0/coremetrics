@@ -4,9 +4,14 @@ Label::Label(std::string text, ivec2 pos, vec3 col) : m_text(text), m_position(p
 {
 }
 
-std::string Label::getText() const 
+std::string Label::getText() const
 {
     return m_text;
+}
+
+void Label::setText(std::string text)
+{
+    m_text = std::move(text);
 }
 
 void Label::draw(Screen& screen) 
