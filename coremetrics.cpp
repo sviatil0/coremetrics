@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include <SDL3/SDL.h>
+#include <SDL3_image/SDL_image.h>
 #include "screen.hpp"
 #include "LayoutManager.hpp"
 #include "EventManager.hpp"
@@ -392,6 +393,13 @@ int main(int argc, char **argv)
     }
     SDL_SetWindowMinimumSize(window, RESX / 2, RESY / 2);
     SDL_SetWindowMaximumSize(window, RESX * 3, RESY * 3);
+
+    SDL_Surface *iconSurface = IMG_Load("assets/logo.png");
+    if (iconSurface != nullptr)
+    {
+        SDL_SetWindowIcon(window, iconSurface);
+        SDL_DestroySurface(iconSurface);
+    }
 
     Screen screen(RESX, RESY);
 
