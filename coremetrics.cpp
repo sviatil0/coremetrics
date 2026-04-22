@@ -132,7 +132,7 @@ static void buildScene()
     Tree<Layout> *tabbar = manager.addChild(&root,
         Layout(vec2(0.0f, 0.0f), vec2(1.0f, static_cast<float>(TAB_BAR_HEIGHT) / static_cast<float>(RESY)), true, "tabbar"));
 
-    int muteBtnWidth = 96;
+    int muteBtnWidth = 140;
     int tabsTotalWidth = RESX - (TAB_BTN_PAD * 4) - muteBtnWidth;
     int btnWidth = tabsTotalWidth / 2;
     int btnY = TAB_BTN_PAD;
@@ -336,7 +336,7 @@ int main(int argc, char **argv)
         return -1;
     }
 
-    SDL_Window *window = SDL_CreateWindow("CoreMetrics", RESX, RESY, 0);
+    SDL_Window *window = SDL_CreateWindow("CoreMetrics", RESX, RESY, SDL_WINDOW_RESIZABLE);
     if (window == nullptr)
     {
         std::cerr << "Failed to create window: " << SDL_GetError() << '\n';
@@ -370,8 +370,16 @@ int main(int argc, char **argv)
                 float clickX = 0.0f;
                 float clickY = 0.0f;
                 SDL_GetMouseState(&clickX, &clickY);
-                int mx = static_cast<int>(clickX);
-                int my = static_cast<int>(clickY);
+                int winW = 0;
+                int winH = 0;
+                SDL_GetWindowSize(window, &winW, &winH);
+                if (winW <= 0 || winH <= 0)
+                {
+                    winW = RESX;
+                    winH = RESY;
+                }
+                int mx = static_cast<int>(clickX * static_cast<float>(RESX) / static_cast<float>(winW));
+                int my = static_cast<int>(clickY * static_cast<float>(RESY) / static_cast<float>(winH));
 
                 if (mx >= g_muteBtnMin.x && mx <= g_muteBtnMax.x
                     && my >= g_muteBtnMin.y && my <= g_muteBtnMax.y)
