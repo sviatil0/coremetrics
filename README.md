@@ -421,3 +421,68 @@ Returns the single global instance.
 
 ### void play(const std::string& filePath)
 Loads the specified WAV file and plays it through the default audio device.
+
+# Bar
+## Description
+A horizontal progress bar used to visualize a metric as a percentage of `[minVal, maxVal]`. Draws a background box, then a proportional fill box. Fill color is overridden to yellow above 60% and red above 80% to flag load states at a glance. Optional `metricName` lets the demo locate bars by semantic tag.
+
+## Methods
+### void setValue(float v)
+Clamps `v` into `[minVal, maxVal]` and stores it.
+
+### float getValue() const
+Returns the currently stored value.
+
+### const std::string& getMetricName() const
+Returns the metric tag used to locate the bar at runtime.
+
+### void draw(Screen& screen) override
+Renders background then threshold-colored fill based on the ratio `(value - minVal) / (maxVal - minVal)`.
+
+# Row
+## Description
+A horizontal strip of N text cells spaced by caller-supplied column weights. Used for tabular process lists where each cell is a short value (PID, NAME, CPU%, MEM%). Cells are truncated if they exceed the column width.
+
+## Methods
+### void setCells(std::vector<std::string> cells)
+Replaces all cell contents (same column weights).
+
+### const std::vector<std::string>& getCells() const
+Returns current cells.
+
+### void draw(Screen& screen) override
+Computes per-column x-offsets from `columnWeights` and draws text as a box-per-character sequence inside each column.
+
+# SystemMetrics
+## Description
+Static utility for reading live system metrics cross-platform. Header is platform-agnostic; implementation is split into per-platform source files guarded by `#ifdef`:
+
+- `src/SystemMetrics_linux.cpp` reads `/proc/stat`, `/proc/meminfo`, and iterates `/proc/[pid]/{comm,stat,status}`
+- `src/SystemMetrics_mac.cpp` uses `host_statistics`, `host_statistics64`, `sysctl(HW_MEMSIZE)`, and `proc_listpids` / `proc_pidinfo` / `proc_name`
+- `src/SystemMetrics_win.cpp` uses `GetSystemTimes`, `GlobalMemoryStatusEx`, and `CreateToolhelp32Snapshot` + `GetProcessMemoryInfo` / `GetProcessTimes`
+
+Only the matching source file contributes symbols on a given OS; the others compile to no-ops inside their guards.
+
+## Methods
+### static float readCpuPercent()
+Returns total CPU usage as a percentage in `[0, 100]`, computed from the delta between successive calls. First call returns `0.0f` (no baseline yet).
+
+### static float readMemPercent()
+Returns used-memory as a percentage of total installed physical memory.
+
+### static std::vector<ProcessInfo> topProcesses(std::size_t n = 20)
+Returns up to `n` processes sorted by memory usage descending. Each `ProcessInfo` has `pid`, `name`, `cpuPct`, `memPct`.
+
+# CoreMetrics Demo
+## Description
+End-product demo application built on top of the GUI library. Run with `make coremetrics`. Two-tab system monitor:
+
+- **System tab**: CPU and RAM bars with live numeric readouts. Bars re-color on load thresholds.
+- **Processes tab**: header row plus a configurable number of data rows listing PID / NAME / CPU% / MEM% sorted by memory usage.
+
+Tab switching is event-driven: each tab button emits a hide `ShowEvent` for the opposite tab and a show `ShowEvent` for its own tab. Both drain in one `processEvents` pass so the switch is atomic.
+
+Metrics refresh every 500 ms via `SystemMetrics`. The main loop walks the layout tree each tick and mutates Bars + Rows + Label readouts in-place (no scene rebuild).
+
+## Entry point
+`coremetrics.cpp` builds the scene programmatically. Alicia is extending `GUIFile::recurseLayout` to parse `<bar>` / `<row>` / `<label>` / `<button>` tags so the scene can later be loaded from `tests/coremetrics.xml`.
