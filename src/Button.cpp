@@ -1,7 +1,19 @@
+<<<<<<< HEAD:src/Button.cpp
 #include "Button.hpp"
+=======
+#include "button.hpp"
+#include "EventManager.hpp"
+#include "ClickEvent.hpp"
+#include "SoundEvent.hpp"
+#include "ShowEvent.hpp"
+>>>>>>> 4f9eeea89c76feba4db6dc7aad8a164f3b50c71d:src/button.cpp
 
-Button::Button(ivec2 minP, ivec2 maxP, vec3 col)
-    : minPos(minP), maxPos(maxP), color(col)
+Button::Button(ivec2 minP, ivec2 maxP, vec3 col,
+               std::string soundFile, std::string targetLayout, std::string targetLayoutHide)
+    : minPos(minP), maxPos(maxP), color(col),
+      soundFile(std::move(soundFile)),
+      targetLayout(std::move(targetLayout)),
+      targetLayoutHide(std::move(targetLayoutHide))
 {
 }
 
@@ -26,4 +38,33 @@ bool Button::checkToggle(int mouseX, int mouseY)
         return true;
     }
     return false;
+}
+
+bool Button::operator()(Event* event)
+{
+    if (event->getType() != EVENT_CLICK)
+    {
+        return false;
+    }
+
+    ClickEvent* click = static_cast<ClickEvent*>(event);
+    if (!checkToggle(click->getMouseX(), click->getMouseY()))
+    {
+        return false;
+    }
+
+    if (!soundFile.empty())
+    {
+        EventManager::getInstance().pushEvent(std::make_unique<SoundEvent>(soundFile));
+    }
+    if (!targetLayoutHide.empty())
+    {
+        EventManager::getInstance().pushEvent(std::make_unique<ShowEvent>(targetLayoutHide, false));
+    }
+    if (!targetLayout.empty())
+    {
+        EventManager::getInstance().pushEvent(std::make_unique<ShowEvent>(targetLayout, true));
+    }
+
+    return true;
 }

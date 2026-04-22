@@ -19,6 +19,7 @@ public:
     static SoundPlayer& getInstance();
 
     void play(const std::string& filePath);
+    void shutdown();
 };
 
 #endif
