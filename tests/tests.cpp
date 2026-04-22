@@ -8,6 +8,9 @@
 #include "LayoutManagerTest.hpp"
 #include "EventManagerTest.hpp"
 #include "layoutTest.hpp"
+#include "BarTest.hpp"
+#include "RowTest.hpp"
+#include "SystemMetricsTest.hpp"
 
 int main(int argc, char **argv)
 {
@@ -25,6 +28,9 @@ int main(int argc, char **argv)
 	layoutManagerTestSuite();
 	eventManagerTestSuite();
 	layoutTestSuite();
+	barTestSuite();
+	rowTestSuite();
+	systemMetricsTestSuite();
 
 	SDL_Quit();
 
