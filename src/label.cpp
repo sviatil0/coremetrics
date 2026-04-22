@@ -4,7 +4,7 @@
 #include <iostream>
 
 constexpr const char *DEFAULT_FONT_PATH = "assets/font.ttf";
-constexpr float DEFAULT_FONT_SIZE = 14.0f;
+constexpr float DEFAULT_FONT_SIZE = 18.0f;
 
 static TTF_Font *g_font = nullptr;
 static bool g_fontInitTried = false;

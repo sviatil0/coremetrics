@@ -83,7 +83,7 @@ void Screen::blitTo(SDL_Surface *target)
     }
 
     SDL_FillSurfaceRect(target, nullptr, 0);
-    SDL_BlitSurfaceScaled(surface, nullptr, target, &dstRect, SDL_SCALEMODE_LINEAR);
+    SDL_BlitSurfaceScaled(surface, nullptr, target, &dstRect, SDL_SCALEMODE_NEAREST);
 }
 
 void Screen::plotLineLow(const Tvec2<int> &a, const Tvec2<int> &b, const Tvec3<float> &color)

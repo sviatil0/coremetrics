@@ -359,6 +359,8 @@ int main(int argc, char **argv)
         SDL_Quit();
         return -2;
     }
+    SDL_SetWindowMinimumSize(window, RESX / 2, RESY / 2);
+    SDL_SetWindowMaximumSize(window, RESX * 3, RESY * 3);
 
     Screen screen(RESX, RESY);
 
