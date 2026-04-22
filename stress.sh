@@ -1,9 +1,13 @@
 #!/bin/bash
 # Stress test helper for CoreMetrics demo.
-# Spawns CPU + RAM load so bars spike.
+# Spawns CPU + RAM + GPU load so bars spike.
 # Usage:
-#   ./stress.sh              # default: 30s, 4 CPU workers, 512MB RAM
+#   ./stress.sh              # default: 30s, 4 CPU workers, 512MB RAM, GPU if available
 #   ./stress.sh 60 8 1024    # duration(sec), cpu workers, ram MB
+#
+# GPU stress requires one of:
+#   brew install glmark2                (macOS)
+#   apt install glmark2 stress-ng       (Linux)
 
 DURATION="${1:-30}"
 WORKERS="${2:-4}"
@@ -55,6 +59,39 @@ time.sleep(dur)
     fi
 }
 
+gpu_burn()
+{
+    if command -v glmark2 >/dev/null 2>&1; then
+        echo "[stress] GPU: glmark2"
+        glmark2 --run-forever >/dev/null 2>&1 &
+        PIDS+=("$!")
+        return
+    fi
+    if command -v stress-ng >/dev/null 2>&1; then
+        echo "[stress] GPU: stress-ng --gpu"
+        stress-ng --gpu 1 --timeout "${DURATION}s" >/dev/null 2>&1 &
+        PIDS+=("$!")
+        return
+    fi
+    if [ "$(uname)" = "Darwin" ] && command -v python3 >/dev/null 2>&1; then
+        # macOS fallback: hammer Metal via Python + Quartz drawing loop
+        echo "[stress] GPU: python Quartz fallback (weak)"
+        python3 -c "
+import time, sys
+try:
+    from Quartz import CGDisplayCreateImageForRect, CGMainDisplayID, CGRectMake
+    end = time.time() + ${DURATION}
+    while time.time() < end:
+        CGDisplayCreateImageForRect(CGMainDisplayID(), CGRectMake(0, 0, 256, 256))
+except Exception as e:
+    sys.stderr.write(str(e))
+" &
+        PIDS+=("$!")
+        return
+    fi
+    echo "[stress] GPU: no stress tool found (install glmark2 or stress-ng)"
+}
+
 for i in $(seq 1 "$WORKERS"); do
     cpu_burn &
     PIDS+=("$!")
@@ -62,6 +99,8 @@ done
 
 DURATION="$DURATION" RAM_MB="$RAM_MB" ram_burn &
 PIDS+=("$!")
+
+gpu_burn
 
 echo "[stress] running. Ctrl+C to abort."
 wait
