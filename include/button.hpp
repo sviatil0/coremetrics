@@ -13,9 +13,13 @@ private:
     vec3 color;
     std::string soundFile;
     std::string targetLayout;
+    std::string targetLayoutHide;
 
 public:
-    Button(ivec2 minP, ivec2 maxP, vec3 col, std::string soundFile = "", std::string targetLayout = "");
+    Button(ivec2 minP, ivec2 maxP, vec3 col,
+           std::string soundFile = "",
+           std::string targetLayout = "",
+           std::string targetLayoutHide = "");
 
     ~Button() {}
 

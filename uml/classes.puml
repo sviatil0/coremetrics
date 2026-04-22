@@ -175,23 +175,85 @@ class Button {
     -minPos: ivec2
     -maxPos: ivec2
     -color: vec3
+    -soundFile: string
+    -targetLayout: string
+    -targetLayoutHide: string
 
-    +Button(minP: ivec2, maxP: ivec2, col: vec3)
+    +Button(minP: ivec2, maxP: ivec2, col: vec3, soundFile: string, targetLayout: string, targetLayoutHide: string)
     +\~Button()
     +draw(screen: Screen&): void
     +checkToggle(mouseX: int, mouseY: int): bool
+    +operator()(event: Event*): bool
+}
+
+class Bar {
+    -minPos: ivec2
+    -maxPos: ivec2
+    -fillColor: vec3
+    -bgColor: vec3
+    -value: float
+    -minVal: float
+    -maxVal: float
+    -metricName: string
+
+    +Bar(minPos, maxPos, fillColor, bgColor, minVal, maxVal, metricName)
+    +setValue(v: float): void
+    +getValue(): float
+    +getMetricName(): string
+    +draw(screen: Screen&): void
+}
+
+class Row {
+    -minPos: ivec2
+    -maxPos: ivec2
+    -cells: vector<string>
+    -columnWeights: vector<float>
+    -textColor: vec3
+
+    +Row(minPos, maxPos, cells, columnWeights, textColor)
+    +setCells(cells: vector<string>): void
+    +getCells(): vector<string>
+    +draw(screen: Screen&): void
+}
+
+class SystemMetrics {
+    +{static} readCpuPercent(): float
+    +{static} readMemPercent(): float
+    +{static} topProcesses(n: size_t): vector<ProcessInfo>
+}
+
+note right of SystemMetrics
+  Static API. Platform impls split:
+    SystemMetrics_linux.cpp  (/proc)
+    SystemMetrics_mac.cpp    (mach + sysctl + libproc)
+    SystemMetrics_win.cpp    (GetSystemTimes + toolhelp)
+end note
+
+class ProcessInfo <<struct>> {
+    +pid: int
+    +name: string
+    +cpuPct: float
+    +memPct: float
 }
 
 enum GUIElementType {
     POINT
     LINE
     BOX
+    BAR
+    ROW
+    LABEL
+    BUTTON
 }
 
 class GUIElementFactory {
     +{static} createPoint(pos: vec2, color: vec3): unique_ptr<GUIElement>
     +{static} createLine(start: vec2, end: vec2, color: vec3): unique_ptr<GUIElement>
     +{static} createBox(minPos: vec2, maxPos: vec2, color: vec3): unique_ptr<GUIElement>
+    +{static} createBar(minPos, maxPos, fillColor, bgColor, minVal, maxVal, metricName): unique_ptr<GUIElement>
+    +{static} createRow(minPos, maxPos, cells, columnWeights, textColor): unique_ptr<GUIElement>
+    +{static} createLabel(text, pos, color): unique_ptr<GUIElement>
+    +{static} createButton(minPos, maxPos, color, soundFile, targetLayout, targetLayoutHide): unique_ptr<GUIElement>
     +{static} create(type: GUIElementType, pos1: vec2, pos2: vec2, color: vec3): unique_ptr<GUIElement>
 }
 
@@ -277,6 +339,10 @@ GUIElement <|-- Label
 GUIElement <|-- Selection
 GUIElement <|-- Image
 GUIElement <|-- Button
+GUIElement <|-- Bar
+GUIElement <|-- Row
+
+SystemMetrics ..> ProcessInfo : produces
 
 GUIElementFactory ..> GUIElement : creates
 GUIElementFactory ..> GUIElementType : uses

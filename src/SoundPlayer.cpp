@@ -10,6 +10,11 @@ SoundPlayer::SoundPlayer() : stream(nullptr)
 
 SoundPlayer::~SoundPlayer()
 {
+    shutdown();
+}
+
+void SoundPlayer::shutdown()
+{
     if (stream != nullptr)
     {
         SDL_DestroyAudioStream(stream);
@@ -35,22 +40,27 @@ void SoundPlayer::play(const std::string& filePath)
         return;
     }
 
-    SDL_AudioSpec desiredSpec;
-    desiredSpec.freq = SAMPLE_RATE;
-    desiredSpec.format = SDL_AUDIO_F32;
-    desiredSpec.channels = NUM_CHANNELS;
+    SDL_AudioSpec deviceSpec;
+    deviceSpec.freq = SAMPLE_RATE;
+    deviceSpec.format = SDL_AUDIO_F32;
+    deviceSpec.channels = NUM_CHANNELS;
 
     if (stream != nullptr)
     {
         SDL_DestroyAudioStream(stream);
     }
 
-    stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &desiredSpec, nullptr, nullptr);
+    stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &deviceSpec, nullptr, nullptr);
     if (stream == nullptr)
     {
         std::cerr << "Failed to open audio device: " << SDL_GetError() << '\n';
         SDL_free(wavBuffer);
         return;
+    }
+
+    if (!SDL_SetAudioStreamFormat(stream, &wavSpec, &deviceSpec))
+    {
+        std::cerr << "Failed to set audio stream format: " << SDL_GetError() << '\n';
     }
 
     SDL_PutAudioStreamData(stream, wavBuffer, wavLength);

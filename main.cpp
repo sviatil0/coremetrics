@@ -77,7 +77,7 @@ int main(int argc, char **argv)
         vec3(1.0f, 1.0f, 1.0f)));
 
     Tree<Layout> *overlay = manager.addChild(&manager.getRoot(),
-                                             Layout(vec2(0.5f, 0.0f), vec2(1.0f, 1.0f), false));
+                                             Layout(vec2(0.5f, 0.0f), vec2(1.0f, 1.0f), false, "overlay"));
     overlay->getData().addElement(std::make_unique<Box>(
         vec2(static_cast<float>(HALF_W), 0.0f),
         vec2(static_cast<float>(RESX - 1), static_cast<float>(RESY - 1)),
@@ -94,7 +94,9 @@ int main(int argc, char **argv)
     manager.getRoot().getData().addElement(std::make_unique<Button>(
         ivec2(BTN_MIN_X, BTN_MIN_Y),
         ivec2(BTN_MAX_X, BTN_MAX_Y),
-        vec3(0.2f, 0.8f, 0.2f)));
+        vec3(0.2f, 0.8f, 0.2f),
+        "assets/click.wav",
+        "overlay"));
 
     vec3 triangleColor(0.8f, 0.2f, 0.3f);
 
@@ -112,14 +114,6 @@ int main(int argc, char **argv)
             case SDL_EVENT_QUIT:
             {
                 end = true;
-                break;
-            }
-            case SDL_EVENT_MOUSE_MOTION:
-            {
-                SDL_GetMouseState(&mouseX, &mouseY);
-                ivec2 mousePos(static_cast<int>(mouseX), static_cast<int>(mouseY));
-                bool inTriangle = pointInTriangle(mousePos, triV1, triV2, triV3);
-                overlay->getData().setActive(inTriangle);
                 break;
             }
             case SDL_EVENT_MOUSE_BUTTON_DOWN:
