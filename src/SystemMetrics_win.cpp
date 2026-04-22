@@ -54,6 +54,12 @@ float SystemMetrics::readCpuPercent()
     return usage * 100.0f;
 }
 
+float SystemMetrics::readGpuPercent()
+{
+    // TODO: PDH counter "\GPU Engine(*)\Utilization Percentage"
+    return 0.0f;
+}
+
 float SystemMetrics::readMemPercent()
 {
     MEMORYSTATUSEX ms;

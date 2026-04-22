@@ -4,6 +4,8 @@
 #include <algorithm>
 #include <chrono>
 #include <cstring>
+#include <CoreFoundation/CoreFoundation.h>
+#include <IOKit/IOKitLib.h>
 #include <libproc.h>
 #include <mach/mach.h>
 #include <mach/mach_host.h>
@@ -55,6 +57,52 @@ float SystemMetrics::readCpuPercent()
     }
     float usage = 1.0f - (static_cast<float>(idleDiff) / static_cast<float>(totalDiff));
     return usage * 100.0f;
+}
+
+float SystemMetrics::readGpuPercent()
+{
+    float result = 0.0f;
+    CFMutableDictionaryRef match = IOServiceMatching("IOAccelerator");
+    if (match == nullptr)
+    {
+        return 0.0f;
+    }
+    io_iterator_t iter = 0;
+    if (IOServiceGetMatchingServices(kIOMasterPortDefault, match, &iter) != KERN_SUCCESS)
+    {
+        return 0.0f;
+    }
+    io_registry_entry_t entry = 0;
+    while ((entry = IOIteratorNext(iter)) != 0)
+    {
+        CFMutableDictionaryRef props = nullptr;
+        if (IORegistryEntryCreateCFProperties(entry, &props, kCFAllocatorDefault, 0) == KERN_SUCCESS
+            && props != nullptr)
+        {
+            CFDictionaryRef perf = static_cast<CFDictionaryRef>(
+                CFDictionaryGetValue(props, CFSTR("PerformanceStatistics")));
+            if (perf != nullptr)
+            {
+                CFNumberRef util = static_cast<CFNumberRef>(
+                    CFDictionaryGetValue(perf, CFSTR("Device Utilization %")));
+                if (util != nullptr)
+                {
+                    int value = 0;
+                    if (CFNumberGetValue(util, kCFNumberIntType, &value))
+                    {
+                        if (static_cast<float>(value) > result)
+                        {
+                            result = static_cast<float>(value);
+                        }
+                    }
+                }
+            }
+            CFRelease(props);
+        }
+        IOObjectRelease(entry);
+    }
+    IOObjectRelease(iter);
+    return result;
 }
 
 float SystemMetrics::readMemPercent()

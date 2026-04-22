@@ -52,14 +52,17 @@ static const vec3 COLOR_ROW_HEADER(0.871f, 1.0f, 0.608f);
 
 static Bar *g_cpuBar = nullptr;
 static Bar *g_ramBar = nullptr;
+static Bar *g_gpuBar = nullptr;
 static Label *g_cpuReadout = nullptr;
 static Label *g_ramReadout = nullptr;
+static Label *g_gpuReadout = nullptr;
 static Label *g_muteLabel = nullptr;
 static std::vector<Row *> g_processRows;
 
 static bool g_alarmEnabled = true;
 static bool g_cpuAlarmActive = false;
 static bool g_ramAlarmActive = false;
+static bool g_gpuAlarmActive = false;
 static ivec2 g_muteBtnMin;
 static ivec2 g_muteBtnMax;
 static ivec2 g_exitBtnMin;
@@ -227,6 +230,7 @@ static void buildScene()
 
     int cpuY = TAB_BAR_HEIGHT + BAR_MARGIN;
     int ramY = cpuY + BAR_HEIGHT + BAR_MARGIN;
+    int gpuY = ramY + BAR_HEIGHT + BAR_MARGIN;
 
     int readoutWidth = 72;
     int barMaxX = RESX - BAR_MARGIN - readoutWidth;
@@ -255,6 +259,19 @@ static void buildScene()
         0.0f, 100.0f, "ram"));
     system->getData().addElement(std::make_unique<Label>("0.0%",
         ivec2(barMaxX + 8, ramY + 4),
+        COLOR_TEXT_ACCENT));
+
+    system->getData().addElement(std::make_unique<Label>("GPU",
+        ivec2(BAR_MARGIN, gpuY + 4),
+        COLOR_TEXT_PRIMARY));
+    system->getData().addElement(std::make_unique<Bar>(
+        ivec2(BAR_MARGIN + BAR_LABEL_WIDTH, gpuY),
+        ivec2(barMaxX, gpuY + BAR_HEIGHT),
+        COLOR_BAR_CPU_FILL,
+        COLOR_BAR_BG,
+        0.0f, 100.0f, "gpu"));
+    system->getData().addElement(std::make_unique<Label>("0.0%",
+        ivec2(barMaxX + 8, gpuY + 4),
         COLOR_TEXT_ACCENT));
 
     Tree<Layout> *processes = manager.addChild(&root,
@@ -290,7 +307,9 @@ static void cacheElementPointers()
     {
         g_cpuReadout = nthLabelInLayout(*systemNode, 1);
         g_ramReadout = nthLabelInLayout(*systemNode, 3);
+        g_gpuReadout = nthLabelInLayout(*systemNode, 5);
     }
+    g_gpuBar = findBarByMetric(root, "gpu");
 
     Tree<Layout> *tabbarNode = findLayoutNode(root, "tabbar");
     if (tabbarNode != nullptr)
@@ -306,6 +325,7 @@ static void pollMetrics()
 {
     float cpuPct = SystemMetrics::readCpuPercent();
     float memPct = SystemMetrics::readMemPercent();
+    float gpuPct = SystemMetrics::readGpuPercent();
 
     if (g_cpuBar != nullptr)
     {
@@ -315,6 +335,10 @@ static void pollMetrics()
     {
         g_ramBar->setValue(memPct);
     }
+    if (g_gpuBar != nullptr)
+    {
+        g_gpuBar->setValue(gpuPct);
+    }
     if (g_cpuReadout != nullptr)
     {
         g_cpuReadout->setText(formatPct(cpuPct) + "%");
@@ -323,9 +347,14 @@ static void pollMetrics()
     {
         g_ramReadout->setText(formatPct(memPct) + "%");
     }
+    if (g_gpuReadout != nullptr)
+    {
+        g_gpuReadout->setText(formatPct(gpuPct) + "%");
+    }
 
     bool cpuNowAlarm = cpuPct >= ALARM_THRESHOLD;
     bool ramNowAlarm = memPct >= ALARM_THRESHOLD;
+    bool gpuNowAlarm = gpuPct >= ALARM_THRESHOLD;
     if (g_alarmEnabled)
     {
         if (cpuNowAlarm && !g_cpuAlarmActive)
@@ -336,9 +365,14 @@ static void pollMetrics()
         {
             EventManager::getInstance().pushEvent(std::make_unique<SoundEvent>(ALARM_SOUND_PATH));
         }
+        if (gpuNowAlarm && !g_gpuAlarmActive)
+        {
+            EventManager::getInstance().pushEvent(std::make_unique<SoundEvent>(ALARM_SOUND_PATH));
+        }
     }
     g_cpuAlarmActive = cpuNowAlarm;
     g_ramAlarmActive = ramNowAlarm;
+    g_gpuAlarmActive = gpuNowAlarm;
 
     if (g_processRows.size() <= 1)
     {

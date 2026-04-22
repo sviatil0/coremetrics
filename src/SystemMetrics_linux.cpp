@@ -154,6 +154,26 @@ float SystemMetrics::readCpuPercent()
     return usage * 100.0f;
 }
 
+float SystemMetrics::readGpuPercent()
+{
+    std::ifstream file("/sys/class/drm/card0/device/gpu_busy_percent");
+    if (!file.is_open())
+    {
+        return 0.0f;
+    }
+    int pct = 0;
+    file >> pct;
+    if (pct < 0)
+    {
+        pct = 0;
+    }
+    if (pct > 100)
+    {
+        pct = 100;
+    }
+    return static_cast<float>(pct);
+}
+
 float SystemMetrics::readMemPercent()
 {
     std::ifstream file("/proc/meminfo");
