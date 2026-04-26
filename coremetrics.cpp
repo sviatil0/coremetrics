@@ -17,8 +17,8 @@
 #include "Bar.hpp"
 #include "Box.hpp"
 #include "Row.hpp"
-#include "label.hpp"
-#include "button.hpp"
+#include "Label.hpp"
+#include "Button.hpp"
 #include "image.hpp"
 #include "SystemMetrics.hpp"
 

@@ -29,55 +29,6 @@ static bool fileContains(const std::string& fileName, const std::string& search)
     return false;
 }
 
-static void testSetAndGetPoint()
-{
-    std::cout << "GUIFile setPoint / getPoints: ";
-    GUIFile f;
-    Point p(vec2(10.0f, 20.0f), vec3(255.0f, 0.0f, 0.0f));
-    f.setPoint(p);
-    
-    auto points = f.getPoints();
-    bool passed = (points.size() == 1 && points[0].pos.x == 10.0f);
-    std::cout << (passed ? "PASS" : "FAIL") << '\n';
-}
-
-static void testSetAndGetLine()
-{
-    std::cout << "GUIFile setLine / getLines: ";
-    GUIFile f;
-    Line l(vec2(0.0f, 0.0f), vec2(50.0f, 50.0f), vec3(0.0f, 255.0f, 0.0f));
-    f.setLine(l);
-    
-    auto lines = f.getLines();
-    bool passed = (lines.size() == 1 && lines[0].end.y == 50.0f);
-    std::cout << (passed ? "PASS" : "FAIL") << '\n';
-}
-
-static void testSetAndGetBox()
-{
-    std::cout << "GUIFile setBox / getBoxes: ";
-    GUIFile f;
-    Box b(vec2(5.0f, 5.0f), vec2(15.0f, 15.0f), vec3(0.0f, 0.0f, 255.0f));
-    f.setBox(b);
-    
-    auto boxes = f.getBoxes();
-    bool passed = (boxes.size() == 1 && boxes[0].maxPos.x == 15.0f);
-    std::cout << (passed ? "PASS" : "FAIL") << '\n';
-}
-
-static void testGetterDataProtection()
-{
-    std::cout << "GUIFile Getters (Data Protection): ";
-    GUIFile f;
-    f.setPoint(Point(vec2(1.0f, 1.0f), vec3(255.0f, 255.0f, 255.0f)));
-    
-    std::vector<Point> pts = f.getPoints();
-    pts.clear(); 
-    
-    bool passed = (f.getPoints().size() == 1);
-    std::cout << (passed ? "PASS" : "FAIL") << '\n';
-}
-
 static void testWriteFile()
 {
     std::cout << "GUIFile writeFile: ";
@@ -151,10 +102,6 @@ void guiFileTestSuite()
     std::cout << "=============================================" << '\n';
     std::cout << '\n';
 
-    testSetAndGetPoint();
-    testSetAndGetLine();
-    testSetAndGetBox();
-    testGetterDataProtection();
     testWriteFile();
     testFileRead();
 

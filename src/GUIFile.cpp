@@ -5,6 +5,7 @@
 #include <sstream>
 #include <iostream>
 #include <algorithm>
+#include <array>
 #include <cctype>
 #include <locale>
 #include <typeinfo>
@@ -23,8 +24,6 @@ std::string GUIFile::getContent(const std::string &source, const std::string &ta
     // if tag not found in string, return
     if (start == std::string::npos) return "";
     
-    //size_t tagEnd = source.find(">", start);
-    //if (tagEnd == std::string::npos) return "";
     start += openTag.length() + 1;
 
     size_t end, tempEnd;
@@ -130,7 +129,7 @@ Tree<Layout>* GUIFile::recurseLayout(const std::string& block, Tree<Layout>* par
     Tree<Layout>* node = manager.addChild(parent, std::move(currLayout));
 
     size_t elemPos;
-    std::vector<GUIElementType> typeVec = {GUIElementType::POINT, GUIElementType::LINE, GUIElementType::BOX};
+    std::array<GUIElementType, 3> types = {GUIElementType::POINT, GUIElementType::LINE, GUIElementType::BOX};
 
     // parse nested layouts
     std::string workingBlock = block;
@@ -151,8 +150,9 @@ Tree<Layout>* GUIFile::recurseLayout(const std::string& block, Tree<Layout>* par
     }
 
     // parse elements
-    for (GUIElementType &elemType : typeVec)
+    for (auto itr = types.begin(); itr != types.end(); ++itr)
     {
+        GUIElementType &elemType = *itr;
         elemPos = 0;
         while (true)
         {
