@@ -1,11 +1,11 @@
 #ifndef __BOX_HPP__
 #define __BOX_HPP__
 
-#include "GUIElement.hpp"
+#include "Cloneable.hpp"
 #include "vec2.hpp"
 #include "vec3.hpp"
 
-class Box : public GUIElement
+class Box : public Cloneable<Box>
 {
 public:
     vec2 minPos;

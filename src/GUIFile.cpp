@@ -168,6 +168,9 @@ Tree<Layout>* GUIFile::recurseLayout(const std::string& block, Tree<Layout>* par
                 case GUIElementType::BOX:
                     innerBlock = getContent(workingBlock, "box", elemPos);
                     break;
+                default:
+                    std::cerr << "unrecogized type\n";
+                    break;
             }
             if (innerBlock == "") break;
 

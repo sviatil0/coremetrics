@@ -3,11 +3,11 @@
 
 #include <string>
 #include <vector>
-#include "GUIElement.hpp"
+#include "Cloneable.hpp"
 #include "vec2.hpp"
 #include "vec3.hpp"
 
-class Row : public GUIElement
+class Row : public Cloneable<Row>
 {
 private:
     ivec2 minPos;

@@ -1,11 +1,11 @@
 #ifndef __SELECTION_HPP__
 #define __SELECTION_HPP__
 
-#include "GUIElement.hpp"
+#include "Cloneable.hpp"
 #include "linear.hpp"
 #include <string>
 
-class Selection : public GUIElement
+class Selection : public Cloneable<Selection>
 {
 private:
     ivec2 m_position;
