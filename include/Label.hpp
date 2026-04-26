@@ -21,6 +21,7 @@ public:
 
     std::string getText() const;
     void setText(std::string text);
+    void setPos(ivec2 pos);
 };
 
 #endif

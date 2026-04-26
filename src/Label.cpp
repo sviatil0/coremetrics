@@ -15,6 +15,11 @@ void Label::setText(std::string text)
     m_text = std::move(text);
 }
 
+void Label::setPos(ivec2 pos)
+{
+    m_position = pos;
+}
+
 void Label::draw(Screen &screen)
 {
     Font::drawText(screen, m_text, m_position, m_color);

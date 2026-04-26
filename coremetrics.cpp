@@ -267,6 +267,10 @@ static void buildScene()
     int readoutWidth = 72;
     int barMaxX = RESX - BAR_MARGIN - readoutWidth;
 
+    auto baseLabel = std::make_unique<Label>("0.0%",
+        ivec2(barMaxX + 8, cpuY + 4),
+        COLOR_TEXT_ACCENT);
+
     system->getData().addElement(std::make_unique<Label>("CPU",
         ivec2(BAR_MARGIN, cpuY + 4),
         COLOR_TEXT_PRIMARY));
@@ -276,9 +280,7 @@ static void buildScene()
         COLOR_BAR_CPU_FILL,
         COLOR_BAR_BG,
         0.0f, 100.0f, "cpu"));
-    system->getData().addElement(std::make_unique<Label>("0.0%",
-        ivec2(barMaxX + 8, cpuY + 4),
-        COLOR_TEXT_ACCENT));
+    system->getData().addElement(std::unique_ptr<GUIElement>(baseLabel->clone()));
 
     system->getData().addElement(std::make_unique<Label>("RAM",
         ivec2(BAR_MARGIN, ramY + 4),
@@ -289,9 +291,9 @@ static void buildScene()
         COLOR_BAR_RAM_FILL,
         COLOR_BAR_BG,
         0.0f, 100.0f, "ram"));
-    system->getData().addElement(std::make_unique<Label>("0.0%",
-        ivec2(barMaxX + 8, ramY + 4),
-        COLOR_TEXT_ACCENT));
+    baseLabel->setPos(ivec2(barMaxX + 8, ramY + 4));
+    system->getData().addElement(std::unique_ptr<GUIElement>(baseLabel->clone()));
+
 
     system->getData().addElement(std::make_unique<Label>("GPU",
         ivec2(BAR_MARGIN, gpuY + 4),
@@ -302,9 +304,9 @@ static void buildScene()
         COLOR_BAR_CPU_FILL,
         COLOR_BAR_BG,
         0.0f, 100.0f, "gpu"));
-    system->getData().addElement(std::make_unique<Label>("0.0%",
-        ivec2(barMaxX + 8, gpuY + 4),
-        COLOR_TEXT_ACCENT));
+    baseLabel->setPos(ivec2(barMaxX + 8, gpuY + 4));
+    system->getData().addElement(std::unique_ptr<GUIElement>(baseLabel->clone()));
+
 
     Tree<Layout> *processes = manager.addChild(&root,
         Layout(vec2(0.0f, tabContentStartY), vec2(1.0f, 1.0f), false, "processes"));
