@@ -4,11 +4,12 @@ CPPFLAGS = -I$(INCDIR) -MMD -MP
 # LDFLAGS = -F/Library/Frameworks -framework sdl3  -Wl,-rpath,/Library/Frameworks  # MacOS, STEFAN
 # CXXFLAGS = -std=c++23 -Wall -I ./include -F/Library/Frameworks/SDL3.xcframework/macos-arm64_x86_64 # Soleksii
 # LDFLAGS = -F/Library/Frameworks/SDL3.xcframework/macos-arm64_x86_64 -framework SDL3 -Wl,-rpath,/Library/Frameworks/SDL3.xcframework/macos-arm64_x86_64 # Soleksii
-# CXXFLAGS = -std=c++23 -Wall -F/Library/Frameworks -I ./include -framework sdl3  -Wl,-rpath,/Library/Frameworks  # Martin (TODO)
-# CXXFLAGS = -std=c++17 -Wall -F/Library/Frameworks -I./include # Martin
-# LDFLAGS = -F/Library/Frameworks -framework SDL3 # Martin
-CXXFLAGS = -std=c++17 -Wall -I./include -I$(HOME)/libs/SDL/include # Alicia
-LDFLAGS = -L$(HOME)/libs/SDL/build -lSDL3 -Wl,-rpath,$(HOME)/libs/SDL/build # also Alicia
+
+#CXXFLAGS = -std=c++17 -Wall -F/Library/Frameworks -I./include -pthread # Martin
+#LDFLAGS = -F/Library/Frameworks -framework SDL3 -pthread # Martin
+
+CXXFLAGS = -std=c++17 -Wall -I./include -I$(HOME)/libs/SDL/include -pthread # Alicia
+LDFLAGS = -L$(HOME)/libs/SDL/build -lSDL3 -Wl,-rpath,$(HOME)/libs/SDL/build -pthread # also Alicia
 
 SRCDIR = src
 TESTDIR = tests

@@ -8,6 +8,7 @@
 #include "LayoutManagerTest.hpp"
 #include "EventManagerTest.hpp"
 #include "layoutTest.hpp"
+#include "ThreadPoolTest.hpp"
 
 int main(int argc, char **argv)
 {
@@ -25,6 +26,7 @@ int main(int argc, char **argv)
 	layoutManagerTestSuite();
 	eventManagerTestSuite();
 	layoutTestSuite();
+	threadPoolTestSuite();
 
 	SDL_Quit();
 
