@@ -1,11 +1,11 @@
 #ifndef __IMAGE_HPP__
 #define __IMAGE_HPP__
 
-#include "GUIElement.hpp"
+#include "Cloneable.hpp"
 #include "linear.hpp" 
 #include <string>
 
-class Image : public GUIElement
+class Image : public Cloneable<Image>
 {
 private:
     std::string m_filePath;
