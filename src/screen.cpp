@@ -1,4 +1,5 @@
 #include "screen.hpp"
+#include "ThreadPool.hpp"
 
 Screen::Screen(unsigned int w, unsigned int h) : width(w), height(h), surface(nullptr)
 {
@@ -203,12 +204,35 @@ void Screen::drawBox(const Tvec2<int> &a, const Tvec2<int> &b, const Tvec3<float
     int xMax = std::max(a.x, b.x);
     int yMin = std::min(a.y, b.y);
     int yMax = std::max(a.y, b.y);
-    for (int row = yMin; row <= yMax; row++)
+
+    ThreadPool& pool = ThreadPool::getInstance();
+    int numThreads = static_cast<int>(pool.threadCount());
+    int numRows = yMax - yMin + 1;
+    int rowsPerThread = std::max(1, numRows / numThreads);
+
+    std::vector<std::future<void>> futures;
+    for (int t = 0; t < numThreads; ++t)
     {
-        for (int col = xMin; col <= xMax; col++)
+        int rowStart = yMin + t * rowsPerThread;
+        if (rowStart > yMax)
         {
-            drawPixel(ivec2(col, row), color);
+            break;
         }
+        int rowEnd = (t == numThreads - 1) ? yMax : std::min(rowStart + rowsPerThread - 1, yMax);
+        futures.push_back(pool.submit([this, xMin, xMax, rowStart, rowEnd, color]()
+        {
+            for (int row = rowStart; row <= rowEnd; ++row)
+            {
+                for (int col = xMin; col <= xMax; ++col)
+                {
+                    drawPixel(ivec2(col, row), color);
+                }
+            }
+        }));
+    }
+    for (std::future<void>& f : futures)
+    {
+        f.get();
     }
 }
     
@@ -220,27 +244,46 @@ int Screen::crossEdge(const Tvec2<int> &a, const Tvec2<int> &b, const Tvec2<int>
 void Screen::drawTriangle(const Tvec2<int> &v1, const Tvec2<int> &v2, const Tvec2<int> &v3, const Tvec3<float> &color)
 {
     //drawing help from: https://www.scratchapixel.com/lessons/3d-basic-rendering/rasterization-practical-implementation/rasterization-stage.html
-    // get bounding coords to loop over (box)
     int minX = std::min(v1.x, std::min(v2.x, v3.x));
     int minY = std::min(v1.y, std::min(v2.y, v3.y));
     int maxX = std::max(v1.x, std::max(v2.x, v3.x));
     int maxY = std::max(v1.y, std::max(v2.y, v3.y));
 
-    // within boundaries, check if each pixel is inside triangle or not
-    for (int x = minX; x <= maxX; x++)
-    {
-        for (int y = minY; y <= maxY; y++)
-        {
-            ivec2 p = ivec2(x, y);
-            int w0 = crossEdge(v2, v3, p);
-            int w1 = crossEdge(v3, v1, p);
-            int w2 = crossEdge(v1, v2, p);
+    ThreadPool& pool = ThreadPool::getInstance();
+    int numThreads = static_cast<int>(pool.threadCount());
+    int numRows = maxY - minY + 1;
+    int rowsPerThread = std::max(1, numRows / numThreads);
 
-            if ((w0 >= 0 && w1 >= 0 && w2 >= 0) || //if clockwise order of verts
-                (w0 <= 0 && w1 <= 0 && w2 <= 0)) //if counter-clockwise order of verts
-            {
-                drawPixel(p, color);
-            }
+    std::vector<std::future<void>> futures;
+    for (int t = 0; t < numThreads; ++t)
+    {
+        int rowStart = minY + t * rowsPerThread;
+        if (rowStart > maxY)
+        {
+            break;
         }
+        int rowEnd = (t == numThreads - 1) ? maxY : std::min(rowStart + rowsPerThread - 1, maxY);
+        futures.push_back(pool.submit([this, minX, maxX, rowStart, rowEnd, v1, v2, v3, color]()
+        {
+            for (int y = rowStart; y <= rowEnd; ++y)
+            {
+                for (int x = minX; x <= maxX; ++x)
+                {
+                    ivec2 p(x, y);
+                    int w0 = crossEdge(v2, v3, p);
+                    int w1 = crossEdge(v3, v1, p);
+                    int w2 = crossEdge(v1, v2, p);
+                    if ((w0 >= 0 && w1 >= 0 && w2 >= 0) ||
+                        (w0 <= 0 && w1 <= 0 && w2 <= 0))
+                    {
+                        drawPixel(p, color);
+                    }
+                }
+            }
+        }));
+    }
+    for (std::future<void>& f : futures)
+    {
+        f.get();
     }
 }
