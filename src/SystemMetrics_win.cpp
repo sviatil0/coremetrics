@@ -6,6 +6,9 @@
 #include <windows.h>
 #include <psapi.h>
 #include <tlhelp32.h>
+#include <pdh.h>
+#include <pdhmsg.h>
+#include <vector>
 
 extern bool systemMetricsCompareByMemDesc(const ProcessInfo &a, const ProcessInfo &b);
 
@@ -56,8 +59,63 @@ float SystemMetrics::readCpuPercent()
 
 float SystemMetrics::readGpuPercent()
 {
-    // TODO: PDH counter "\GPU Engine(*)\Utilization Percentage"
-    return 0.0f;
+    static PDH_HQUERY query = nullptr;
+    static PDH_HCOUNTER counter = nullptr;
+    static bool initialized = false;
+
+    if (!initialized)
+    {
+        if (PdhOpenQuery(NULL, 0, &query) != ERROR_SUCCESS)
+            return 0.0f;
+
+        if (PdhAddEnglishCounter(query,
+            "\\GPU Engine(*)\\Utilization Percentage",
+            0,
+            &counter) != ERROR_SUCCESS)
+            return 0.0f;
+
+        PdhCollectQueryData(query);
+
+        initialized = true;
+        return 0.0f;
+    }
+
+    if (PdhCollectQueryData(query) != ERROR_SUCCESS)
+        return 0.0f;
+
+    DWORD bufferSize = 0;
+    DWORD itemCount = 0;
+
+    PdhGetFormattedCounterArray(
+        counter,
+        PDH_FMT_DOUBLE,
+        &bufferSize,
+        &itemCount,
+        nullptr
+    );
+
+    std::vector<BYTE> buffer(bufferSize);
+
+    auto items = reinterpret_cast<PDH_FMT_COUNTERVALUE_ITEM*>(buffer.data());
+
+    if (PdhGetFormattedCounterArray(
+            counter,
+            PDH_FMT_DOUBLE,
+            &bufferSize,
+            &itemCount,
+            items) != ERROR_SUCCESS)
+    {
+        return 0.0f;
+    }
+
+    double total = 0.0;
+
+    for (DWORD i = 0; i < itemCount; ++i)
+    {
+        total += items[i].FmtValue.doubleValue;
+    }
+
+    return static_cast<float>(total);
 }
 
 float SystemMetrics::readMemPercent()
