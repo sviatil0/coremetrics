@@ -43,13 +43,48 @@ void Screen::clear()
     SDL_FillSurfaceRect(surface, nullptr, 0);
 }
 
+void Screen::blitSurface(SDL_Surface *src, const Tvec2<int> &pos)
+{
+    if (!surface || !src)
+    {
+        return;
+    }
+    SDL_Rect dst;
+    dst.x = pos.x;
+    dst.y = pos.y;
+    dst.w = src->w;
+    dst.h = src->h;
+    SDL_BlitSurface(src, nullptr, surface, &dst);
+}
+
 void Screen::blitTo(SDL_Surface *target)
 {
     if (!surface || !target)
     {
         return;
     }
-    SDL_BlitSurface(surface, nullptr, target, nullptr);
+
+    float srcAspect = static_cast<float>(surface->w) / static_cast<float>(surface->h);
+    float dstAspect = static_cast<float>(target->w) / static_cast<float>(target->h);
+
+    SDL_Rect dstRect;
+    if (dstAspect > srcAspect)
+    {
+        dstRect.h = target->h;
+        dstRect.w = static_cast<int>(static_cast<float>(target->h) * srcAspect);
+        dstRect.x = (target->w - dstRect.w) / 2;
+        dstRect.y = 0;
+    }
+    else
+    {
+        dstRect.w = target->w;
+        dstRect.h = static_cast<int>(static_cast<float>(target->w) / srcAspect);
+        dstRect.x = 0;
+        dstRect.y = (target->h - dstRect.h) / 2;
+    }
+
+    SDL_FillSurfaceRect(target, nullptr, 0);
+    SDL_BlitSurfaceScaled(surface, nullptr, target, &dstRect, SDL_SCALEMODE_NEAREST);
 }
 
 void Screen::plotLineLow(const Tvec2<int> &a, const Tvec2<int> &b, const Tvec3<float> &color)

@@ -4,12 +4,20 @@
 #include "Point.hpp"
 #include "Line.hpp"
 #include "Box.hpp"
+#include "Bar.hpp"
+#include "Row.hpp"
+#include "label.hpp"
+#include "button.hpp"
 
 enum class GUIElementType
 {
     POINT,
     LINE,
-    BOX
+    BOX,
+    BAR,
+    ROW,
+    LABEL,
+    BUTTON
 };
 
 #endif

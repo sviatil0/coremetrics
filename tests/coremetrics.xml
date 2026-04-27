@@ -1,0 +1,71 @@
+<layout sX=0.0 sY=0.0 eX=1.0 eY=1.0 active=true name=root>
+
+    <layout sX=0.0 sY=0.0 eX=1.0 eY=0.09 active=true name=tabbar>
+        <button target=system hide=processes>
+            <ivec2><x>8</x><y>8</y></ivec2>
+            <ivec2><x>472</x><y>40</y></ivec2>
+            <vec3><x>0.2</x><y>0.4</y><z>0.7</z></vec3>
+        </button>
+        <label>
+            <ivec2><x>20</x><y>14</y></ivec2>
+            <vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3>
+            <text>System</text>
+        </label>
+
+        <button target=processes hide=system>
+            <ivec2><x>488</x><y>8</y></ivec2>
+            <ivec2><x>952</x><y>40</y></ivec2>
+            <vec3><x>0.2</x><y>0.4</y><z>0.7</z></vec3>
+        </button>
+        <label>
+            <ivec2><x>500</x><y>14</y></ivec2>
+            <vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3>
+            <text>Processes</text>
+        </label>
+    </layout>
+
+    <layout sX=0.0 sY=0.09 eX=1.0 eY=1.0 active=true name=system>
+        <label>
+            <ivec2><x>24</x><y>76</y></ivec2>
+            <vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3>
+            <text>CPU</text>
+        </label>
+        <bar metric=cpu min=0 max=100>
+            <ivec2><x>84</x><y>72</y></ivec2>
+            <ivec2><x>936</x><y>96</y></ivec2>
+            <vec3><x>0.2</x><y>0.8</y><z>0.2</z></vec3>
+            <vec3><x>0.15</x><y>0.15</y><z>0.15</z></vec3>
+        </bar>
+
+        <label>
+            <ivec2><x>24</x><y>124</y></ivec2>
+            <vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3>
+            <text>RAM</text>
+        </label>
+        <bar metric=ram min=0 max=100>
+            <ivec2><x>84</x><y>120</y></ivec2>
+            <ivec2><x>936</x><y>144</y></ivec2>
+            <vec3><x>0.8</x><y>0.6</y><z>0.2</z></vec3>
+            <vec3><x>0.15</x><y>0.15</y><z>0.15</z></vec3>
+        </bar>
+    </layout>
+
+    <layout sX=0.0 sY=0.09 eX=1.0 eY=1.0 active=false name=processes>
+        <row>
+            <ivec2><x>24</x><y>64</y></ivec2>
+            <ivec2><x>936</x><y>84</y></ivec2>
+            <cell weight=0.15>PID</cell>
+            <cell weight=0.5>NAME</cell>
+            <cell weight=0.175>CPU%</cell>
+            <cell weight=0.175>MEM%</cell>
+            <vec3><x>1.0</x><y>1.0</y><z>0.4</z></vec3>
+        </row>
+
+        <row metric=proc0>
+            <ivec2><x>24</x><y>100</y></ivec2>
+            <ivec2><x>936</x><y>120</y></ivec2>
+            <vec3><x>0.9</x><y>0.9</y><z>0.9</z></vec3>
+        </row>
+    </layout>
+
+</layout>
