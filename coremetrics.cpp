@@ -2,7 +2,6 @@
 #include <fstream>
 #include <iostream>
 #include <memory>
-#include <sstream>
 #include <string>
 #include <vector>
 #include <SDL3/SDL.h>
@@ -14,13 +13,10 @@
 #include "SoundEvent.hpp"
 #include "SoundPlayer.hpp"
 #include "font.hpp"
-#include "Bar.hpp"
-#include "Box.hpp"
-#include "Row.hpp"
-#include "Label.hpp"
-#include "Button.hpp"
-#include "image.hpp"
+#include "GUIElements.hpp"
 #include "SystemMetrics.hpp"
+#include "LayoutUtils.hpp"
+#include "ProcessUtils.hpp"
 
 constexpr int RESX = 960;
 constexpr int RESY = 540;
@@ -66,14 +62,6 @@ static bool g_cpuAlarmActive = false;
 static bool g_ramAlarmActive = false;
 static bool g_gpuAlarmActive = false;
 
-enum SortColumn
-{
-    SORT_PID = 0,
-    SORT_NAME = 1,
-    SORT_CPU = 2,
-    SORT_MEM = 3
-};
-
 static SortColumn g_sortColumn = SORT_MEM;
 static bool g_sortAscending = false;
 static Row *g_headerRow = nullptr;
@@ -83,79 +71,6 @@ static ivec2 g_muteBtnMin;
 static ivec2 g_muteBtnMax;
 static ivec2 g_exitBtnMin;
 static ivec2 g_exitBtnMax;
-
-static Bar *findBarByMetric(Tree<Layout> &node, const std::string &metric)
-{
-    for (const auto &element : node.getData().elements)
-    {
-        Bar *bar = dynamic_cast<Bar *>(element.get());
-        if (bar != nullptr && bar->getMetricName() == metric)
-        {
-            return bar;
-        }
-    }
-    for (auto &child : node.getChildren())
-    {
-        Bar *bar = findBarByMetric(*child, metric);
-        if (bar != nullptr)
-        {
-            return bar;
-        }
-    }
-    return nullptr;
-}
-
-static Tree<Layout> *findLayoutNode(Tree<Layout> &node, const std::string &name)
-{
-    if (node.getData().getName() == name)
-    {
-        return &node;
-    }
-    for (auto &child : node.getChildren())
-    {
-        Tree<Layout> *found = findLayoutNode(*child, name);
-        if (found != nullptr)
-        {
-            return found;
-        }
-    }
-    return nullptr;
-}
-
-static Label *nthLabelInLayout(Tree<Layout> &layoutNode, std::size_t index)
-{
-    std::size_t seen = 0;
-    for (const auto &element : layoutNode.getData().elements)
-    {
-        Label *label = dynamic_cast<Label *>(element.get());
-        if (label == nullptr)
-        {
-            continue;
-        }
-        if (seen == index)
-        {
-            return label;
-        }
-        ++seen;
-    }
-    return nullptr;
-}
-
-static void collectRows(Tree<Layout> &node, std::vector<Row *> &out)
-{
-    for (const auto &element : node.getData().elements)
-    {
-        Row *row = dynamic_cast<Row *>(element.get());
-        if (row != nullptr)
-        {
-            out.push_back(row);
-        }
-    }
-    for (auto &child : node.getChildren())
-    {
-        collectRows(*child, out);
-    }
-}
 
 static bool compareProcesses(const ProcessInfo &a, const ProcessInfo &b)
 {
@@ -171,14 +86,6 @@ static bool compareProcesses(const ProcessInfo &a, const ProcessInfo &b)
         return g_sortAscending ? (a.memPct < b.memPct) : (a.memPct > b.memPct);
     }
     return false;
-}
-
-static std::string formatPct(float value)
-{
-    std::ostringstream oss;
-    oss.precision(1);
-    oss << std::fixed << value;
-    return oss.str();
 }
 
 static void buildScene()
@@ -280,7 +187,7 @@ static void buildScene()
         COLOR_BAR_CPU_FILL,
         COLOR_BAR_BG,
         0.0f, 100.0f, "cpu"));
-    system->getData().addElement(std::unique_ptr<GUIElement>(baseLabel->clone()));
+    system->getData().addElement(cloneUnique(*baseLabel));
 
     system->getData().addElement(std::make_unique<Label>("RAM",
         ivec2(BAR_MARGIN, ramY + 4),
@@ -292,7 +199,7 @@ static void buildScene()
         COLOR_BAR_BG,
         0.0f, 100.0f, "ram"));
     baseLabel->setPos(ivec2(barMaxX + 8, ramY + 4));
-    system->getData().addElement(std::unique_ptr<GUIElement>(baseLabel->clone()));
+    system->getData().addElement(cloneUnique(*baseLabel));
 
 
     system->getData().addElement(std::make_unique<Label>("GPU",
@@ -305,7 +212,7 @@ static void buildScene()
         COLOR_BAR_BG,
         0.0f, 100.0f, "gpu"));
     baseLabel->setPos(ivec2(barMaxX + 8, gpuY + 4));
-    system->getData().addElement(std::unique_ptr<GUIElement>(baseLabel->clone()));
+    system->getData().addElement(cloneUnique(*baseLabel));
 
 
     Tree<Layout> *processes = manager.addChild(&root,
@@ -347,7 +254,7 @@ static void cacheElementPointers()
     g_cpuBar = findBarByMetric(root, "cpu");
     g_ramBar = findBarByMetric(root, "ram");
 
-    Tree<Layout> *systemNode = findLayoutNode(root, "system");
+    Tree<Layout> *systemNode = EventManager::findLayoutByName(root, "system");
     if (systemNode != nullptr)
     {
         g_cpuReadout = nthLabelInLayout(*systemNode, 1);
@@ -356,7 +263,7 @@ static void cacheElementPointers()
     }
     g_gpuBar = findBarByMetric(root, "gpu");
 
-    Tree<Layout> *tabbarNode = findLayoutNode(root, "tabbar");
+    Tree<Layout> *tabbarNode = EventManager::findLayoutByName(root, "tabbar");
     if (tabbarNode != nullptr)
     {
         g_muteLabel = nthLabelInLayout(*tabbarNode, 2);

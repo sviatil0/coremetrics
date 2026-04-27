@@ -8,6 +8,7 @@
 #include "Row.hpp"
 #include "Label.hpp"
 #include "Button.hpp"
+#include "image.hpp"
 
 enum class GUIElementType
 {
@@ -17,7 +18,8 @@ enum class GUIElementType
     BAR,
     ROW,
     LABEL,
-    BUTTON
+    BUTTON,
+    IMAGE
 };
 
 #endif
