@@ -1,11 +1,11 @@
 #ifndef __POINT_HPP__
 #define __POINT_HPP__
 
-#include "GUIElement.hpp"
+#include "Cloneable.hpp"
 #include "vec2.hpp"
 #include "vec3.hpp"
 
-class Point : public GUIElement
+class Point : public Cloneable<Point>
 {
 public:
     vec2 pos;

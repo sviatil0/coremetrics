@@ -1,11 +1,11 @@
 #ifndef __LABEL_HPP__
 #define __LABEL_HPP__
 
-#include "GUIElement.hpp"
+#include "Cloneable.hpp"
 #include "linear.hpp"
 #include <string>
 
-class Label : public GUIElement
+class Label : public Cloneable<Label>
 {
 private:
     std::string m_text;
@@ -21,6 +21,7 @@ public:
 
     std::string getText() const;
     void setText(std::string text);
+    void setPos(ivec2 pos);
 };
 
 #endif

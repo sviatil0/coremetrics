@@ -15,10 +15,6 @@
 class GUIFile
 {
 private:
-    std::vector<Point> points;
-    std::vector<Line> lines;
-    std::vector<Box> boxes;
-
     LayoutManager &manager;
 
     std::string getContent(const std::string &source, const std::string &tag, size_t &pos);
@@ -28,17 +24,8 @@ private:
     Layout parseLayout(const std::string &block);
     Tree<Layout>* recurseLayout(const std::string& block, Tree<Layout>* parent, int i);
 
-
 public:
     GUIFile();
-    //setter/staging methods
-    void setPoint(Point);
-    void setLine(Line);
-    void setBox(Box);
-    //getter methods
-    std::vector<Point> getPoints();
-    std::vector<Line> getLines();
-    std::vector<Box> getBoxes();
     //file reading/parsing and writing
     void readFile(const std::string &fileName);
     void writeFile(std::string fileName);

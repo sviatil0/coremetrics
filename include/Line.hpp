@@ -1,11 +1,11 @@
 #ifndef __LINE_HPP__
 #define __LINE_HPP__
 
-#include "GUIElement.hpp"
+#include "Cloneable.hpp"
 #include "vec2.hpp"
 #include "vec3.hpp"
 
-class Line : public GUIElement
+class Line : public Cloneable<Line>
 {
 public:
     vec2 start;

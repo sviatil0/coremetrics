@@ -9,8 +9,8 @@ CPPFLAGS = -I$(INCDIR) -MMD -MP
 # LDFLAGS = -F/Library/Frameworks -framework SDL3 # Martin
 CXXFLAGS = -std=c++23 -Wall -I ./include -I/opt/homebrew/include # Soleksii (brew sdl3 + sdl3_ttf + sdl3_image)
 LDFLAGS = -L/opt/homebrew/lib -lSDL3 -lSDL3_ttf -lSDL3_image -Wl,-rpath,/opt/homebrew/lib -framework IOKit -framework CoreFoundation # Soleksii
-# CXXFLAGS = -std=c++17 -Wall -I./include -I$(HOME)/libs/SDL/include # Alicia
-# LDFLAGS = -L$(HOME)/libs/SDL/build -lSDL3 -Wl,-rpath,$(HOME)/libs/SDL/build # also Alicia
+# CXXFLAGS = -std=c++17 -Wall -I./include -I$(HOME)/dev/sdl3/install/include # Alicia
+# LDFLAGS = -L$(HOME)/dev/sdl3/install/lib -lSDL3 -lSDL3_ttf -lSDL3_image -Wl,-rpath,$(HOME)/dev/sdl3/install/lib # also Alicia
 
 SRCDIR = src
 TESTDIR = tests

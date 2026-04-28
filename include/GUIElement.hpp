@@ -10,6 +10,7 @@ public:
     virtual ~GUIElement() {}
     virtual void draw(Screen& screen) = 0;
     virtual bool operator()(Event* event) { return false; }
+    virtual GUIElement* clone() const = 0;
 };
 
 #endif

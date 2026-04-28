@@ -2,10 +2,10 @@
 #define __BUTTON_HPP__
 
 #include <string>
-#include "GUIElement.hpp"
+#include "Cloneable.hpp"
 #include "linear.hpp"
 
-class Button : public GUIElement
+class Button : public Cloneable<Button>
 {
 private:
     ivec2 minPos;

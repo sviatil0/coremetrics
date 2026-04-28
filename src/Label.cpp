@@ -1,4 +1,4 @@
-#include "label.hpp"
+#include "Label.hpp"
 #include "font.hpp"
 
 Label::Label(std::string text, ivec2 pos, vec3 col) : m_text(std::move(text)), m_position(pos), m_color(col)
@@ -13,6 +13,11 @@ std::string Label::getText() const
 void Label::setText(std::string text)
 {
     m_text = std::move(text);
+}
+
+void Label::setPos(ivec2 pos)
+{
+    m_position = pos;
 }
 
 void Label::draw(Screen &screen)

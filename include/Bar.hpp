@@ -2,11 +2,11 @@
 #define __BAR_HPP__
 
 #include <string>
-#include "GUIElement.hpp"
+#include "Cloneable.hpp"
 #include "vec2.hpp"
 #include "vec3.hpp"
 
-class Bar : public GUIElement
+class Bar : public Cloneable<Bar>
 {
 private:
     ivec2 minPos;

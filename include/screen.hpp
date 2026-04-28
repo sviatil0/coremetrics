@@ -16,6 +16,7 @@ private:
     unsigned int width;
     unsigned int height;
     SDL_Surface *surface;
+    SDL_Renderer* renderer;
 
     void plotLineLow(const Tvec2<int> &a, const Tvec2<int> &b, const Tvec3<float> &color);
     void plotLineHigh(const Tvec2<int> &a, const Tvec2<int> &b, const Tvec3<float> &color);
@@ -33,6 +34,7 @@ public:
     void drawLine(const Tvec2<int> &a, const Tvec2<int> &b, const Tvec3<int> &color);
     void drawBox(const Tvec2<int> &a, const Tvec2<int> &b, const Tvec3<float> &color);
     void drawTriangle(const Tvec2<int> &v1, const Tvec2<int> &v2, const Tvec2<int> &v3, const Tvec3<float> &color);
+    void drawText(const Tvec2<int> &pos, const Tvec3<float> &color, std::string text);
 };
 
 #endif

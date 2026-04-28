@@ -17,7 +17,6 @@ private:
     std::string name;
 
 public:
-    //Layout(vec2 start, vec2 end, bool active = true);
     Layout(vec2 start, vec2 end, bool active = true, std::string name = "");
 
     void addElement(std::unique_ptr<GUIElement> element);
@@ -28,7 +27,7 @@ public:
     void setName(std::string name);
     std::string getName() const;
 
-    std::vector<std::unique_ptr<GUIElement>> elements; // MADE THIS PUBLIC FOR TESTING PURPOSES, SHOULD ADD getElements METHOD
+    std::vector<std::unique_ptr<GUIElement>> elements;
 
     ivec2 resolveAbsStart(ivec2 parentStart, ivec2 parentEnd) const;
     ivec2 resolveAbsEnd(ivec2 parentStart, ivec2 parentEnd) const;
