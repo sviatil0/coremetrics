@@ -1,6 +1,8 @@
 #ifndef __LAYOUT_UTILS_HPP__
 #define __LAYOUT_UTILS_HPP__
 
+#include <string>
+#include <vector>
 #include "Tree.hpp"
 #include "Layout.hpp"
 #include "Bar.hpp"

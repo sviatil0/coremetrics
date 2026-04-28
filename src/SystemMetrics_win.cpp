@@ -108,14 +108,21 @@ float SystemMetrics::readGpuPercent()
         return 0.0f;
     }
 
-    double total = 0.0;
+    double maxEngine = 0.0;
 
     for (DWORD i = 0; i < itemCount; ++i)
     {
-        total += items[i].FmtValue.doubleValue;
+        if (items[i].FmtValue.doubleValue > maxEngine)
+        {
+            maxEngine = items[i].FmtValue.doubleValue;
+        }
     }
 
-    return static_cast<float>(total);
+    if (maxEngine > 100.0)
+    {
+        maxEngine = 100.0;
+    }
+    return static_cast<float>(maxEngine);
 }
 
 float SystemMetrics::readMemPercent()

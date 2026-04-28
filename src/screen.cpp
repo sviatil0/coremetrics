@@ -306,5 +306,4 @@ void Screen::drawText(const Tvec2<int> &pos, const Tvec3<float> &color, std::str
                                             static_cast<Uint8>(color.y * 255),
                                             static_cast<Uint8>(color.z * 255), 255);
     SDL_RenderDebugText(this->renderer, pos.x, pos.y, text.c_str());
-    SDL_RenderPresent(this->renderer);
 }
