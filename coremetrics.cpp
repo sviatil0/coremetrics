@@ -14,6 +14,7 @@
 #include "SoundPlayer.hpp"
 #include "font.hpp"
 #include "GUIElements.hpp"
+#include "GUIFile.hpp"
 #include "SystemMetrics.hpp"
 #include "LayoutUtils.hpp"
 #include "ProcessUtils.hpp"
@@ -92,75 +93,21 @@ static void buildScene()
 {
     LayoutManager &manager = LayoutManager::getInstance();
     Tree<Layout> &root = manager.getRoot();
-
-    Tree<Layout> *tabbar = manager.addChild(&root,
-        Layout(vec2(0.0f, 0.0f), vec2(1.0f, static_cast<float>(TAB_BAR_HEIGHT) / static_cast<float>(RESY)), true, "tabbar"));
+    GUIFile g;
+    g.readFile("base.xml", manager);
 
     int muteBtnWidth = 140;
     int tabsTotalWidth = RESX - (TAB_BTN_PAD * 4) - muteBtnWidth;
     int btnWidth = tabsTotalWidth / 2;
     int btnY = TAB_BTN_PAD;
     int btnMaxY = TAB_BAR_HEIGHT - TAB_BTN_PAD;
-
-    tabbar->getData().addElement(std::make_unique<Button>(
-        ivec2(TAB_BTN_PAD, btnY),
-        ivec2(TAB_BTN_PAD + btnWidth, btnMaxY),
-        COLOR_TAB_ACTIVE,
-        "",
-        "system",
-        "processes"));
-    tabbar->getData().addElement(std::make_unique<Label>("System",
-        ivec2(TAB_BTN_PAD + 12, btnY + 6),
-        COLOR_TEXT_PRIMARY));
-
-    tabbar->getData().addElement(std::make_unique<Button>(
-        ivec2(TAB_BTN_PAD * 2 + btnWidth, btnY),
-        ivec2(TAB_BTN_PAD * 2 + btnWidth * 2, btnMaxY),
-        COLOR_TAB_ACTIVE,
-        "",
-        "processes",
-        "system"));
-    tabbar->getData().addElement(std::make_unique<Label>("Processes",
-        ivec2(TAB_BTN_PAD * 2 + btnWidth + 12, btnY + 6),
-        COLOR_TEXT_PRIMARY));
-
     g_muteBtnMin = ivec2(TAB_BTN_PAD * 3 + btnWidth * 2, btnY);
     g_muteBtnMax = ivec2(g_muteBtnMin.x + muteBtnWidth, btnMaxY);
-
-    tabbar->getData().addElement(std::make_unique<Button>(
-        g_muteBtnMin,
-        g_muteBtnMax,
-        COLOR_MUTE_BTN,
-        "", "", ""));
-    tabbar->getData().addElement(std::make_unique<Label>("SOUND ON",
-        ivec2(g_muteBtnMin.x + 6, btnY + 6),
-        COLOR_TEXT_PRIMARY));
 
     int exitBtnSize = 64;
     int exitBtnPad = 16;
     g_exitBtnMin = ivec2(RESX - exitBtnSize - exitBtnPad, RESY - exitBtnSize - exitBtnPad);
     g_exitBtnMax = ivec2(g_exitBtnMin.x + exitBtnSize, g_exitBtnMin.y + exitBtnSize);
-    root.getData().addElement(std::make_unique<Button>(
-        g_exitBtnMin,
-        g_exitBtnMax,
-        COLOR_EXIT_BTN,
-        "", "", ""));
-    root.getData().addElement(std::make_unique<Label>("EXIT",
-        ivec2(g_exitBtnMin.x + 16, g_exitBtnMin.y + 22),
-        COLOR_TEXT_PRIMARY));
-
-    int logoX = BAR_MARGIN;
-    int logoY = RESY - 48 - exitBtnPad;
-    root.getData().addElement(std::make_unique<Box>(
-        vec2(static_cast<float>(logoX), static_cast<float>(logoY + 28)),
-        vec2(static_cast<float>(logoX + 180), static_cast<float>(logoY + 32)),
-        COLOR_ACCENT_GREEN));
-    root.getData().addElement(std::make_unique<Label>("CoreMetrics",
-        ivec2(logoX, logoY),
-        COLOR_WHITE));
-    root.getData().addElement(std::make_unique<Label>("v1.0",
-        ivec2(logoX + 160, logoY + 4),
-        COLOR_ACCENT_GREEN));
 
     float tabContentStartY = static_cast<float>(TAB_BAR_HEIGHT) / static_cast<float>(RESY);
 

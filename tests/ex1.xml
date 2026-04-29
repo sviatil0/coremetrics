@@ -15,6 +15,18 @@
         <vec3><x>244.0</x> <y>245.0</y> <z>103.3</z>
     </vec3>
 </line>
+<button>
+            <ivec2><x>8</x><y>8</y></ivec2>
+            <ivec2><x>472</x><y>40</y></ivec2>
+            <vec3><x>0.2</x><y>0.4</y><z>0.7</z></vec3>
+            <target>system</target>
+            <hide>processes</hide>
+        </button>
+        <label>
+            <ivec2><x>20</x><y>14</y></ivec2>
+            <vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3>
+            <text>System</text>
+        </label>
         <layout sX=0.25 sY=0.25 eX=0.75 eY=0.75 active=true>
         <line>
             <vec2>
