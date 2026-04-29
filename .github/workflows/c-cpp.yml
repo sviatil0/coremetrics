@@ -11,7 +11,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest, macos-latest, windows-latest]
 
     runs-on: ${{ matrix.os }}
 
@@ -39,6 +39,14 @@ jobs:
         version-sdl-ttf: 3-latest
         version-sdl-image: 3-latest
 
+    - name: Setup SDL3 (Windows)
+      if: runner.os == 'Windows'
+      uses: libsdl-org/setup-sdl@main
+      with:
+        version: 3-latest
+        version-sdl-ttf: 3-latest
+        version-sdl-image: 3-latest
+
     - name: Build tests (Linux)
       if: runner.os == 'Linux'
       env:
@@ -57,3 +65,15 @@ jobs:
         SDL_VIDEO_DRIVER: dummy
       run: |
         make test
+
+    - name: Build tests (Windows)
+      if: runner.os == 'Windows'
+      shell: bash
+      env:
+        SDL_VIDEO_DRIVER: dummy
+      run: |
+        SDL_PREFIX="${SDL3_ROOT}"
+        make CXX=g++ \
+             CXXFLAGS="-std=c++23 -Wall -I ./include -I${SDL_PREFIX}/include" \
+             LDFLAGS="-L${SDL_PREFIX}/lib -lSDL3 -lSDL3_ttf -lSDL3_image" \
+             test
