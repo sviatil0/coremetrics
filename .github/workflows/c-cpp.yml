@@ -72,8 +72,10 @@ jobs:
       env:
         SDL_VIDEO_DRIVER: dummy
       run: |
-        SDL_PREFIX="${SDL3_ROOT}"
+        INCLUDES="-I ./include -I${SDL3_ROOT}/include -I${SDL3_TTF_ROOT}/include -I${SDL3_IMAGE_ROOT}/include"
+        LIBS="-L${SDL3_ROOT}/lib -L${SDL3_TTF_ROOT}/lib -L${SDL3_IMAGE_ROOT}/lib -lSDL3 -lSDL3_ttf -lSDL3_image"
+        export PATH="${SDL3_ROOT}/bin:${SDL3_TTF_ROOT}/bin:${SDL3_IMAGE_ROOT}/bin:$PATH"
         make CXX=g++ \
-             CXXFLAGS="-std=c++23 -Wall -I ./include -I${SDL_PREFIX}/include" \
-             LDFLAGS="-L${SDL_PREFIX}/lib -lSDL3 -lSDL3_ttf -lSDL3_image" \
+             CXXFLAGS="-std=c++23 -Wall $INCLUDES" \
+             LDFLAGS="$LIBS" \
              test
