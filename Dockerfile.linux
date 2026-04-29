@@ -1,0 +1,68 @@
+# Reproducible Linux build/test environment for CoreMetrics.
+# Build:  docker build -f Dockerfile.linux -t coremetrics-linux .
+# Test:   docker run --rm -e SDL_VIDEO_DRIVER=dummy coremetrics-linux make test
+# Shell:  docker run --rm -it coremetrics-linux bash
+
+FROM ubuntu:24.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    pkg-config \
+    git \
+    cmake \
+    ca-certificates \
+    libfreetype-dev \
+    libharfbuzz-dev \
+    libpng-dev \
+    libjpeg-dev \
+    libwebp-dev \
+    libx11-dev \
+    libxext-dev \
+    libxrandr-dev \
+    libxcursor-dev \
+    libxi-dev \
+    libxss-dev \
+    libwayland-dev \
+    libxkbcommon-dev \
+    libdrm-dev \
+    libgbm-dev \
+    libdecor-0-dev \
+    libpipewire-0.3-dev \
+    libpulse-dev \
+    libasound2-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# SDL3 packages aren't in apt yet on 24.04. Build SDL3, SDL3_ttf, SDL3_image from source.
+WORKDIR /tmp/build
+
+ARG SDL3_TAG=release-3.2.16
+ARG SDL3_TTF_TAG=release-3.2.2
+ARG SDL3_IMAGE_TAG=release-3.2.4
+
+RUN git clone --depth 1 --branch ${SDL3_TAG} https://github.com/libsdl-org/SDL.git \
+    && cmake -S SDL -B SDL/build -DCMAKE_BUILD_TYPE=Release -DSDL_TESTS=OFF \
+    && cmake --build SDL/build --parallel \
+    && cmake --install SDL/build \
+    && rm -rf SDL
+
+RUN git clone --depth 1 --branch ${SDL3_TTF_TAG} https://github.com/libsdl-org/SDL_ttf.git \
+    && cmake -S SDL_ttf -B SDL_ttf/build -DCMAKE_BUILD_TYPE=Release -DSDLTTF_VENDORED=OFF \
+    && cmake --build SDL_ttf/build --parallel \
+    && cmake --install SDL_ttf/build \
+    && rm -rf SDL_ttf
+
+RUN git clone --depth 1 --branch ${SDL3_IMAGE_TAG} https://github.com/libsdl-org/SDL_image.git \
+    && cmake -S SDL_image -B SDL_image/build -DCMAKE_BUILD_TYPE=Release -DSDLIMAGE_VENDORED=OFF \
+    && cmake --build SDL_image/build --parallel \
+    && cmake --install SDL_image/build \
+    && rm -rf SDL_image
+
+RUN ldconfig
+
+WORKDIR /work
+COPY . /work
+
+# Override Makefile flags to use system include/lib paths populated by SDL3 install.
+CMD ["sh", "-c", "make clean && make CXXFLAGS='-std=c++23 -Wall -I ./include -I/usr/local/include' LDFLAGS='-L/usr/local/lib -lSDL3 -lSDL3_ttf -lSDL3_image -Wl,-rpath,/usr/local/lib' test"]

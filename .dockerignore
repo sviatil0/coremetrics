@@ -1,0 +1,7 @@
+obj/
+bin/
+.git/
+.claude/
+*.dylib
+*.dSYM/
+.DS_Store

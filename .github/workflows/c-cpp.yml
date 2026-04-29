@@ -11,7 +11,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest, macos-latest, windows-latest]
 
     runs-on: ${{ matrix.os }}
 
@@ -39,6 +39,14 @@ jobs:
         version-sdl-ttf: 3-latest
         version-sdl-image: 3-latest
 
+    - name: Setup SDL3 (Windows)
+      if: runner.os == 'Windows'
+      uses: libsdl-org/setup-sdl@main
+      with:
+        version: 3-latest
+        version-sdl-ttf: 3-latest
+        version-sdl-image: 3-latest
+
     - name: Build tests (Linux)
       if: runner.os == 'Linux'
       env:
@@ -57,3 +65,17 @@ jobs:
         SDL_VIDEO_DRIVER: dummy
       run: |
         make test
+
+    - name: Build tests (Windows)
+      if: runner.os == 'Windows'
+      shell: bash
+      env:
+        SDL_VIDEO_DRIVER: dummy
+      run: |
+        which pkg-config || pacman -S --noconfirm mingw-w64-x86_64-pkgconf || true
+        echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH"
+        pkg-config --cflags sdl3 sdl3-ttf sdl3-image || true
+        make CXX=g++ \
+             CXXFLAGS="-std=c++23 -Wall -I ./include $(pkg-config --cflags sdl3 sdl3-ttf sdl3-image)" \
+             LDFLAGS="$(pkg-config --libs sdl3 sdl3-ttf sdl3-image)" \
+             test
