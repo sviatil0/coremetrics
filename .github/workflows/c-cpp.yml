@@ -72,10 +72,10 @@ jobs:
       env:
         SDL_VIDEO_DRIVER: dummy
       run: |
-        INCLUDES="-I ./include -I${SDL3_ROOT}/include -I${SDL3_TTF_ROOT}/include -I${SDL3_IMAGE_ROOT}/include"
-        LIBS="-L${SDL3_ROOT}/lib -L${SDL3_TTF_ROOT}/lib -L${SDL3_IMAGE_ROOT}/lib -lSDL3 -lSDL3_ttf -lSDL3_image"
-        export PATH="${SDL3_ROOT}/bin:${SDL3_TTF_ROOT}/bin:${SDL3_IMAGE_ROOT}/bin:$PATH"
+        which pkg-config || pacman -S --noconfirm mingw-w64-x86_64-pkgconf || true
+        echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH"
+        pkg-config --cflags sdl3 sdl3-ttf sdl3-image || true
         make CXX=g++ \
-             CXXFLAGS="-std=c++23 -Wall $INCLUDES" \
-             LDFLAGS="$LIBS" \
+             CXXFLAGS="-std=c++23 -Wall -I ./include $(pkg-config --cflags sdl3 sdl3-ttf sdl3-image)" \
+             LDFLAGS="$(pkg-config --libs sdl3 sdl3-ttf sdl3-image)" \
              test
