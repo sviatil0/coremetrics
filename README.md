@@ -81,6 +81,12 @@ If none are available the CPU and RAM stress still work; GPU stress is skipped w
 
 The `.github/workflows/c-cpp.yml` matrix builds on Ubuntu, macOS, and Windows. The most recent green runs verified Linux and macOS. As of late April the GitHub Actions runs are paused with the error "recent account payments have failed or your spending limit needs to be increased". This is a billing setting on the organization account, not a code issue. Local verification still passes via `./run-cross-platform-tests.sh` (macOS native + Ubuntu via Docker).
 
+### Known issues
+
+- `Label - Placeholder Rendering` test reports FAIL in the GUIElement suite. The Label class renders fine in the live demo (CPU / RAM / GPU / readouts / process columns all draw correctly). The test predates the SDL3_ttf rewrite of Label and asserts on the old box-per-character placeholder behavior. Tracked as a follow-up to either rewrite the test against the TTF renderer or remove it.
+- Per-process GPU usage is not currently exposed by the cross-platform `SystemMetrics` API. Total GPU usage is reported on Linux (`/sys/class/drm/card0/device/gpu_busy_percent`), macOS (`IOServiceMatching("IOAccelerator")`), and Windows (PDH `\GPU Engine(*)\Utilization Percentage`). Per-process attribution is a backlog item.
+- Windows GUI has not been visually verified end-to-end. Compilation and unit tests pass on the Windows CI runner; visual interaction (mouse clicks, tab switch, sort) is verified on macOS and Linux only.
+
 ### Style
 
 | Category | Convention |
