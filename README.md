@@ -6,7 +6,15 @@ High-level overview, grouped by package:
 
 ![Class Diagram Overview](assets/overview.png)
 
-The full diagram with every field and method per class lives in `uml/classes.puml` (rendered to `assets/classes.png`). It is too wide to embed inline; open the PNG directly if you need the member-level detail.
+Per-package detail diagrams (each is small enough to fit on a normal screen):
+
+- Core (math + Screen + ThreadPool): ![Core](assets/core.png)
+- GUI elements (GUIElement hierarchy + Cloneable + Factory): ![GUI](assets/gui.png)
+- Layout (Tree, Layout, LayoutManager, GUIFile): ![Layout](assets/layout.png)
+- Events (Event hierarchy, EventManager, SoundPlayer): ![Events](assets/events.png)
+- System metrics: ![Metrics](assets/metrics.png)
+
+The single combined diagram in `uml/classes.puml` is kept for archival reference; it renders wide and is not embedded here.
 
 ---
 

@@ -1,0 +1,79 @@
+@startuml events
+
+skinparam classFontSize 12
+skinparam classAttributeFontSize 11
+skinparam ranksep 30
+skinparam nodesep 25
+
+title Event system: Event hierarchy, EventManager, SoundPlayer
+
+enum EventType {
+    EVENT_CLICK
+    EVENT_SHOW
+    EVENT_SOUND
+}
+
+abstract class Event {
+    #type: EventType
+
+    +Event(type: EventType)
+    +\~Event()
+    +getType(): EventType
+}
+
+class ClickEvent {
+    -mouseX: int
+    -mouseY: int
+
+    +ClickEvent(mouseX: int, mouseY: int)
+    +getMouseX(): int
+    +getMouseY(): int
+}
+
+class ShowEvent {
+    -layoutName: string
+    -show: bool
+
+    +ShowEvent(layoutName: string, show: bool)
+    +getLayoutName(): string
+    +getShow(): bool
+}
+
+class SoundEvent {
+    -filePath: string
+
+    +SoundEvent(filePath: string)
+    +getFilePath(): string
+}
+
+class EventManager {
+    -eventQueue: queue<unique_ptr<Event>>
+
+    -EventManager()
+    -{static} trickleEvent(node: Tree<Layout>&, event: Event*, parentStart: ivec2, parentEnd: ivec2): bool
+    -{static} findLayoutByName(node: Tree<Layout>&, name: string): Tree<Layout>*
+
+    +{static} getInstance(): EventManager&
+    +pushEvent(event: unique_ptr<Event>): void
+    +processEvents(screenStart: ivec2, screenEnd: ivec2): void
+}
+
+class SoundPlayer {
+    -stream: SDL_AudioStream*
+
+    -SoundPlayer()
+
+    +\~SoundPlayer()
+    +{static} getInstance(): SoundPlayer&
+    +play(filePath: string): void
+}
+
+Event <|-- ClickEvent
+Event <|-- ShowEvent
+Event <|-- SoundEvent
+Event *-- EventType
+
+EventManager ..> Event : processes
+EventManager ..> SoundPlayer : delegates sound
+
+@enduml

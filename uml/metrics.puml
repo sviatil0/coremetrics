@@ -1,0 +1,33 @@
+@startuml metrics
+
+skinparam classFontSize 12
+skinparam classAttributeFontSize 11
+skinparam ranksep 30
+skinparam nodesep 25
+
+title System metrics: cross-platform CPU / RAM / GPU / per-process
+
+class SystemMetrics {
+    +{static} readCpuPercent(): float
+    +{static} readMemPercent(): float
+    +{static} readGpuPercent(): float
+    +{static} topProcesses(n: size_t): vector<ProcessInfo>
+}
+
+note right of SystemMetrics
+  Static API. Platform impls split across files:
+    SystemMetrics_linux.cpp  (/proc, /sys/class/drm)
+    SystemMetrics_mac.cpp    (mach + sysctl + libproc + IOKit)
+    SystemMetrics_win.cpp    (GetSystemTimes + toolhelp + PDH)
+end note
+
+class ProcessInfo <<struct>> {
+    +pid: int
+    +name: string
+    +cpuPct: float
+    +memPct: float
+}
+
+SystemMetrics ..> ProcessInfo : produces
+
+@enduml
