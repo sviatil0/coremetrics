@@ -92,106 +92,25 @@ static bool compareProcesses(const ProcessInfo &a, const ProcessInfo &b)
 static void buildScene()
 {
     LayoutManager &manager = LayoutManager::getInstance();
-    Tree<Layout> &root = manager.getRoot();
     GUIFile g;
     g.readFile("base.xml", manager);
 
-    int muteBtnWidth = 140;
-    int tabsTotalWidth = RESX - (TAB_BTN_PAD * 4) - muteBtnWidth;
-    int btnWidth = tabsTotalWidth / 2;
-    int btnY = TAB_BTN_PAD;
-    int btnMaxY = TAB_BAR_HEIGHT - TAB_BTN_PAD;
-    g_muteBtnMin = ivec2(TAB_BTN_PAD * 3 + btnWidth * 2, btnY);
-    g_muteBtnMax = ivec2(g_muteBtnMin.x + muteBtnWidth, btnMaxY);
+    g_muteBtnMin = ivec2(812, 8);
+    g_muteBtnMax = ivec2(952, 40);
 
-    int exitBtnSize = 64;
-    int exitBtnPad = 16;
-    g_exitBtnMin = ivec2(RESX - exitBtnSize - exitBtnPad, RESY - exitBtnSize - exitBtnPad);
-    g_exitBtnMax = ivec2(g_exitBtnMin.x + exitBtnSize, g_exitBtnMin.y + exitBtnSize);
+    g_exitBtnMin = ivec2(880, 460);
+    g_exitBtnMax = ivec2(944, 524);
 
-    float tabContentStartY = static_cast<float>(TAB_BAR_HEIGHT) / static_cast<float>(RESY);
-
-    Tree<Layout> *system = manager.addChild(&root,
-        Layout(vec2(0.0f, tabContentStartY), vec2(1.0f, 1.0f), true, "system"));
-
-    int cpuY = TAB_BAR_HEIGHT + BAR_MARGIN;
-    int ramY = cpuY + BAR_HEIGHT + BAR_MARGIN;
-    int gpuY = ramY + BAR_HEIGHT + BAR_MARGIN;
-
-    int readoutWidth = 72;
-    int barMaxX = RESX - BAR_MARGIN - readoutWidth;
-
-    auto baseLabel = std::make_unique<Label>("0.0%",
-        ivec2(barMaxX + 8, cpuY + 4),
-        COLOR_TEXT_ACCENT);
-
-    system->getData().addElement(std::make_unique<Label>("CPU",
-        ivec2(BAR_MARGIN, cpuY + 4),
-        COLOR_TEXT_PRIMARY));
-    system->getData().addElement(std::make_unique<Bar>(
-        ivec2(BAR_MARGIN + BAR_LABEL_WIDTH, cpuY),
-        ivec2(barMaxX, cpuY + BAR_HEIGHT),
-        COLOR_BAR_CPU_FILL,
-        COLOR_BAR_BG,
-        0.0f, 100.0f, "cpu"));
-    system->getData().addElement(cloneUnique(*baseLabel));
-
-    system->getData().addElement(std::make_unique<Label>("RAM",
-        ivec2(BAR_MARGIN, ramY + 4),
-        COLOR_TEXT_PRIMARY));
-    system->getData().addElement(std::make_unique<Bar>(
-        ivec2(BAR_MARGIN + BAR_LABEL_WIDTH, ramY),
-        ivec2(barMaxX, ramY + BAR_HEIGHT),
-        COLOR_BAR_RAM_FILL,
-        COLOR_BAR_BG,
-        0.0f, 100.0f, "ram"));
-    baseLabel->setPos(ivec2(barMaxX + 8, ramY + 4));
-    system->getData().addElement(cloneUnique(*baseLabel));
-
-
-    system->getData().addElement(std::make_unique<Label>("GPU",
-        ivec2(BAR_MARGIN, gpuY + 4),
-        COLOR_TEXT_PRIMARY));
-    system->getData().addElement(std::make_unique<Bar>(
-        ivec2(BAR_MARGIN + BAR_LABEL_WIDTH, gpuY),
-        ivec2(barMaxX, gpuY + BAR_HEIGHT),
-        COLOR_BAR_CPU_FILL,
-        COLOR_BAR_BG,
-        0.0f, 100.0f, "gpu"));
-    baseLabel->setPos(ivec2(barMaxX + 8, gpuY + 4));
-    system->getData().addElement(cloneUnique(*baseLabel));
-
-
-    Tree<Layout> *processes = manager.addChild(&root,
-        Layout(vec2(0.0f, tabContentStartY), vec2(1.0f, 1.0f), false, "processes"));
-
+    int rowY = 64;
     std::vector<float> weights = {0.15f, 0.5f, 0.175f, 0.175f};
-    std::vector<std::string> header = {"PID", "NAME", "CPU%", "MEM%"};
-    int rowY = TAB_BAR_HEIGHT + PROCESS_TOP_PADDING;
-
-    int headerRowWidth = (RESX - BAR_MARGIN) - BAR_MARGIN;
-    int colX = BAR_MARGIN;
+    int headerRowWidth = 936 - 24;
+    int colX = 24;
     for (int c = 0; c < 4; ++c)
     {
         int colW = static_cast<int>(weights[c] * static_cast<float>(headerRowWidth));
         g_headerColMin[c] = ivec2(colX, rowY);
         g_headerColMax[c] = ivec2(colX + colW, rowY + PROCESS_ROW_HEIGHT);
         colX += colW;
-    }
-
-    processes->getData().addElement(std::make_unique<Row>(
-        ivec2(BAR_MARGIN, rowY),
-        ivec2(RESX - BAR_MARGIN, rowY + PROCESS_ROW_HEIGHT),
-        header, weights, COLOR_ROW_HEADER));
-
-    for (std::size_t i = 0; i < PROCESS_ROW_COUNT; ++i)
-    {
-        int y = rowY + PROCESS_ROW_HEIGHT + PROCESS_TOP_PADDING + static_cast<int>(i) * PROCESS_ROW_HEIGHT;
-        std::vector<std::string> emptyCells = {"", "", "", ""};
-        processes->getData().addElement(std::make_unique<Row>(
-            ivec2(BAR_MARGIN, y),
-            ivec2(RESX - BAR_MARGIN, y + PROCESS_ROW_HEIGHT),
-            emptyCells, weights, COLOR_ROW_TEXT));
     }
 }
 

@@ -125,8 +125,9 @@ Tree<Layout>* GUIFile::recurseLayout(const std::string& block, Tree<Layout>* par
     Tree<Layout>* node = manager.addChild(parent, std::move(currLayout));
 
     size_t elemPos;
-    std::array<GUIElementType, 5> types = {GUIElementType::POINT, GUIElementType::LINE, GUIElementType::BOX,
-                                            GUIElementType::BUTTON, GUIElementType::LABEL};
+    std::array<GUIElementType, 8> types = {GUIElementType::POINT, GUIElementType::LINE, GUIElementType::BOX,
+                                            GUIElementType::BUTTON, GUIElementType::LABEL,
+                                            GUIElementType::BAR, GUIElementType::ROW, GUIElementType::IMAGE};
 
     // parse nested layouts
     std::string workingBlock = block;
@@ -171,6 +172,15 @@ Tree<Layout>* GUIFile::recurseLayout(const std::string& block, Tree<Layout>* par
                 case GUIElementType::BUTTON:
                     innerBlock = getContent(workingBlock, "button", elemPos);
                     break;
+                case GUIElementType::BAR:
+                    innerBlock = getContent(workingBlock, "bar", elemPos);
+                    break;
+                case GUIElementType::ROW:
+                    innerBlock = getContent(workingBlock, "row", elemPos);
+                    break;
+                case GUIElementType::IMAGE:
+                    innerBlock = getContent(workingBlock, "image", elemPos);
+                    break;
                 default:
                     std::cerr << "unrecogized type\n";
                     break;
@@ -178,28 +188,91 @@ Tree<Layout>* GUIFile::recurseLayout(const std::string& block, Tree<Layout>* par
             if (innerBlock == "") break;
 
             size_t vecPos = 0;
-            vec2 pos1 = parseVec2(innerBlock, vecPos);
-            vec2 pos2 = parseVec2(innerBlock, vecPos);
-            vec3 color = parseVec3(innerBlock, vecPos);
-
             std::unique_ptr<GUIElement> elem;
+
             if (elemType == GUIElementType::LABEL)
             {
+                vec2 pos1 = parseVec2(innerBlock, vecPos);
+                vec3 color = parseVec3(innerBlock, vecPos);
                 std::string text = getContent(innerBlock, "text", vecPos);
                 elem = GUIElementFactory::createLabel(text, pos1, color);
             }
             else if (elemType == GUIElementType::BUTTON)
             {
+                vec2 pos1 = parseVec2(innerBlock, vecPos);
+                vec2 pos2 = parseVec2(innerBlock, vecPos);
+                vec3 color = parseVec3(innerBlock, vecPos);
                 std::string sound = getContent(innerBlock, "sound", vecPos);
                 std::string target = getContent(innerBlock, "target", vecPos);
                 std::string hide = getContent(innerBlock, "hide", vecPos);
                 elem = GUIElementFactory::createButton(pos1, pos2, color, sound, target, hide);
             }
+            else if (elemType == GUIElementType::BAR)
+            {
+                float minVal = extractFloat(innerBlock, "min");
+                float maxVal = extractFloat(innerBlock, "max");
+                if (maxVal <= 0.0f) maxVal = 100.0f;
+                vec2 pos1 = parseVec2(innerBlock, vecPos);
+                vec2 pos2 = parseVec2(innerBlock, vecPos);
+                vec3 fillColor = parseVec3(innerBlock, vecPos);
+                vec3 bgColor = parseVec3(innerBlock, vecPos);
+                size_t metricPos = 0;
+                std::string metric = getContent(innerBlock, "metric", metricPos);
+                elem = GUIElementFactory::createBar(
+                    ivec2(static_cast<int>(pos1.x), static_cast<int>(pos1.y)),
+                    ivec2(static_cast<int>(pos2.x), static_cast<int>(pos2.y)),
+                    fillColor, bgColor, minVal, maxVal, metric);
+            }
+            else if (elemType == GUIElementType::ROW)
+            {
+                vec2 pos1 = parseVec2(innerBlock, vecPos);
+                vec2 pos2 = parseVec2(innerBlock, vecPos);
+                std::vector<std::string> cells;
+                std::vector<float> weights;
+                size_t cellSearch = 0;
+                while (true)
+                {
+                    size_t cellTagStart = innerBlock.find("<cell", cellSearch);
+                    if (cellTagStart == std::string::npos) break;
+                    size_t headerEnd = innerBlock.find('>', cellTagStart);
+                    if (headerEnd == std::string::npos) break;
+                    std::string header = innerBlock.substr(cellTagStart, headerEnd - cellTagStart + 1);
+                    float weight = extractFloat(header, "weight");
+                    size_t closeStart = innerBlock.find("</cell>", headerEnd);
+                    if (closeStart == std::string::npos) break;
+                    std::string text = innerBlock.substr(headerEnd + 1, closeStart - headerEnd - 1);
+                    cells.push_back(text);
+                    weights.push_back(weight);
+                    cellSearch = closeStart + std::string("</cell>").length();
+                }
+                vec3 color = parseVec3(innerBlock, vecPos);
+                elem = GUIElementFactory::createRow(
+                    ivec2(static_cast<int>(pos1.x), static_cast<int>(pos1.y)),
+                    ivec2(static_cast<int>(pos2.x), static_cast<int>(pos2.y)),
+                    std::move(cells), std::move(weights), color);
+            }
+            else if (elemType == GUIElementType::IMAGE)
+            {
+                vec2 pos = parseVec2(innerBlock, vecPos);
+                size_t pathPos = 0;
+                std::string path = getContent(innerBlock, "path", pathPos);
+                if (!path.empty())
+                {
+                    elem = std::make_unique<Image>(path,
+                        ivec2(static_cast<int>(pos.x), static_cast<int>(pos.y)));
+                }
+            }
             else
             {
+                vec2 pos1 = parseVec2(innerBlock, vecPos);
+                vec2 pos2 = parseVec2(innerBlock, vecPos);
+                vec3 color = parseVec3(innerBlock, vecPos);
                 elem = GUIElementFactory::create(elemType, pos1, pos2, color);
-            }     
-            node->getData().addElement(std::move(elem));
+            }
+            if (elem)
+            {
+                node->getData().addElement(std::move(elem));
+            }
         }
     }
 
