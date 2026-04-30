@@ -40,6 +40,89 @@
 
     </layout>
 
+    <layout sX=0.0 sY=0.089 eX=1.0 eY=1.0 active=true name=system>
+        <label>
+            <ivec2><x>24</x><y>76</y></ivec2>
+            <vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3>
+            <text>CPU</text>
+        </label>
+        <bar min=0 max=100>
+            <ivec2><x>84</x><y>72</y></ivec2>
+            <ivec2><x>864</x><y>96</y></ivec2>
+            <vec3><x>0.871</x><y>1.0</y><z>0.608</z></vec3>
+            <vec3><x>0.12</x><y>0.12</y><z>0.12</z></vec3>
+            <metric>cpu</metric>
+        </bar>
+        <label>
+            <ivec2><x>872</x><y>76</y></ivec2>
+            <vec3><x>0.871</x><y>1.0</y><z>0.608</z></vec3>
+            <text>0.0%</text>
+        </label>
+
+        <label>
+            <ivec2><x>24</x><y>124</y></ivec2>
+            <vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3>
+            <text>RAM</text>
+        </label>
+        <bar min=0 max=100>
+            <ivec2><x>84</x><y>120</y></ivec2>
+            <ivec2><x>864</x><y>144</y></ivec2>
+            <vec3><x>0.871</x><y>1.0</y><z>0.608</z></vec3>
+            <vec3><x>0.12</x><y>0.12</y><z>0.12</z></vec3>
+            <metric>ram</metric>
+        </bar>
+        <label>
+            <ivec2><x>872</x><y>124</y></ivec2>
+            <vec3><x>0.871</x><y>1.0</y><z>0.608</z></vec3>
+            <text>0.0%</text>
+        </label>
+
+        <label>
+            <ivec2><x>24</x><y>172</y></ivec2>
+            <vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3>
+            <text>GPU</text>
+        </label>
+        <bar min=0 max=100>
+            <ivec2><x>84</x><y>168</y></ivec2>
+            <ivec2><x>864</x><y>192</y></ivec2>
+            <vec3><x>0.871</x><y>1.0</y><z>0.608</z></vec3>
+            <vec3><x>0.12</x><y>0.12</y><z>0.12</z></vec3>
+            <metric>gpu</metric>
+        </bar>
+        <label>
+            <ivec2><x>872</x><y>172</y></ivec2>
+            <vec3><x>0.871</x><y>1.0</y><z>0.608</z></vec3>
+            <text>0.0%</text>
+        </label>
+    </layout>
+
+    <layout sX=0.0 sY=0.089 eX=1.0 eY=1.0 active=false name=processes>
+        <row>
+            <ivec2><x>24</x><y>64</y></ivec2>
+            <ivec2><x>936</x><y>84</y></ivec2>
+            <cell weight=0.15>PID</cell>
+            <cell weight=0.5>NAME</cell>
+            <cell weight=0.175>CPU%</cell>
+            <cell weight=0.175>MEM%</cell>
+            <vec3><x>0.871</x><y>1.0</y><z>0.608</z></vec3>
+        </row>
+        <row><ivec2><x>24</x><y>100</y></ivec2><ivec2><x>936</x><y>120</y></ivec2><cell weight=0.15></cell><cell weight=0.5></cell><cell weight=0.175></cell><cell weight=0.175></cell><vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3></row>
+        <row><ivec2><x>24</x><y>120</y></ivec2><ivec2><x>936</x><y>140</y></ivec2><cell weight=0.15></cell><cell weight=0.5></cell><cell weight=0.175></cell><cell weight=0.175></cell><vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3></row>
+        <row><ivec2><x>24</x><y>140</y></ivec2><ivec2><x>936</x><y>160</y></ivec2><cell weight=0.15></cell><cell weight=0.5></cell><cell weight=0.175></cell><cell weight=0.175></cell><vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3></row>
+        <row><ivec2><x>24</x><y>160</y></ivec2><ivec2><x>936</x><y>180</y></ivec2><cell weight=0.15></cell><cell weight=0.5></cell><cell weight=0.175></cell><cell weight=0.175></cell><vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3></row>
+        <row><ivec2><x>24</x><y>180</y></ivec2><ivec2><x>936</x><y>200</y></ivec2><cell weight=0.15></cell><cell weight=0.5></cell><cell weight=0.175></cell><cell weight=0.175></cell><vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3></row>
+        <row><ivec2><x>24</x><y>200</y></ivec2><ivec2><x>936</x><y>220</y></ivec2><cell weight=0.15></cell><cell weight=0.5></cell><cell weight=0.175></cell><cell weight=0.175></cell><vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3></row>
+        <row><ivec2><x>24</x><y>220</y></ivec2><ivec2><x>936</x><y>240</y></ivec2><cell weight=0.15></cell><cell weight=0.5></cell><cell weight=0.175></cell><cell weight=0.175></cell><vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3></row>
+        <row><ivec2><x>24</x><y>240</y></ivec2><ivec2><x>936</x><y>260</y></ivec2><cell weight=0.15></cell><cell weight=0.5></cell><cell weight=0.175></cell><cell weight=0.175></cell><vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3></row>
+        <row><ivec2><x>24</x><y>260</y></ivec2><ivec2><x>936</x><y>280</y></ivec2><cell weight=0.15></cell><cell weight=0.5></cell><cell weight=0.175></cell><cell weight=0.175></cell><vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3></row>
+        <row><ivec2><x>24</x><y>280</y></ivec2><ivec2><x>936</x><y>300</y></ivec2><cell weight=0.15></cell><cell weight=0.5></cell><cell weight=0.175></cell><cell weight=0.175></cell><vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3></row>
+        <row><ivec2><x>24</x><y>300</y></ivec2><ivec2><x>936</x><y>320</y></ivec2><cell weight=0.15></cell><cell weight=0.5></cell><cell weight=0.175></cell><cell weight=0.175></cell><vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3></row>
+        <row><ivec2><x>24</x><y>320</y></ivec2><ivec2><x>936</x><y>340</y></ivec2><cell weight=0.15></cell><cell weight=0.5></cell><cell weight=0.175></cell><cell weight=0.175></cell><vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3></row>
+        <row><ivec2><x>24</x><y>340</y></ivec2><ivec2><x>936</x><y>360</y></ivec2><cell weight=0.15></cell><cell weight=0.5></cell><cell weight=0.175></cell><cell weight=0.175></cell><vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3></row>
+        <row><ivec2><x>24</x><y>360</y></ivec2><ivec2><x>936</x><y>380</y></ivec2><cell weight=0.15></cell><cell weight=0.5></cell><cell weight=0.175></cell><cell weight=0.175></cell><vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3></row>
+        <row><ivec2><x>24</x><y>380</y></ivec2><ivec2><x>936</x><y>400</y></ivec2><cell weight=0.15></cell><cell weight=0.5></cell><cell weight=0.175></cell><cell weight=0.175></cell><vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3></row>
+    </layout>
+
         <button>
             <ivec2><x>880</x><y>460</y></ivec2>
             <ivec2><x>944</x><y>524</y></ivec2>
