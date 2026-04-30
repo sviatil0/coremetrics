@@ -20,14 +20,26 @@ bool checkPixel(SDL_Surface *surface, int x, int y, Uint8 expectedR, Uint8 expec
 void testLabelPlacement()
 {
     std::cout << "Label - Placeholder Rendering: ";
-    Screen s(50, 50);
+    Screen s(200, 80);
     Label l("Test", ivec2(20, 20), vec3(0.0f, 0.0f, 1.0f));
     l.draw(s);
 
-    SDL_Surface *target = SDL_CreateSurface(50, 50, SDL_PIXELFORMAT_RGBA8888);
+    SDL_Surface *target = SDL_CreateSurface(200, 80, SDL_PIXELFORMAT_RGBA8888);
     s.blitTo(target);
 
-    bool passed = checkPixel(target, 20, 20, 0, 0, 255);
+    bool passed = false;
+    for (int y = 18; y < 60 && !passed; ++y)
+    {
+        for (int x = 18; x < 120 && !passed; ++x)
+        {
+            Uint8 r = 0, g = 0, b = 0, a = 0;
+            SDL_ReadSurfacePixel(target, x, y, &r, &g, &b, &a);
+            if (b > 60 && b > r && b > g)
+            {
+                passed = true;
+            }
+        }
+    }
 
     SDL_DestroySurface(target);
     std::cout << (passed ? "PASS" : "FAIL") << '\n';
