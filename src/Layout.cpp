@@ -4,6 +4,34 @@ Layout::Layout(vec2 start, vec2 end, bool active, std::string name) : start(star
 {
 }
 
+Layout::Layout(const Layout& other) : start(other.start), end(other.end), active(other.active), name(other.name)
+{
+    elements.reserve(other.elements.size());
+    for (const auto& element : other.elements)
+    {
+        elements.emplace_back(std::unique_ptr<GUIElement>(element->clone()));
+    }
+}
+
+Layout& Layout::operator=(const Layout& other)
+{
+    if (this == &other)
+    {
+        return *this;
+    }
+    start = other.start;
+    end = other.end;
+    active = other.active;
+    name = other.name;
+    elements.clear();
+    elements.reserve(other.elements.size());
+    for (const auto& element : other.elements)
+    {
+        elements.emplace_back(std::unique_ptr<GUIElement>(element->clone()));
+    }
+    return *this;
+}
+
 ivec2 Layout::resolveAbsStart(ivec2 parentStart, ivec2 parentEnd) const
 {
     ivec2 cont = parentEnd - parentStart;

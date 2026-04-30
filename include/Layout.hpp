@@ -19,6 +19,12 @@ private:
 public:
     Layout(vec2 start, vec2 end, bool active = true, std::string name = "");
 
+    Layout(const Layout& other);
+    Layout& operator=(const Layout& other);
+    Layout(Layout&& other) noexcept = default;
+    Layout& operator=(Layout&& other) noexcept = default;
+    ~Layout() = default;
+
     void addElement(std::unique_ptr<GUIElement> element);
     void setActive(bool active);
     bool isActive() const;
