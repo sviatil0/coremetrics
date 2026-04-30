@@ -1,0 +1,91 @@
+@startuml overview
+
+skinparam classFontSize 13
+skinparam ranksep 35
+skinparam nodesep 30
+skinparam packageStyle rectangle
+hide members
+
+package "Math" {
+    class "Tvec2<T>"
+    class "Tvec3<T>"
+    class Matrix
+}
+
+package "Rendering" {
+    class Screen
+    class ThreadPool
+    abstract class GUIElement
+    class "Cloneable<Derived>" <<CRTP>>
+}
+
+package "GUI elements" {
+    class Point
+    class Line
+    class Box
+    class Label
+    class Selection
+    class Image
+    class Button
+    class Bar
+    class Row
+}
+
+package "Layout / Files" {
+    class "Tree<T>"
+    class Layout
+    class LayoutManager
+    class GUIFile
+    class GUIElementFactory
+    enum GUIElementType
+}
+
+package "Events" {
+    abstract class Event
+    class ClickEvent
+    class ShowEvent
+    class SoundEvent
+    enum EventType
+    class EventManager
+    class SoundPlayer
+}
+
+package "System metrics" {
+    class SystemMetrics
+    class ProcessInfo <<struct>>
+}
+
+GUIElement <|-- "Cloneable<Derived>"
+"Cloneable<Derived>" <|-- Point
+"Cloneable<Derived>" <|-- Line
+"Cloneable<Derived>" <|-- Box
+"Cloneable<Derived>" <|-- Label
+"Cloneable<Derived>" <|-- Selection
+"Cloneable<Derived>" <|-- Image
+"Cloneable<Derived>" <|-- Button
+"Cloneable<Derived>" <|-- Bar
+"Cloneable<Derived>" <|-- Row
+
+Event <|-- ClickEvent
+Event <|-- ShowEvent
+Event <|-- SoundEvent
+Event *-- EventType
+
+GUIElementFactory ..> GUIElement : creates
+GUIElementFactory ..> GUIElementType : uses
+
+Layout o-- GUIElement : contains
+"Tree<T>" *-- "Tree<T>" : children
+LayoutManager *-- "Tree<T>" : root
+LayoutManager ..> Layout : manages
+LayoutManager ..> Screen : renders to
+
+EventManager ..> Event : processes
+EventManager ..> LayoutManager : accesses
+EventManager ..> SoundPlayer : delegates sound
+GUIElement ..> Event : consumes
+
+Screen ..> ThreadPool : parallelizes drawBox/drawTriangle
+SystemMetrics ..> ProcessInfo : produces
+
+@enduml

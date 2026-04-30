@@ -1,6 +1,13 @@
 # SP26_Team04
 
 ## Class Diagram
+
+High-level overview, grouped by package:
+
+![Class Diagram Overview](assets/overview.png)
+
+Full class diagram with members and relationships:
+
 ![Class Diagram](assets/classes.png)
 
 ---
