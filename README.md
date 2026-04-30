@@ -75,7 +75,11 @@ If none are available the CPU and RAM stress still work; GPU stress is skipped w
 - `SystemMetrics` is split into `src/SystemMetrics_linux.cpp`, `src/SystemMetrics_mac.cpp`, and `src/SystemMetrics_win.cpp`. Only the file matching the build target emits symbols (guarded by `#ifdef __linux__` / `__APPLE__` / `_WIN32`).
 - On Mac, the Makefile links `-framework IOKit -framework CoreFoundation` to support GPU utilization via `IOServiceMatching("IOAccelerator")`.
 - On Linux, GPU usage is read from `/sys/class/drm/card0/device/gpu_busy_percent` (AMD). NVIDIA support via NVML is a backlog item.
-- On Windows, GPU is currently stubbed. PDH counters are a backlog item.
+- On Windows, GPU usage uses PDH counters with `\GPU Engine(*)\Utilization Percentage`.
+
+### CI status
+
+The `.github/workflows/c-cpp.yml` matrix builds on Ubuntu, macOS, and Windows. The most recent green runs verified Linux and macOS. As of late April the GitHub Actions runs are paused with the error "recent account payments have failed or your spending limit needs to be increased". This is a billing setting on the organization account, not a code issue. Local verification still passes via `./run-cross-platform-tests.sh` (macOS native + Ubuntu via Docker).
 
 ### Style
 
