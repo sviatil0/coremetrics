@@ -28,6 +28,10 @@ TEST_SOURCES = $(wildcard $(TESTDIR)/*.cpp)
 OBJECTS = $(SOURCES:$(SRCDIR)/%.cpp=$(OBJDIR)/%.o)
 TEST_OBJECTS = $(TEST_SOURCES:$(TESTDIR)/%.cpp=$(OBJDIR)/%.o)
 
+.PHONY: all demo test coremetrics directories clean
+
+all: coremetrics
+
 demo: directories $(DEMO_TARGET)
 	./$(DEMO_TARGET)
 

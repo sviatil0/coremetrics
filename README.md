@@ -49,8 +49,9 @@ Download dev libraries from the SDL release pages above, extract to a known path
 
 **Targets**
 ```
+make               # default: build and run the CoreMetrics demo
+make coremetrics   # same as default
 make test          # run unit tests
-make coremetrics   # run the CoreMetrics demo
 make demo          # run the Milestone 005 event demo
 ```
 
