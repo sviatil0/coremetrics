@@ -254,6 +254,23 @@ A pure virtual method that subclasses must implement. By receiving a `Screen` re
 ### virtual bool operator()(Event* event)
 Called by `EventManager` during trickle propagation. Returns `false` by default. Subclasses override this to handle an incoming event. Returns `true` if the event was consumed and propagation should stop.
 
+### virtual GUIElement* clone() const = 0
+Pure virtual deep copy. Implemented automatically by the `Cloneable<Derived>` CRTP mixin so concrete elements do not have to write the boilerplate themselves.
+
+# Cloneable
+## Description
+A CRTP (Curiously Recurring Template Pattern) mixin that provides a default `clone()` implementation for `GUIElement` subclasses. Each concrete element inherits from `Cloneable<Self>` instead of `GUIElement` directly and gets `clone()` for free.
+
+## Methods
+### GUIElement* clone() const override
+Returns a heap-allocated copy of the derived object via its copy constructor.
+
+### Derived* cloneDerived() const
+Demonstrates covariant return: same call as `clone()` but returns the derived pointer type so callers do not have to cast.
+
+### template<typename T> std::unique_ptr<T> cloneUnique(const T& obj)
+Free helper that wraps `obj.clone()` in a `std::unique_ptr<T>`.
+
 # Point
 ## Description
 A concrete GUIElement that represents a single colored pixel. Stores a 2D position and a color.
@@ -483,6 +500,20 @@ Returns the single global instance.
 
 ### void play(const std::string& filePath)
 Loads the specified WAV file and plays it through the default audio device.
+
+# ThreadPool
+## Description
+Singleton worker pool. Workers are spawned at first `getInstance()` call (count = `std::thread::hardware_concurrency`). `Screen::drawBox` and `Screen::drawTriangle` partition their pixel rows across the pool via `submit` and join on the returned futures, so wide fills run in parallel. Copy and assignment are deleted; the destructor signals `stop` and joins every worker.
+
+## Methods
+### static ThreadPool& getInstance()
+Returns the single global instance.
+
+### size_t threadCount() const
+Number of worker threads currently in the pool.
+
+### template<typename F> std::future<void> submit(F&& f)
+Enqueues a task and returns a future that becomes ready when the task finishes.
 
 # Bar
 ## Description

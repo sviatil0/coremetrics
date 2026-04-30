@@ -104,9 +104,25 @@ class Matrix {
 
 abstract class GUIElement {
     +{abstract} draw(screen: Screen&): void
+    +{abstract} clone(): GUIElement*
     +operator()(event: Event*): bool
     +\~GUIElement()
 }
+
+class "Cloneable<Derived>" <<CRTP>> {
+    +clone(): GUIElement*
+    +cloneDerived(): Derived*
+}
+
+note right of "Cloneable<Derived>"
+  CRTP base. Derived classes inherit from
+  Cloneable<Self> instead of GUIElement directly,
+  picking up clone() / cloneDerived() automatically.
+  cloneDerived() demonstrates covariant return.
+  Free helper: cloneUnique<T>(const T&) -> unique_ptr<T>.
+end note
+
+GUIElement <|-- "Cloneable<Derived>"
 
 class Point {
     +pos: vec2
@@ -270,8 +286,8 @@ class GUIFile {
     +getPoints(): vector<Point>
     +getLines(): vector<Line>
     +getBoxes(): vector<Box>
-    +readFile(fileName: string): void
-    +writeFile(fileName: string): void
+    +readFile(fileName: string, manager: LayoutManager&): void
+    +writeFile(fileName: string, manager: LayoutManager&): void
     -splitString(str: string, delim: string): vector<string>
 }
 
@@ -294,13 +310,16 @@ class Layout {
     -start: vec2
     -end: vec2
     -active: bool
+    -name: string
     -elements: vector<unique_ptr<GUIElement>>
 
-    +Layout(start: vec2, end: vec2, active: bool)
+    +Layout(start: vec2, end: vec2, active: bool, name: string)
 
     +addElement(element: unique_ptr<GUIElement>): void
     +setActive(active: bool): void
     +isActive(): bool
+    +setName(name: string): void
+    +getName(): string
     +getStart(): vec2
     +getEnd(): vec2
 
@@ -415,6 +434,27 @@ class SoundPlayer {
     +play(filePath: string): void
 }
 
+class ThreadPool {
+    -workers: vector<thread>
+    -tasks: queue<function<void()>>
+    -queueMutex: mutex
+    -cv: condition_variable
+    -stop: bool
+
+    -ThreadPool()
+
+    +\~ThreadPool()
+    +{static} getInstance(): ThreadPool&
+    +threadCount(): size_t
+    +submit<F>(f: F): future<void>
+}
+
+note right of ThreadPool
+  Singleton. Worker count = hardware_concurrency.
+  Used by Screen::drawBox / drawTriangle to parallelize
+  pixel fills across rows. Copy + assignment deleted.
+end note
+
 Event <|-- ClickEvent
 Event <|-- ShowEvent
 Event <|-- SoundEvent
@@ -430,5 +470,7 @@ GUIElement ..> Event : consumes
 LayoutManager *-- "Tree<T>" : root
 LayoutManager ..> Layout : manages
 LayoutManager ..> Screen : renders to
+
+Screen ..> ThreadPool : parallelizes drawBox/drawTriangle
 
 @enduml
