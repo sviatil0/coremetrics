@@ -6,9 +6,7 @@ High-level overview, grouped by package:
 
 ![Class Diagram Overview](assets/overview.png)
 
-Full class diagram with members and relationships:
-
-![Class Diagram](assets/classes.png)
+The full diagram with every field and method per class lives in `uml/classes.puml` (rendered to `assets/classes.png`). It is too wide to embed inline; open the PNG directly if you need the member-level detail.
 
 ---
 
