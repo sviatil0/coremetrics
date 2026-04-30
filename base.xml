@@ -1,0 +1,70 @@
+<layout sX=0.0 sY=0.0 eX=1.0 eY=1.0 active=true name=root>
+
+    <layout sX=0.0 sY=0.0 eX=1.0 eY=0.09 active=true name=tabbar>
+        <button>
+            <ivec2><x>8</x><y>8</y></ivec2>
+            <ivec2><x>402</x><y>40</y></ivec2>
+            <vec3><x>0.1</x><y>0.1</y><z>0.1</z></vec3>
+            <target>system</target>
+            <hide>processes</hide>
+        </button>
+        <label>
+            <ivec2><x>20</x><y>14</y></ivec2>
+            <vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3>
+            <text>System</text>
+        </label>
+
+        <button>
+            <ivec2><x>410</x><y>8</y></ivec2>
+            <ivec2><x>804</x><y>40</y></ivec2>
+            <vec3><x>0.1</x><y>0.1</y><z>0.1</z></vec3>
+            <target>processes</target>
+            <hide>system</hide>
+        </button>
+        <label>
+            <ivec2><x>422</x><y>14</y></ivec2>
+            <vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3>
+            <text>Processes</text>
+        </label>
+
+        <button>
+            <ivec2><x>812</x><y>8</y></ivec2>
+            <ivec2><x>952</x><y>40</y></ivec2>
+            <vec3><x>0.08</x><y>0.08</y><z>0.08</z></vec3>
+        </button>
+        <label>
+            <ivec2><x>818</x><y>14</y></ivec2>
+            <vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3>
+            <text>SOUND ON</text>
+        </label>
+
+    </layout>
+
+        <button>
+            <ivec2><x>880</x><y>460</y></ivec2>
+            <ivec2><x>944</x><y>524</y></ivec2>
+            <vec3><x>0.18</x><y>0.05</y><z>0.05</z></vec3>
+        </button>
+        <label>
+            <ivec2><x>896</x><y>482</y></ivec2>
+            <vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3>
+            <text>EXIT</text>
+        </label>
+
+        <box>
+            <ivec2><x>24</x><y>504</y></ivec2>
+            <ivec2><x>204</x><y>508</y></ivec2>
+            <vec3><x>0.871</x><y>1.0</y><z>0.608</z></vec3>
+        </box>
+        <label>
+            <ivec2><x>24</x><y>476</y></ivec2>
+            <vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3>
+            <text>CoreMetrics</text>
+        </label>
+        <label>
+            <ivec2><x>184</x><y>480</y></ivec2>
+            <vec3><x>0.871</x><y>1.0</y><z>0.608</z></vec3>
+            <text>v1.0</text>
+        </label>
+
+</layout>
