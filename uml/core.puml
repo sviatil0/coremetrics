@@ -1,0 +1,135 @@
+@startuml core
+
+skinparam classFontSize 12
+skinparam classAttributeFontSize 11
+skinparam ranksep 30
+skinparam nodesep 25
+
+title Core: math primitives, screen, thread pool
+
+class "Tvec2<T>" {
+    -components: T[2]
+
+    +x: T&
+    +y: T&
+
+    +Tvec2()
+    +Tvec2(copy: Tvec2<T>)
+    +Tvec2(_x: T, _y: T)
+
+    +operator=(copy: Tvec2<T>): Tvec2<T>&
+    +operator==(rhs: Tvec2<T>): bool
+    +operator+(rhs: Tvec2<T>): Tvec2<T>
+    +operator-(rhs: Tvec2<T>): Tvec2<T>
+    +operator*(scalar: T): Tvec2<T>
+    +operator+=(rhs: Tvec2<T>): Tvec2<T>&
+    +operator-=(rhs: Tvec2<T>): Tvec2<T>&
+    +operator*=(scalar: T): Tvec2<T>&
+    +operator[](index: int): T&
+
+    +dot(rhs: Tvec2<T>): T
+    +magnitude(): T
+    +unit(): Tvec2<T>
+}
+
+note right of "Tvec2<T>"
+  Typedefs: vec2 = Tvec2<float>, ivec2 = Tvec2<int>
+  Tvec2<int> specializations:
+    magnitude() uses L1 (Manhattan) norm
+    unit() uses integer division by L1 magnitude
+end note
+
+class "Tvec3<T>" {
+    -components: T[3]
+
+    +x: T&
+    +y: T&
+    +z: T&
+
+    +Tvec3()
+    +Tvec3(copy: Tvec3<T>)
+    +Tvec3(_x: T, _y: T, _z: T)
+    +Tvec3(other: Tvec3<U>)
+
+    +operator=(copy: Tvec3<T>): Tvec3<T>&
+    +operator==(rhs: Tvec3<T>): bool
+    +operator+(rhs: Tvec3<T>): Tvec3<T>
+    +operator-(rhs: Tvec3<T>): Tvec3<T>
+    +operator*(scalar: T): Tvec3<T>
+    +operator+=(rhs: Tvec3<T>): Tvec3<T>&
+    +operator-=(rhs: Tvec3<T>): Tvec3<T>&
+    +operator*=(scalar: T): Tvec3<T>&
+    +operator[](index: int): T&
+
+    +dot(rhs: Tvec3<T>): T
+    +magnitude(): T
+    +unit(): Tvec3<T>
+    +cross(rhs: Tvec3<T>): Tvec3<T>
+}
+
+note right of "Tvec3<T>"
+  Typedefs: vec3 = Tvec3<float>, ivec3 = Tvec3<int>
+  Tvec3<int> specializations:
+    magnitude() uses L1 (Manhattan) norm
+    unit() uses integer division by L1 magnitude
+end note
+
+class Matrix {
+    -{static} SIZE: int
+    -components: float[3][3]
+
+    +Matrix()
+    +Matrix(data: float[3][3])
+    +Matrix(copy: Matrix)
+
+    +operator=(copy: Matrix): Matrix&
+    +operator*(rhs: Matrix): Matrix
+    +operator==(rhs: Matrix): bool
+    +toTranspose(): Matrix
+}
+
+class Screen {
+    -{static} MAX_CHANNEL_VALUE: int
+    -width: unsigned int
+    -height: unsigned int
+    -surface: SDL_Surface*
+
+    -plotLineLow(a: ivec2, b: ivec2, color: vec3): void
+    -plotLineHigh(a: ivec2, b: ivec2, color: vec3): void
+    -crossEdge(a: ivec2, b: ivec2, c: ivec2): int
+
+    +Screen(w: unsigned int, h: unsigned int)
+    +\~Screen()
+
+    +blitTo(target: SDL_Surface*): void
+    +drawPixel(pos: ivec2, color: vec3): void
+    +drawLine(a: ivec2, b: ivec2, color: vec3): void
+    +drawLine(a: ivec2, b: ivec2, color: ivec3): void
+    +drawBox(a: ivec2, b: ivec2, color: vec3): void
+    +drawTriangle(v1: ivec2, v2: ivec2, v3: ivec2, color: vec3): void
+}
+
+class ThreadPool {
+    -workers: vector<thread>
+    -tasks: queue<function<void()>>
+    -queueMutex: mutex
+    -cv: condition_variable
+    -stop: bool
+
+    -ThreadPool()
+
+    +\~ThreadPool()
+    +{static} getInstance(): ThreadPool&
+    +threadCount(): size_t
+    +submit<F>(f: F): future<void>
+}
+
+note right of ThreadPool
+  Singleton. Worker count = hardware_concurrency.
+  Used by Screen::drawBox / drawTriangle to parallelize
+  pixel fills across rows. Copy + assignment deleted.
+end note
+
+Screen ..> ThreadPool : parallelizes drawBox/drawTriangle
+
+@enduml
