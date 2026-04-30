@@ -1,7 +1,12 @@
 # SP26_Team04
 
 ## Class Diagram
-![Class Diagram](assets/classes.png)
+
+High-level overview, grouped by package:
+
+![Class Diagram Overview](assets/overview.png)
+
+The full diagram with every field and method per class lives in `uml/classes.puml` (rendered to `assets/classes.png`). It is too wide to embed inline; open the PNG directly if you need the member-level detail.
 
 ---
 
