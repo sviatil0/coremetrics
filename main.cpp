@@ -8,7 +8,8 @@
 #include "Box.hpp"
 #include "Line.hpp"
 #include "Point.hpp"
-#include "button.hpp"
+#include "Button.hpp"
+#include "Label.hpp"
 
 constexpr int RESX = 960;
 constexpr int RESY = 540;
@@ -49,13 +50,13 @@ int main(int argc, char **argv)
 
     Screen screen(RESX, RESY);
 
-    ivec2 triV1(HALF_W - QUARTER_W, HALF_H - QUARTER_H);
+    ivec2 triV1(HALF_W - QUARTER_W, HALF_H);
     ivec2 triV2(HALF_W - QUARTER_W, HALF_H + QUARTER_H);
-    ivec2 triV3(HALF_W, HALF_H);
+    ivec2 triV3(HALF_W - QUARTER_W/2, HALF_H + QUARTER_H/2);
 
     LayoutManager &manager = LayoutManager::getInstance();
 
-    manager.getRoot().getData().addElement(std::make_unique<Box>(
+    /*manager.getRoot().getData().addElement(std::make_unique<Box>(
         vec2(static_cast<float>(HALF_W - QUARTER_W), static_cast<float>(HALF_H - QUARTER_H)),
         vec2(static_cast<float>(HALF_W + QUARTER_W), static_cast<float>(HALF_H + QUARTER_H)),
         vec3(0.0f, 0.3f, 0.6f)));
@@ -74,10 +75,29 @@ int main(int argc, char **argv)
     manager.getRoot().getData().addElement(std::make_unique<Line>(
         vec2(static_cast<float>(HALF_W), static_cast<float>(HALF_H)),
         vec2(static_cast<float>(RESX - 1), static_cast<float>(RESY - 1)),
-        vec3(1.0f, 1.0f, 1.0f)));
+        vec3(1.0f, 1.0f, 1.0f)));*/
+
+    manager.getRoot().getData().addElement(std::make_unique<Label>(
+        "System Resources Monitor",
+        ivec2(QUARTER_W, QUARTER_H),
+        vec3(1.0f, 1.0f, 0.2f)));
+
+    int barWidth = 80, barHeight = 20;
+    manager.getRoot().getData().addElement(std::make_unique<Box>(
+        vec2(static_cast<float>(RESX/3), static_cast<float>(RESY/3)),
+        vec2(static_cast<float>(2*RESX/3), static_cast<float>(RESY/3 + 20)),
+        vec3(0.0f, 0.3f, 0.6f)));
+    manager.getRoot().getData().addElement(std::make_unique<Box>(
+        vec2(static_cast<float>(RESX/3), static_cast<float>(RESY/3 + 30)),
+        vec2(static_cast<float>(2*RESX/3), static_cast<float>(RESY/3 + 50)),
+        vec3(0.0f, 0.3f, 0.6f)));
+    manager.getRoot().getData().addElement(std::make_unique<Box>(
+        vec2(static_cast<float>(RESX/3), static_cast<float>(RESY/3 + 60)),
+        vec2(static_cast<float>(2*RESX/3), static_cast<float>(RESY/3 + 80)),
+        vec3(0.0f, 0.3f, 0.6f)));
 
     Tree<Layout> *overlay = manager.addChild(&manager.getRoot(),
-                                             Layout(vec2(0.5f, 0.0f), vec2(1.0f, 1.0f), false));
+                                             Layout(vec2(0.5f, 0.0f), vec2(1.0f, 1.0f), false, "overlay"));
     overlay->getData().addElement(std::make_unique<Box>(
         vec2(static_cast<float>(HALF_W), 0.0f),
         vec2(static_cast<float>(RESX - 1), static_cast<float>(RESY - 1)),
@@ -94,7 +114,9 @@ int main(int argc, char **argv)
     manager.getRoot().getData().addElement(std::make_unique<Button>(
         ivec2(BTN_MIN_X, BTN_MIN_Y),
         ivec2(BTN_MAX_X, BTN_MAX_Y),
-        vec3(0.2f, 0.8f, 0.2f)));
+        vec3(0.2f, 0.8f, 0.2f),
+        "assets/click.wav",
+        "overlay"));
 
     vec3 triangleColor(0.8f, 0.2f, 0.3f);
 
@@ -112,14 +134,6 @@ int main(int argc, char **argv)
             case SDL_EVENT_QUIT:
             {
                 end = true;
-                break;
-            }
-            case SDL_EVENT_MOUSE_MOTION:
-            {
-                SDL_GetMouseState(&mouseX, &mouseY);
-                ivec2 mousePos(static_cast<int>(mouseX), static_cast<int>(mouseY));
-                bool inTriangle = pointInTriangle(mousePos, triV1, triV2, triV3);
-                overlay->getData().setActive(inTriangle);
                 break;
             }
             case SDL_EVENT_MOUSE_BUTTON_DOWN:

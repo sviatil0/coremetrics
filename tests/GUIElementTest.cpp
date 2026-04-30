@@ -1,10 +1,10 @@
 #include <iostream>
 #include <SDL3/SDL.h>
 #include "screen.hpp"
-#include "label.hpp"
+#include "Label.hpp"
 #include "selection.hpp"
 #include "image.hpp"
-#include "button.hpp"
+#include "Button.hpp"
 #include "GUIElements.hpp"
 #include "GUIElementFactory.hpp"
 #include "ClickEvent.hpp"

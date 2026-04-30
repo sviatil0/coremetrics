@@ -5,42 +5,10 @@
 #include <sstream>
 #include <iostream>
 #include <algorithm>
+#include <array>
 #include <cctype>
 #include <locale>
 #include <typeinfo>
-
-GUIFile::GUIFile() : manager(LayoutManager::getInstance())
-{
-}
-
-
-void GUIFile::setPoint(Point point)
-{
-    points.push_back(point);
-}
-
-void GUIFile::setLine(Line line)
-{
-    lines.push_back(line);
-}
-
-void GUIFile::setBox(Box box)
-{
-    boxes.push_back(box);
-}
-
-std::vector<Point> GUIFile::getPoints()
-{
-    return points;
-}
-std::vector<Line> GUIFile::getLines()
-{
-    return lines;
-}
-std::vector<Box> GUIFile::getBoxes()
-{
-    return boxes;
-}
 
 std::string GUIFile::getContent(const std::string &source, const std::string &tag, size_t &pos)
 {
@@ -52,8 +20,6 @@ std::string GUIFile::getContent(const std::string &source, const std::string &ta
     // if tag not found in string, return
     if (start == std::string::npos) return "";
     
-    //size_t tagEnd = source.find(">", start);
-    //if (tagEnd == std::string::npos) return "";
     start += openTag.length() + 1;
 
     size_t end, tempEnd;
@@ -153,13 +119,14 @@ Layout GUIFile::parseLayout(const std::string &block)
     return Layout(vec2(sx, sy), vec2(ex, ey), active, name);
 }
 
-Tree<Layout>* GUIFile::recurseLayout(const std::string& block, Tree<Layout>* parent, int i)
+Tree<Layout>* GUIFile::recurseLayout(const std::string& block, Tree<Layout>* parent, int i, LayoutManager& manager)
 {
     Layout currLayout = parseLayout(block);
     Tree<Layout>* node = manager.addChild(parent, std::move(currLayout));
 
     size_t elemPos;
-    std::vector<GUIElementType> typeVec = {GUIElementType::POINT, GUIElementType::LINE, GUIElementType::BOX};
+    std::array<GUIElementType, 5> types = {GUIElementType::POINT, GUIElementType::LINE, GUIElementType::BOX,
+                                            GUIElementType::BUTTON, GUIElementType::LABEL};
 
     // parse nested layouts
     std::string workingBlock = block;
@@ -173,15 +140,16 @@ Tree<Layout>* GUIFile::recurseLayout(const std::string& block, Tree<Layout>* par
             break;
         }
 
-        recurseLayout(childBlock, node, i+1);
+        recurseLayout(childBlock, node, i+1, manager);
 
         workingBlock.erase(startPos, layoutPos - startPos);
         layoutPos = startPos;
     }
 
     // parse elements
-    for (GUIElementType &elemType : typeVec)
+    for (auto itr = types.begin(); itr != types.end(); ++itr)
     {
+        GUIElementType &elemType = *itr;
         elemPos = 0;
         while (true)
         {
@@ -197,6 +165,15 @@ Tree<Layout>* GUIFile::recurseLayout(const std::string& block, Tree<Layout>* par
                 case GUIElementType::BOX:
                     innerBlock = getContent(workingBlock, "box", elemPos);
                     break;
+                case GUIElementType::LABEL:
+                    innerBlock = getContent(workingBlock, "label", elemPos);
+                    break;
+                case GUIElementType::BUTTON:
+                    innerBlock = getContent(workingBlock, "button", elemPos);
+                    break;
+                default:
+                    std::cerr << "unrecogized type\n";
+                    break;
             }
             if (innerBlock == "") break;
 
@@ -204,7 +181,24 @@ Tree<Layout>* GUIFile::recurseLayout(const std::string& block, Tree<Layout>* par
             vec2 pos1 = parseVec2(innerBlock, vecPos);
             vec2 pos2 = parseVec2(innerBlock, vecPos);
             vec3 color = parseVec3(innerBlock, vecPos);
-            std::unique_ptr<GUIElement> elem = GUIElementFactory::create(elemType, pos1, pos2, color);
+
+            std::unique_ptr<GUIElement> elem;
+            if (elemType == GUIElementType::LABEL)
+            {
+                std::string text = getContent(innerBlock, "text", vecPos);
+                elem = GUIElementFactory::createLabel(text, pos1, color);
+            }
+            else if (elemType == GUIElementType::BUTTON)
+            {
+                std::string sound = getContent(innerBlock, "sound", vecPos);
+                std::string target = getContent(innerBlock, "target", vecPos);
+                std::string hide = getContent(innerBlock, "hide", vecPos);
+                elem = GUIElementFactory::createButton(pos1, pos2, color, sound, target, hide);
+            }
+            else
+            {
+                elem = GUIElementFactory::create(elemType, pos1, pos2, color);
+            }     
             node->getData().addElement(std::move(elem));
         }
     }
@@ -212,7 +206,7 @@ Tree<Layout>* GUIFile::recurseLayout(const std::string& block, Tree<Layout>* par
     return node;
 }
 
-void GUIFile::readFile(const std::string &fileName)
+void GUIFile::readFile(const std::string &fileName, LayoutManager& manager)
 {
     manager.clear();
 
@@ -237,8 +231,8 @@ void GUIFile::readFile(const std::string &fileName)
     {
         std::string layoutBlock = getContent(content, "layout", currPos);
         if (layoutBlock == "") break;
-        
-        recurseLayout(layoutBlock, root, 0);
+
+        recurseLayout(layoutBlock, root, 0, manager);
     }
 
 }
@@ -291,7 +285,7 @@ static void writeNode(std::ofstream& outFile, const Tree<Layout>& node, int dept
     outFile << indent << "</layout>\n";
 }
 
-void GUIFile::writeFile(std::string fileName)
+void GUIFile::writeFile(std::string fileName, LayoutManager& manager)
 {
     std::ofstream outFile{fileName};
 
