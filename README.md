@@ -352,6 +352,8 @@ Constructs a new child node from the given value, appends it to the children vec
 ## Description
 Represents a rectangular region of the screen defined by relative coordinates (0.0–1.0) within its parent region. Layouts form a tree hierarchy managed by `LayoutManager`. Each layout holds a flat list of `GUIElement` objects that are drawn when the layout is active. The painter's algorithm is handled externally by `LayoutManager::render`, which traverses the tree and draws parent layouts before children.
 
+The copy constructor and copy-assignment operator perform a true deep copy of the contained elements by calling `GUIElement::clone()` on each child. This is the production caller of the `Cloneable<Derived>` CRTP base; without it the `unique_ptr<GUIElement>` ownership would block any meaningful copy of a populated Layout.
+
 ## Methods
 ### ivec2 resolveAbsStart(ivec2 parentStart, ivec2 parentEnd) const
 Converts the layout's relative `start` (0.0–1.0) to an absolute pixel coordinate by interpolating within the parent's pixel bounds: `parentStart + start * (parentEnd - parentStart)`.

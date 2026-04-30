@@ -4,6 +4,7 @@
 #include "screen.hpp"
 #include "Layout.hpp"
 #include "Point.hpp"
+#include "Bar.hpp"
 
 static bool checkPixel(SDL_Surface* surface, int x, int y, Uint8 expectedR, Uint8 expectedG, Uint8 expectedB)
 {
@@ -62,6 +63,54 @@ static void testDrawSkipsWhenInactive()
     std::cout << (passed ? "PASS" : "FAIL") << '\n';
 }
 
+static void testCopyConstructorDeepClonesElements()
+{
+    std::cout << "Layout - copy ctor deep-clones polymorphic children via CRTP clone(): ";
+
+    Layout original(vec2(0.0f, 0.0f), vec2(1.0f, 1.0f), true, "src");
+    auto bar = std::make_unique<Bar>(ivec2(0, 0), ivec2(50, 10), vec3(0.0f, 1.0f, 0.0f), vec3(0.1f, 0.1f, 0.1f), 0.0f, 100.0f, "cpu");
+    bar->setValue(42.0f);
+    original.addElement(std::move(bar));
+
+    Layout copy = original;
+
+    bool sizeMatches = (copy.elements.size() == 1);
+    Bar *originalBar = dynamic_cast<Bar *>(original.elements.front().get());
+    Bar *copyBar = dynamic_cast<Bar *>(copy.elements.front().get());
+    bool independentPointers = (originalBar != nullptr) && (copyBar != nullptr) && (originalBar != copyBar);
+    bool valueCopied = independentPointers && (copyBar->getValue() == 42.0f);
+
+    if (originalBar != nullptr)
+    {
+        originalBar->setValue(7.0f);
+    }
+    bool independentState = independentPointers && (copyBar->getValue() == 42.0f);
+
+    bool passed = sizeMatches && independentPointers && valueCopied && independentState;
+    std::cout << (passed ? "PASS" : "FAIL") << '\n';
+}
+
+static void testAssignmentOperatorDeepClones()
+{
+    std::cout << "Layout - operator= deep-clones children: ";
+
+    Layout source(vec2(0.0f, 0.0f), vec2(1.0f, 1.0f), true, "src");
+    source.addElement(std::make_unique<Point>(vec2(5.0f, 5.0f), vec3(1.0f, 0.0f, 0.0f)));
+
+    Layout target(vec2(0.0f, 0.0f), vec2(0.5f, 0.5f), false, "old");
+    target.addElement(std::make_unique<Point>(vec2(0.0f, 0.0f), vec3(0.0f, 0.0f, 1.0f)));
+    target.addElement(std::make_unique<Point>(vec2(1.0f, 1.0f), vec3(0.0f, 1.0f, 0.0f)));
+
+    target = source;
+
+    bool sizeReplaced = (target.elements.size() == 1);
+    bool nameCopied = (target.getName() == "src");
+    bool independent = (target.elements.front().get() != source.elements.front().get());
+
+    bool passed = sizeReplaced && nameCopied && independent;
+    std::cout << (passed ? "PASS" : "FAIL") << '\n';
+}
+
 void layoutTestSuite()
 {
     std::cout << "=============================================" << '\n';
@@ -72,6 +121,8 @@ void layoutTestSuite()
     testSetActiveIsActive();
     testResolveAbsPositions();
     testDrawSkipsWhenInactive();
+    testCopyConstructorDeepClonesElements();
+    testAssignmentOperatorDeepClones();
 
     std::cout << '\n';
     std::cout << "=============================================" << '\n';

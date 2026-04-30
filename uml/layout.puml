@@ -30,6 +30,8 @@ class Layout {
     -elements: vector<unique_ptr<GUIElement>>
 
     +Layout(start: vec2, end: vec2, active: bool, name: string)
+    +Layout(other: const Layout&)
+    +operator=(other: const Layout&): Layout&
 
     +addElement(element: unique_ptr<GUIElement>): void
     +setActive(active: bool): void
@@ -47,6 +49,8 @@ class Layout {
 note right of Layout
   start/end are relative (0.0–1.0) to parent.
   draw() is a no-op when active == false.
+  Copy ctor + operator= deep-clone each child
+  via GUIElement::clone() (CRTP via Cloneable).
 end note
 
 class LayoutManager {
