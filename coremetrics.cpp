@@ -280,6 +280,13 @@ int main(int argc, char **argv)
         Screen shot(RESX, RESY);
         buildScene();
         cacheElementPointers();
+        // Per-process CPU% is a delta between two samples: a single pollMetrics
+        // call always reports 0.0% because there is no previous sample to
+        // diff against. Take a priming sample, sleep ~1.1s (enough that a
+        // typical process accumulates measurable ticks), then sample again
+        // before rendering. The aggregate CPU bar benefits the same way.
+        pollMetrics();
+        SDL_Delay(1100);
         pollMetrics();
 
         if (tab == "processes")
@@ -299,7 +306,25 @@ int main(int argc, char **argv)
             return -3;
         }
         shot.blitTo(out);
-        if (!SDL_SaveBMP(out, screenshotPath.c_str()))
+
+        // Pick the writer by extension so the same flag produces what the
+        // README expects (PNG hero images) without forcing callers to run an
+        // external converter step. Falls back to BMP for any other suffix.
+        auto endsWith = [](const std::string &s, const std::string &suffix)
+        {
+            return s.size() >= suffix.size()
+                   && s.compare(s.size() - suffix.size(), suffix.size(), suffix) == 0;
+        };
+        bool saved = false;
+        if (endsWith(screenshotPath, ".png") || endsWith(screenshotPath, ".PNG"))
+        {
+            saved = IMG_SavePNG(out, screenshotPath.c_str());
+        }
+        else
+        {
+            saved = SDL_SaveBMP(out, screenshotPath.c_str());
+        }
+        if (!saved)
         {
             std::cerr << "Failed to save screenshot: " << SDL_GetError() << '\n';
         }
