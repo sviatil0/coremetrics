@@ -22,6 +22,16 @@ struct ProcessInfo
     unsigned long long diskWriteKbPerSec = 0;
 };
 
+// Disk usage for the root volume. totalKb is the total capacity; freeKb
+// is the user-visible free space (after reserved blocks). Zero on both
+// fields when the platform call fails so the UI can decide whether to
+// render the strip at all.
+struct DiskUsage
+{
+    unsigned long long totalKb;
+    unsigned long long freeKb;
+};
+
 // htop-style memory breakdown. All fields are kilobytes. The four
 // segments (active, wired, cached, free) cover the total: any byte not
 // accounted for elsewhere is folded into `free` so the four always sum
@@ -63,6 +73,9 @@ public:
     // 1-, 5-, 15-minute load averages. Vector size is always 3. Falls
     // back to {0, 0, 0} on Windows since there is no portable analog.
     static std::vector<float> readLoadAverages();
+    // Root volume capacity. Returns zeroed totals on platforms where the
+    // call fails (in which case the UI hides the strip).
+    static DiskUsage readDiskUsage();
     static std::vector<ProcessInfo> topProcesses(std::size_t n = 20);
 };
 
