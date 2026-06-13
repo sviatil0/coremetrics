@@ -4,3 +4,5 @@ bin/
 .vscode/
 main
 uml/*.pnga.out
+build_warnings.txt
+*.bmp
