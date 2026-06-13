@@ -109,7 +109,7 @@ Layout GUIFile::parseLayout(const std::string &block)
     {
         nameStart += nameTag.length() + 1;
         size_t nameEnd = nameStart;
-        while ((nameEnd < block.length()) && (block[nameEnd] != '>') && (block[nameEnd != ' ']))
+        while ((nameEnd < block.length()) && (block[nameEnd] != '>') && (block[nameEnd] != ' '))
         {
             nameEnd++;
         }

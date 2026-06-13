@@ -5,12 +5,18 @@
 #include <cstdlib>
 #include <dirent.h>
 #include <fstream>
+#include <map>
 #include <sstream>
 
 extern bool systemMetricsCompareByMemDesc(const ProcessInfo &a, const ProcessInfo &b);
 
 static unsigned long long g_lastTotal = 0;
 static unsigned long long g_lastIdle = 0;
+
+// Per-process CPU% needs a delta: jiffies a process used between two samples,
+// over the system-wide jiffies that elapsed in the same window.
+static std::map<int, unsigned long long> g_lastProcTicks;
+static unsigned long long g_lastProcSampleTotal = 0;
 
 static bool readProcStatTotals(unsigned long long &total, unsigned long long &idle)
 {
@@ -234,6 +240,17 @@ std::vector<ProcessInfo> SystemMetrics::topProcesses(std::size_t n)
         }
     }
 
+    // Sample the system-wide total jiffies once, as the denominator for every
+    // process's CPU% this round.
+    unsigned long long sysTotal = 0;
+    unsigned long long sysIdle = 0;
+    readProcStatTotals(sysTotal, sysIdle);
+    unsigned long long sysTotalDiff = (g_lastProcSampleTotal == 0 || sysTotal < g_lastProcSampleTotal)
+                                          ? 0
+                                          : sysTotal - g_lastProcSampleTotal;
+
+    std::map<int, unsigned long long> currentProcTicks;
+
     struct dirent *entry = nullptr;
     while ((entry = readdir(dir)) != nullptr)
     {
@@ -249,6 +266,19 @@ std::vector<ProcessInfo> SystemMetrics::topProcesses(std::size_t n)
             continue;
         }
         unsigned long long cpuTicks = readProcCpuTicks(pid);
+        currentProcTicks[pid] = cpuTicks;
+
+        float cpuPct = 0.0f;
+        if (sysTotalDiff > 0)
+        {
+            auto prev = g_lastProcTicks.find(pid);
+            if (prev != g_lastProcTicks.end() && cpuTicks >= prev->second)
+            {
+                unsigned long long procDiff = cpuTicks - prev->second;
+                cpuPct = (static_cast<float>(procDiff) / static_cast<float>(sysTotalDiff)) * 100.0f;
+            }
+        }
+
         unsigned long long memKb = readProcMemKb(pid);
         float memPct = 0.0f;
         if (memTotalKb > 0)
@@ -258,11 +288,14 @@ std::vector<ProcessInfo> SystemMetrics::topProcesses(std::size_t n)
         ProcessInfo info;
         info.pid = pid;
         info.name = procName;
-        info.cpuPct = static_cast<float>(cpuTicks);
+        info.cpuPct = cpuPct;
         info.memPct = memPct;
         result.push_back(info);
     }
     closedir(dir);
+
+    g_lastProcTicks = std::move(currentProcTicks);
+    g_lastProcSampleTotal = sysTotal;
 
     std::sort(result.begin(), result.end(), systemMetricsCompareByMemDesc);
     if (result.size() > n)
