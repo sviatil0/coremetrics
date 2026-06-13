@@ -43,8 +43,9 @@ CoreMetrics is two things in one repo: a small **GUI toolkit written directly on
 No build toolchain required.
 
 ```bash
-# macOS (Homebrew)
+# macOS (Homebrew, Apple Silicon)
 brew tap sviatil0/coremetrics
+brew trust sviatil0/coremetrics   # one-time: Homebrew requires explicit trust for third-party taps
 brew install coremetrics
 
 # Debian / Ubuntu
