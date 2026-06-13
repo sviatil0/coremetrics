@@ -12,6 +12,14 @@ struct ProcessInfo
     std::string name;
     float cpuPct;
     float memPct;
+    // Disk I/O throughput in kilobytes per second since the previous
+    // topProcesses() sample. Zero on the very first sample for a pid
+    // (nothing to diff against) and on platforms where the rate cannot
+    // be derived (Windows GetProcessIoCounters reports cumulative bytes
+    // and is fully supported; mac proc_pidinfo PROC_PIDRUSAGE_V2 and
+    // linux /proc/<pid>/io are also supported).
+    unsigned long long diskReadKbPerSec = 0;
+    unsigned long long diskWriteKbPerSec = 0;
 };
 
 // htop-style memory breakdown. All fields are kilobytes. The four

@@ -4,6 +4,7 @@
 #include "ProcParsers.hpp"
 #include "ProcessUtils.hpp"
 #include <algorithm>
+#include <chrono>
 #include <cstdlib>
 #include <dirent.h>
 #include <fstream>
@@ -22,6 +23,41 @@ static unsigned long long g_lastIdle = 0;
 // over the system-wide jiffies that elapsed in the same window.
 static std::map<int, unsigned long long> g_lastProcTicks;
 static unsigned long long g_lastProcSampleTotal = 0;
+
+// Per-process disk I/O rate needs a delta: bytes read/written between two
+// samples, over wall-clock seconds. Tracked separately because /proc/[pid]/io
+// counters are cumulative and need real time (not jiffies) to convert into
+// KB/sec.
+struct ProcIoCounters
+{
+    unsigned long long readBytes;
+    unsigned long long writeBytes;
+};
+static std::map<int, ProcIoCounters> g_lastProcIo;
+static std::chrono::steady_clock::time_point g_lastProcIoSampleTime;
+
+static ProcIoCounters readProcIoBytes(int pid)
+{
+    ProcIoCounters out{0, 0};
+    std::ostringstream path;
+    path << "/proc/" << pid << "/io";
+    std::ifstream file(path.str());
+    if (!file.is_open())
+    {
+        return out;
+    }
+    std::string line;
+    while (std::getline(file, line))
+    {
+        std::istringstream iss(line);
+        std::string key;
+        unsigned long long value = 0;
+        iss >> key >> value;
+        if (key == "read_bytes:") out.readBytes = value;
+        else if (key == "write_bytes:") out.writeBytes = value;
+    }
+    return out;
+}
 
 static std::string slurpFile(const std::string &path)
 {
@@ -326,6 +362,16 @@ std::vector<ProcessInfo> SystemMetrics::topProcesses(std::size_t n)
                                           : sysTotal - g_lastProcSampleTotal;
 
     std::map<int, unsigned long long> currentProcTicks;
+    std::map<int, ProcIoCounters> currentProcIo;
+
+    // Wall-clock seconds since the previous I/O sample. Used to convert
+    // cumulative byte counters from /proc/[pid]/io into a KB/sec rate.
+    auto nowTp = std::chrono::steady_clock::now();
+    double ioElapsedSec = 0.0;
+    if (g_lastProcIoSampleTime.time_since_epoch().count() != 0)
+    {
+        ioElapsedSec = std::chrono::duration<double>(nowTp - g_lastProcIoSampleTime).count();
+    }
 
     struct dirent *entry = nullptr;
     while ((entry = readdir(dir)) != nullptr)
@@ -384,18 +430,44 @@ std::vector<ProcessInfo> SystemMetrics::topProcesses(std::size_t n)
             }
         }
 
+        ProcIoCounters io = readProcIoBytes(pid);
+        currentProcIo[pid] = io;
+        unsigned long long readKbPerSec = 0;
+        unsigned long long writeKbPerSec = 0;
+        if (ioElapsedSec > 0.0)
+        {
+            auto prevIo = g_lastProcIo.find(pid);
+            if (prevIo != g_lastProcIo.end())
+            {
+                unsigned long long readDelta = (io.readBytes >= prevIo->second.readBytes)
+                                                   ? io.readBytes - prevIo->second.readBytes
+                                                   : 0;
+                unsigned long long writeDelta = (io.writeBytes >= prevIo->second.writeBytes)
+                                                    ? io.writeBytes - prevIo->second.writeBytes
+                                                    : 0;
+                readKbPerSec = static_cast<unsigned long long>(
+                    static_cast<double>(readDelta) / 1024.0 / ioElapsedSec);
+                writeKbPerSec = static_cast<unsigned long long>(
+                    static_cast<double>(writeDelta) / 1024.0 / ioElapsedSec);
+            }
+        }
+
         ProcessInfo info;
         info.pid = pid;
         info.parentPid = parentPid;
         info.name = procName;
         info.cpuPct = cpuPct;
         info.memPct = memPct;
+        info.diskReadKbPerSec = readKbPerSec;
+        info.diskWriteKbPerSec = writeKbPerSec;
         result.push_back(info);
     }
     closedir(dir);
 
     g_lastProcTicks = std::move(currentProcTicks);
     g_lastProcSampleTotal = sysTotal;
+    g_lastProcIo = std::move(currentProcIo);
+    g_lastProcIoSampleTime = nowTp;
 
     std::sort(result.begin(), result.end(), systemMetricsCompareByMemDesc);
     if (result.size() > n)

@@ -22,6 +22,17 @@ static ULONGLONG g_lastIdle = 0;
 static std::map<DWORD, ULONGLONG> g_lastProcTicks;
 static ULONGLONG g_lastProcSampleSysTotal = 0;
 
+// Per-process disk I/O. GetProcessIoCounters returns cumulative bytes;
+// we diff against the prior sample and convert via the elapsed time
+// since the previous topProcesses() call.
+struct WinProcIoCounters
+{
+    ULONGLONG readBytes;
+    ULONGLONG writeBytes;
+};
+static std::map<DWORD, WinProcIoCounters> g_lastProcIo;
+static ULONGLONG g_lastProcIoSampleTickMs = 0;
+
 static ULONGLONG fileTimeToULL(const FILETIME &ft)
 {
     ULARGE_INTEGER li;
@@ -209,6 +220,13 @@ std::vector<ProcessInfo> SystemMetrics::topProcesses(std::size_t n)
                                  ? 0
                                  : sysTotal - g_lastProcSampleSysTotal;
     std::map<DWORD, ULONGLONG> currentProcTicks;
+    std::map<DWORD, WinProcIoCounters> currentProcIo;
+    ULONGLONG nowTickMs = GetTickCount64();
+    double ioElapsedSec = 0.0;
+    if (g_lastProcIoSampleTickMs != 0 && nowTickMs > g_lastProcIoSampleTickMs)
+    {
+        ioElapsedSec = static_cast<double>(nowTickMs - g_lastProcIoSampleTickMs) / 1000.0;
+    }
 
     HANDLE snap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
     if (snap == INVALID_HANDLE_VALUE)
@@ -265,6 +283,29 @@ std::vector<ProcessInfo> SystemMetrics::topProcesses(std::size_t n)
                         static_cast<std::uint64_t>(sysTotalDiff));
                 }
             }
+            IO_COUNTERS ioc;
+            if (GetProcessIoCounters(hProc, &ioc))
+            {
+                WinProcIoCounters io{ioc.ReadTransferCount, ioc.WriteTransferCount};
+                currentProcIo[entry.th32ProcessID] = io;
+                if (ioElapsedSec > 0.0)
+                {
+                    auto prevIo = g_lastProcIo.find(entry.th32ProcessID);
+                    if (prevIo != g_lastProcIo.end())
+                    {
+                        ULONGLONG readDelta = (io.readBytes >= prevIo->second.readBytes)
+                                                  ? io.readBytes - prevIo->second.readBytes
+                                                  : 0;
+                        ULONGLONG writeDelta = (io.writeBytes >= prevIo->second.writeBytes)
+                                                   ? io.writeBytes - prevIo->second.writeBytes
+                                                   : 0;
+                        info.diskReadKbPerSec = static_cast<unsigned long long>(
+                            static_cast<double>(readDelta) / 1024.0 / ioElapsedSec);
+                        info.diskWriteKbPerSec = static_cast<unsigned long long>(
+                            static_cast<double>(writeDelta) / 1024.0 / ioElapsedSec);
+                    }
+                }
+            }
             CloseHandle(hProc);
         }
         result.push_back(info);
@@ -274,6 +315,8 @@ std::vector<ProcessInfo> SystemMetrics::topProcesses(std::size_t n)
 
     g_lastProcTicks = std::move(currentProcTicks);
     g_lastProcSampleSysTotal = sysTotal;
+    g_lastProcIo = std::move(currentProcIo);
+    g_lastProcIoSampleTickMs = nowTickMs;
 
     std::sort(result.begin(), result.end(), systemMetricsCompareByMemDesc);
     if (result.size() > n)
