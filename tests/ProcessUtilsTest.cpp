@@ -119,6 +119,128 @@ static void testCompareByMem()
            compareProcessByColumn(light, heavy, SORT_MEM, true));
 }
 
+static void testCompareUnknownColumnFallback()
+{
+    // An unrecognized column value (e.g. an enum value added later in the
+    // header but missing a case here) must fall through to `return false`.
+    // This pins the contract so a future enum addition that forgets a
+    // switch case becomes a test failure rather than a silent wrong sort.
+    ProcessInfo a = make(1, "a", 5.0f, 5.0f);
+    ProcessInfo b = make(2, "b", 5.0f, 5.0f);
+    SortColumn unknown = static_cast<SortColumn>(999);
+    report("compareProcessByColumn unknown column returns false (asc)",
+           compareProcessByColumn(a, b, unknown, true) == false);
+    report("compareProcessByColumn unknown column returns false (desc)",
+           compareProcessByColumn(b, a, unknown, false) == false);
+}
+
+static void testComputeIoKbPerSecZeroElapsed()
+{
+    report("computeIoKbPerSec elapsed 0 returns 0",
+           computeIoKbPerSec(0, 1024 * 1024, 0.0) == 0);
+}
+
+static void testComputeIoKbPerSecNegativeElapsed()
+{
+    report("computeIoKbPerSec elapsed < 0 returns 0",
+           computeIoKbPerSec(0, 1024 * 1024, -1.0) == 0);
+}
+
+static void testComputeIoKbPerSecCounterReset()
+{
+    // PID reuse or some Windows resets can roll the cumulative counter
+    // backwards; we want 0 KB/s, not a billion KB/s from underflow.
+    report("computeIoKbPerSec counter reset returns 0",
+           computeIoKbPerSec(2048, 1024, 1.0) == 0);
+}
+
+static void testComputeIoKbPerSecNormalDelta()
+{
+    // 1 MB delta over 1 second is 1024 KB/sec.
+    report("computeIoKbPerSec 1MB/s",
+           computeIoKbPerSec(0, 1024 * 1024, 1.0) == 1024);
+    // 512 KB delta over 0.5 seconds is also 1024 KB/sec.
+    report("computeIoKbPerSec scales by elapsed",
+           computeIoKbPerSec(0, 512 * 1024, 0.5) == 1024);
+}
+
+static void testComputeIoKbPerSecEqualCounters()
+{
+    report("computeIoKbPerSec curr == prev returns 0",
+           computeIoKbPerSec(1024, 1024, 1.0) == 0);
+}
+
+static void testProcessNameMatchesFilterEmptyNeedle()
+{
+    report("filter empty needle matches anything",
+           processNameMatchesFilter("bash", "") == true);
+    report("filter empty needle matches empty name",
+           processNameMatchesFilter("", "") == true);
+}
+
+static void testProcessNameMatchesFilterEmptyName()
+{
+    report("filter empty name does not match non-empty needle",
+           processNameMatchesFilter("", "bash") == false);
+}
+
+static void testProcessNameMatchesFilterCaseInsensitive()
+{
+    report("filter is case-insensitive (BASH matches bash)",
+           processNameMatchesFilter("BASH", "bash") == true);
+    report("filter is case-insensitive (bash matches BASH)",
+           processNameMatchesFilter("bash", "BASH") == true);
+}
+
+static void testProcessNameMatchesFilterSubstring()
+{
+    report("filter matches substring at start",
+           processNameMatchesFilter("postgres-server", "post") == true);
+    report("filter matches substring in middle",
+           processNameMatchesFilter("com.docker.backend", "docker") == true);
+    report("filter rejects non-match",
+           processNameMatchesFilter("kernel_task", "chrome") == false);
+}
+
+static void testFormatUptimeStringZero()
+{
+    report("formatUptimeString 0 yields 'Up --'",
+           formatUptimeString(0) == "Up --");
+}
+
+static void testFormatUptimeStringMinutesOnly()
+{
+    report("formatUptimeString 0d 0h 5m -> 'Up 5m'",
+           formatUptimeString(5 * 60) == "Up 5m");
+}
+
+static void testFormatUptimeStringHoursAndMinutes()
+{
+    // 2h 30m
+    report("formatUptimeString 2h 30m -> 'Up 2h 30m'",
+           formatUptimeString(2 * 3600 + 30 * 60) == "Up 2h 30m");
+}
+
+static void testFormatUptimeStringDaysHoursMinutes()
+{
+    // 9d 22h 35m
+    unsigned long long secs = 9 * 86400 + 22 * 3600 + 35 * 60;
+    report("formatUptimeString 9d 22h 35m -> 'Up 9d 22h 35m'",
+           formatUptimeString(secs) == "Up 9d 22h 35m");
+}
+
+static void testFormatUptimeStringExactlyOneHour()
+{
+    report("formatUptimeString exactly 1h 0m -> 'Up 1h 0m'",
+           formatUptimeString(3600) == "Up 1h 0m");
+}
+
+static void testFormatUptimeStringExactlyOneMinute()
+{
+    report("formatUptimeString exactly 1m 'Up 1m'",
+           formatUptimeString(60) == "Up 1m");
+}
+
 void processUtilsTestSuite()
 {
     std::cout << "=============================================" << '\n';
@@ -142,6 +264,25 @@ void processUtilsTestSuite()
     testCompareByName();
     testCompareByCpu();
     testCompareByMem();
+    testCompareUnknownColumnFallback();
+
+    testComputeIoKbPerSecZeroElapsed();
+    testComputeIoKbPerSecNegativeElapsed();
+    testComputeIoKbPerSecCounterReset();
+    testComputeIoKbPerSecNormalDelta();
+    testComputeIoKbPerSecEqualCounters();
+
+    testProcessNameMatchesFilterEmptyNeedle();
+    testProcessNameMatchesFilterEmptyName();
+    testProcessNameMatchesFilterCaseInsensitive();
+    testProcessNameMatchesFilterSubstring();
+
+    testFormatUptimeStringZero();
+    testFormatUptimeStringMinutesOnly();
+    testFormatUptimeStringHoursAndMinutes();
+    testFormatUptimeStringDaysHoursMinutes();
+    testFormatUptimeStringExactlyOneHour();
+    testFormatUptimeStringExactlyOneMinute();
 
     std::cout << '\n';
     std::cout << "  Failures: " << g_failures << '\n';
