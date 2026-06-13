@@ -49,8 +49,34 @@ bool compareProcessByColumn(const ProcessInfo &a,
         return ascending ? (a.cpuPct < b.cpuPct) : (a.cpuPct > b.cpuPct);
     case SORT_MEM:
         return ascending ? (a.memPct < b.memPct) : (a.memPct > b.memPct);
+    case SORT_DISK:
+    {
+        unsigned long long ai = a.diskReadKbPerSec + a.diskWriteKbPerSec;
+        unsigned long long bi = b.diskReadKbPerSec + b.diskWriteKbPerSec;
+        return ascending ? (ai < bi) : (ai > bi);
+    }
     }
     return false;
+}
+
+std::string formatDiskIo(unsigned long long readKbPerSec,
+                         unsigned long long writeKbPerSec)
+{
+    unsigned long long total = readKbPerSec + writeKbPerSec;
+    if (total == 0)
+    {
+        return "";
+    }
+    if (total >= 1024)
+    {
+        std::ostringstream oss;
+        oss.precision(1);
+        oss << std::fixed
+            << (static_cast<double>(total) / 1024.0)
+            << " MB/s";
+        return oss.str();
+    }
+    return std::to_string(total) + " KB/s";
 }
 
 std::uint64_t computeIoKbPerSec(std::uint64_t prev,

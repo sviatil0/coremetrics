@@ -108,10 +108,11 @@
         <row>
             <ivec2><x>24</x><y>64</y></ivec2>
             <ivec2><x>936</x><y>84</y></ivec2>
-            <cell weight=0.15>PID</cell>
-            <cell weight=0.5>NAME</cell>
-            <cell weight=0.175>CPU%</cell>
-            <cell weight=0.175>MEM%</cell>
+            <cell weight=0.10>PID</cell>
+            <cell weight=0.42>NAME</cell>
+            <cell weight=0.12>CPU%</cell>
+            <cell weight=0.12>MEM%</cell>
+            <cell weight=0.24>DISK I/O</cell>
             <vec3><x>0.871</x><y>1.0</y><z>0.608</z></vec3>
         </row>
         <box>
@@ -119,21 +120,21 @@
             <ivec2><x>936</x><y>91</y></ivec2>
             <vec3><x>0.22</x><y>0.22</y><z>0.22</z></vec3>
         </box>
-        <row><ivec2><x>24</x><y>100</y></ivec2><ivec2><x>936</x><y>120</y></ivec2><cell weight=0.15></cell><cell weight=0.5></cell><cell weight=0.175></cell><cell weight=0.175></cell><vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3></row>
-        <row><ivec2><x>24</x><y>120</y></ivec2><ivec2><x>936</x><y>140</y></ivec2><cell weight=0.15></cell><cell weight=0.5></cell><cell weight=0.175></cell><cell weight=0.175></cell><vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3></row>
-        <row><ivec2><x>24</x><y>140</y></ivec2><ivec2><x>936</x><y>160</y></ivec2><cell weight=0.15></cell><cell weight=0.5></cell><cell weight=0.175></cell><cell weight=0.175></cell><vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3></row>
-        <row><ivec2><x>24</x><y>160</y></ivec2><ivec2><x>936</x><y>180</y></ivec2><cell weight=0.15></cell><cell weight=0.5></cell><cell weight=0.175></cell><cell weight=0.175></cell><vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3></row>
-        <row><ivec2><x>24</x><y>180</y></ivec2><ivec2><x>936</x><y>200</y></ivec2><cell weight=0.15></cell><cell weight=0.5></cell><cell weight=0.175></cell><cell weight=0.175></cell><vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3></row>
-        <row><ivec2><x>24</x><y>200</y></ivec2><ivec2><x>936</x><y>220</y></ivec2><cell weight=0.15></cell><cell weight=0.5></cell><cell weight=0.175></cell><cell weight=0.175></cell><vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3></row>
-        <row><ivec2><x>24</x><y>220</y></ivec2><ivec2><x>936</x><y>240</y></ivec2><cell weight=0.15></cell><cell weight=0.5></cell><cell weight=0.175></cell><cell weight=0.175></cell><vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3></row>
-        <row><ivec2><x>24</x><y>240</y></ivec2><ivec2><x>936</x><y>260</y></ivec2><cell weight=0.15></cell><cell weight=0.5></cell><cell weight=0.175></cell><cell weight=0.175></cell><vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3></row>
-        <row><ivec2><x>24</x><y>260</y></ivec2><ivec2><x>936</x><y>280</y></ivec2><cell weight=0.15></cell><cell weight=0.5></cell><cell weight=0.175></cell><cell weight=0.175></cell><vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3></row>
-        <row><ivec2><x>24</x><y>280</y></ivec2><ivec2><x>936</x><y>300</y></ivec2><cell weight=0.15></cell><cell weight=0.5></cell><cell weight=0.175></cell><cell weight=0.175></cell><vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3></row>
-        <row><ivec2><x>24</x><y>300</y></ivec2><ivec2><x>936</x><y>320</y></ivec2><cell weight=0.15></cell><cell weight=0.5></cell><cell weight=0.175></cell><cell weight=0.175></cell><vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3></row>
-        <row><ivec2><x>24</x><y>320</y></ivec2><ivec2><x>936</x><y>340</y></ivec2><cell weight=0.15></cell><cell weight=0.5></cell><cell weight=0.175></cell><cell weight=0.175></cell><vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3></row>
-        <row><ivec2><x>24</x><y>340</y></ivec2><ivec2><x>936</x><y>360</y></ivec2><cell weight=0.15></cell><cell weight=0.5></cell><cell weight=0.175></cell><cell weight=0.175></cell><vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3></row>
-        <row><ivec2><x>24</x><y>360</y></ivec2><ivec2><x>936</x><y>380</y></ivec2><cell weight=0.15></cell><cell weight=0.5></cell><cell weight=0.175></cell><cell weight=0.175></cell><vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3></row>
-        <row><ivec2><x>24</x><y>380</y></ivec2><ivec2><x>936</x><y>400</y></ivec2><cell weight=0.15></cell><cell weight=0.5></cell><cell weight=0.175></cell><cell weight=0.175></cell><vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3></row>
+        <row><ivec2><x>24</x><y>100</y></ivec2><ivec2><x>936</x><y>120</y></ivec2><cell weight=0.10></cell><cell weight=0.42></cell><cell weight=0.12></cell><cell weight=0.12></cell><cell weight=0.24></cell><vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3></row>
+        <row><ivec2><x>24</x><y>120</y></ivec2><ivec2><x>936</x><y>140</y></ivec2><cell weight=0.10></cell><cell weight=0.42></cell><cell weight=0.12></cell><cell weight=0.12></cell><cell weight=0.24></cell><vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3></row>
+        <row><ivec2><x>24</x><y>140</y></ivec2><ivec2><x>936</x><y>160</y></ivec2><cell weight=0.10></cell><cell weight=0.42></cell><cell weight=0.12></cell><cell weight=0.12></cell><cell weight=0.24></cell><vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3></row>
+        <row><ivec2><x>24</x><y>160</y></ivec2><ivec2><x>936</x><y>180</y></ivec2><cell weight=0.10></cell><cell weight=0.42></cell><cell weight=0.12></cell><cell weight=0.12></cell><cell weight=0.24></cell><vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3></row>
+        <row><ivec2><x>24</x><y>180</y></ivec2><ivec2><x>936</x><y>200</y></ivec2><cell weight=0.10></cell><cell weight=0.42></cell><cell weight=0.12></cell><cell weight=0.12></cell><cell weight=0.24></cell><vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3></row>
+        <row><ivec2><x>24</x><y>200</y></ivec2><ivec2><x>936</x><y>220</y></ivec2><cell weight=0.10></cell><cell weight=0.42></cell><cell weight=0.12></cell><cell weight=0.12></cell><cell weight=0.24></cell><vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3></row>
+        <row><ivec2><x>24</x><y>220</y></ivec2><ivec2><x>936</x><y>240</y></ivec2><cell weight=0.10></cell><cell weight=0.42></cell><cell weight=0.12></cell><cell weight=0.12></cell><cell weight=0.24></cell><vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3></row>
+        <row><ivec2><x>24</x><y>240</y></ivec2><ivec2><x>936</x><y>260</y></ivec2><cell weight=0.10></cell><cell weight=0.42></cell><cell weight=0.12></cell><cell weight=0.12></cell><cell weight=0.24></cell><vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3></row>
+        <row><ivec2><x>24</x><y>260</y></ivec2><ivec2><x>936</x><y>280</y></ivec2><cell weight=0.10></cell><cell weight=0.42></cell><cell weight=0.12></cell><cell weight=0.12></cell><cell weight=0.24></cell><vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3></row>
+        <row><ivec2><x>24</x><y>280</y></ivec2><ivec2><x>936</x><y>300</y></ivec2><cell weight=0.10></cell><cell weight=0.42></cell><cell weight=0.12></cell><cell weight=0.12></cell><cell weight=0.24></cell><vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3></row>
+        <row><ivec2><x>24</x><y>300</y></ivec2><ivec2><x>936</x><y>320</y></ivec2><cell weight=0.10></cell><cell weight=0.42></cell><cell weight=0.12></cell><cell weight=0.12></cell><cell weight=0.24></cell><vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3></row>
+        <row><ivec2><x>24</x><y>320</y></ivec2><ivec2><x>936</x><y>340</y></ivec2><cell weight=0.10></cell><cell weight=0.42></cell><cell weight=0.12></cell><cell weight=0.12></cell><cell weight=0.24></cell><vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3></row>
+        <row><ivec2><x>24</x><y>340</y></ivec2><ivec2><x>936</x><y>360</y></ivec2><cell weight=0.10></cell><cell weight=0.42></cell><cell weight=0.12></cell><cell weight=0.12></cell><cell weight=0.24></cell><vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3></row>
+        <row><ivec2><x>24</x><y>360</y></ivec2><ivec2><x>936</x><y>380</y></ivec2><cell weight=0.10></cell><cell weight=0.42></cell><cell weight=0.12></cell><cell weight=0.12></cell><cell weight=0.24></cell><vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3></row>
+        <row><ivec2><x>24</x><y>380</y></ivec2><ivec2><x>936</x><y>400</y></ivec2><cell weight=0.10></cell><cell weight=0.42></cell><cell weight=0.12></cell><cell weight=0.12></cell><cell weight=0.24></cell><vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3></row>
     </layout>
 
         <button>
@@ -161,7 +162,7 @@
         <label>
             <ivec2><x>148</x><y>492</y></ivec2>
             <vec3><x>0.5</x><y>0.5</y><z>0.5</z></vec3>
-            <text>v0.2.2</text>
+            <text>v0.2.3</text>
         </label>
         <label>
             <ivec2><x>240</x><y>492</y></ivec2>
