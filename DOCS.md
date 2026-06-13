@@ -49,7 +49,7 @@ Suggested reading order, simplest to most involved:
 
 ```sh
 make                                       # build + launch
-make test                                  # 214 unit tests across 16 suites
+make test                                  # 17 test suites
 make bench                                 # Bresenham line rasterizer throughput
 make asan                                  # tests under AddressSanitizer
 make ubsan                                 # tests under UndefinedBehaviorSanitizer

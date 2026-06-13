@@ -420,7 +420,12 @@ std::vector<ProcessInfo> SystemMetrics::topProcesses(std::size_t n)
         info.cpuPct = cpuPct;
         if (memSize > 0)
         {
-            info.memPct = (static_cast<float>(taskInfo.pti_resident_size) / static_cast<float>(memSize)) * 100.0f;
+            // pti_resident_size is bytes (uint64_t). Casting to float before
+            // the divide loses ~3 significant digits for processes over a
+            // few hundred MB; do the ratio in double then narrow.
+            info.memPct = static_cast<float>(
+                (static_cast<double>(taskInfo.pti_resident_size)
+                 / static_cast<double>(memSize)) * 100.0);
         }
         else
         {

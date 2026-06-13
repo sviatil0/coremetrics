@@ -36,6 +36,19 @@
   </screenshots>
   <content_rating type="oars-1.1" />
   <releases>
+    <release version="0.2.1" date="2026-06-13">
+      <description>
+        <p>
+          Post-v0.2.0 polish wave from an automated audit: stuck-at-100%
+          RAM fix on Linux kernels missing MemAvailable, Windows PDH GPU
+          read no longer hits UB on a zero-sample probe, macOS per-process
+          MEM% computed in double, README and DOCS test counts and
+          screenshot caption matched to reality, pure ProcessUtils helpers
+          for I/O rate / filter / uptime with unit tests, live procs
+          counter and sparkline labels in the System hero UI.
+        </p>
+      </description>
+    </release>
     <release version="0.2.0" date="2026-06-13">
       <description>
         <p>

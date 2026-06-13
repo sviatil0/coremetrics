@@ -302,33 +302,45 @@ float SystemMetrics::readMemPercent()
 
     unsigned long long memTotal = 0;
     unsigned long long memAvailable = 0;
+    unsigned long long memFree = 0;
+    unsigned long long buffers = 0;
+    unsigned long long cached = 0;
+    bool sawMemAvailable = false;
     std::string line;
+    // Walk the entire file. The previous version broke out once memTotal
+    // and memAvailable were both nonzero, but on Linux kernels older than
+    // 3.14 (and some stripped container kernels) MemAvailable is absent
+    // entirely. In that case the loop used to exit with memAvailable == 0
+    // and the function pinned at 100% forever. Keep reading so we can fall
+    // back to MemFree + Buffers + Cached, which is what htop does on those
+    // hosts.
     while (std::getline(file, line))
     {
         std::istringstream iss(line);
         std::string key;
         unsigned long long value = 0;
         iss >> key >> value;
-        if (key == "MemTotal:")
-        {
-            memTotal = value;
-        }
+        if (key == "MemTotal:") memTotal = value;
         else if (key == "MemAvailable:")
         {
             memAvailable = value;
+            sawMemAvailable = true;
         }
-        if (memTotal > 0 && memAvailable > 0)
-        {
-            break;
-        }
+        else if (key == "MemFree:") memFree = value;
+        else if (key == "Buffers:") buffers = value;
+        else if (key == "Cached:") cached = value;
     }
 
     if (memTotal == 0)
     {
         return 0.0f;
     }
-    float used = static_cast<float>(memTotal - memAvailable);
-    return (used / static_cast<float>(memTotal)) * 100.0f;
+    unsigned long long available = sawMemAvailable
+                                       ? memAvailable
+                                       : memFree + buffers + cached;
+    if (available > memTotal) available = memTotal;
+    double used = static_cast<double>(memTotal - available);
+    return static_cast<float>((used / static_cast<double>(memTotal)) * 100.0);
 }
 
 std::vector<ProcessInfo> SystemMetrics::topProcesses(std::size_t n)

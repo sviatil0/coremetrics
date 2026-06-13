@@ -265,26 +265,7 @@ static void destroySparklines()
 
 static std::string formatUptime(unsigned long long secs)
 {
-    if (secs == 0)
-    {
-        return "Up --";
-    }
-    unsigned long long days = secs / 86400;
-    secs %= 86400;
-    unsigned long long hrs = secs / 3600;
-    secs %= 3600;
-    unsigned long long mins = secs / 60;
-    std::string out = "Up ";
-    if (days > 0)
-    {
-        out += std::to_string(days) + "d ";
-    }
-    if (days > 0 || hrs > 0)
-    {
-        out += std::to_string(hrs) + "h ";
-    }
-    out += std::to_string(mins) + "m";
-    return out;
+    return formatUptimeString(secs);
 }
 
 static std::string formatLoadAverages()
@@ -390,6 +371,31 @@ static void renderPerCoreStrip(Screen &dest)
     }
 }
 
+// Live footer string replacing the v0.1.x static "alarm threshold 80%"
+// label. Same color and y-baseline as the other footer chrome
+// (coremetrics / v0.2.0 / poll 500ms) so it reads as a continuation.
+// Latest process count is set by pollMetrics().
+static std::size_t g_lastProcCount = 0;
+
+static void renderFooterLiveStats(Screen &dest)
+{
+    const vec3 dim(0.5f, 0.5f, 0.5f);
+    std::string text = "procs " + std::to_string(g_lastProcCount);
+    Font::drawText(dest, text, ivec2(370, 492), dim);
+}
+
+// Tiny accent labels at the left edge of each sparkline strip. Without
+// them three unlabeled polylines at the bottom of the System tab read as
+// abstract decoration; with them a reviewer instantly sees they're CPU
+// / RAM / GPU history. y-baseline picked to sit just above each strip.
+static void renderSparklineLabels(Screen &dest)
+{
+    const vec3 dim(0.55f, 0.55f, 0.55f);
+    Font::drawText(dest, "CPU history", ivec2(24, 230), dim);
+    Font::drawText(dest, "RAM history", ivec2(24, 298), dim);
+    Font::drawText(dest, "GPU history", ivec2(24, 366), dim);
+}
+
 static void pollMetrics()
 {
     float cpuPct = SystemMetrics::readCpuPercent();
@@ -474,6 +480,11 @@ static void pollMetrics()
     std::size_t fetchN = g_treeMode ? std::max<std::size_t>(500, dataRowCount * 30)
                                     : dataRowCount * 3;
     std::vector<ProcessInfo> procs = SystemMetrics::topProcesses(fetchN);
+    // Captured before filter/truncate so the live footer count reflects
+    // what the backend actually returned (after any over-fetch), which
+    // is the most useful single number a reviewer can see: "this system
+    // monitor is watching N processes right now."
+    g_lastProcCount = procs.size();
     // Parallel array of indent depths produced when tree mode flattens
     // the parent/child graph; stays empty in flat mode. Same length as
     // procs after the sort+filter+truncate pass below.
@@ -566,22 +577,16 @@ static void pollMetrics()
     }
     if (!g_filterText.empty())
     {
-        std::string needle;
-        needle.reserve(g_filterText.size());
-        for (char c : g_filterText)
+        std::vector<ProcessInfo> kept;
+        kept.reserve(procs.size());
+        for (const auto &p : procs)
         {
-            needle.push_back(static_cast<char>(std::tolower(static_cast<unsigned char>(c))));
+            if (processNameMatchesFilter(p.name, g_filterText))
+            {
+                kept.push_back(p);
+            }
         }
-        procs.erase(std::remove_if(procs.begin(), procs.end(),
-            [&needle](const ProcessInfo &p) {
-                std::string hay;
-                hay.reserve(p.name.size());
-                for (char c : p.name)
-                {
-                    hay.push_back(static_cast<char>(std::tolower(static_cast<unsigned char>(c))));
-                }
-                return hay.find(needle) == std::string::npos;
-            }), procs.end());
+        procs = std::move(kept);
     }
     if (procs.size() > dataRowCount)
     {
@@ -756,6 +761,7 @@ int main(int argc, char **argv)
 
         shot.clear();
         LayoutManager::getInstance().render(shot, ivec2(0, 0), ivec2(RESX - 1, RESY - 1));
+        renderFooterLiveStats(shot);
         if (tab != "processes")
         {
             renderUptimeAndLoad(shot);
@@ -766,6 +772,7 @@ int main(int argc, char **argv)
                 if (g_cpuSparkline != nullptr) g_cpuSparkline->draw(shot);
                 if (g_ramSparkline != nullptr) g_ramSparkline->draw(shot);
                 if (g_gpuSparkline != nullptr) g_gpuSparkline->draw(shot);
+                renderSparklineLabels(shot);
             }
         }
         else if (!g_filterText.empty())
@@ -1199,9 +1206,11 @@ int main(int argc, char **argv)
                     if (g_cpuSparkline != nullptr) g_cpuSparkline->draw(screen);
                     if (g_ramSparkline != nullptr) g_ramSparkline->draw(screen);
                     if (g_gpuSparkline != nullptr) g_gpuSparkline->draw(screen);
+                    renderSparklineLabels(screen);
                 }
             }
         }
+        renderFooterLiveStats(screen);
 
         // Process-kill overlays: selected-row highlight + signal menu + the
         // brief status flash after a send. Painted over the layout tree so
