@@ -22,7 +22,7 @@
 | System tab | Processes tab |
 |:---:|:---:|
 | ![System tab](assets/screenshot-system.png) | ![Processes tab](assets/screenshot-processes.png) |
-| CPU / RAM / GPU bars, load-colored (RAM red past 80%), per-core strip, memory breakdown segments, uptime + load average, optional sparklines | Sortable, filterable process table with parent-child tree view, row selection, and signal menu (TERM / KILL / INT / HUP / STOP / CONT) |
+| CPU / RAM / GPU / DISK readouts, load-colored (RAM and DISK red past 80%), per-core strip, memory breakdown segments, uptime + load average, optional sparklines | Sortable / filterable process table with PID / NAME / CPU% / MEM% / DISK I/O columns, parent-child tree view, row selection, and signal menu (TERM / KILL / INT / HUP / STOP / CONT) |
 
 > Both frames are rendered by the app itself, headlessly: `coremetrics --screenshot out.png [system|processes]` runs one render pass to an offscreen surface and saves it, no window required. The extension picks the writer (`.png` via `IMG_SavePNG`, anything else via `SDL_SaveBMP`).
 
@@ -34,7 +34,7 @@ New here? [**DOCS.md**](DOCS.md) maps the whole repo; [**API.md**](API.md) is th
 
 CoreMetrics is two things in one repo: a small **GUI toolkit written directly on SDL3 pixel surfaces** (no Dear ImGui, no Qt, no game framework) and a **real system monitor built on top of it**. A few things worth a look:
 
-- **htop-comparable Processes tab.** Search and filter by name (`/`), parent-child tree view (`t`), row selection + signal menu (`k`) covering TERM / KILL / INT / HUP / STOP / CONT, all backed by per-process disk I/O, memory breakdown, uptime, and 1/5/15-minute load averages on the System tab.
+- **htop-comparable Processes tab.** Five-column table (PID / NAME / CPU% / MEM% / DISK I/O); click any header to sort. Search and filter by name (`/`), parent-child tree view (`t`), row selection + signal menu (`k`) covering TERM / KILL / INT / HUP / STOP / CONT. System tab pairs these with per-process disk I/O backend, memory breakdown, uptime, 1/5/15-minute load averages, and a root-volume DISK readout.
 - **Three native metrics backends, one header.** `SystemMetrics` reads live data from `/proc` + `/sys` on Linux, mach + IOKit on macOS, and PDH + Toolhelp on Windows, selected at compile time via `#ifdef`.
 - **From-scratch UI stack.** Every widget rasterizes itself onto a raw `SDL_Surface` through one `Screen` primitive layer (`drawPixel`, Bresenham `drawLine`, `drawBox`, `drawTriangle`, `blitTo`). No retained-mode GUI library underneath; geometry is hand-rasterized, text and image decode go through SDL's debug renderer and SDL_image/SDL_ttf.
 - **Event-driven, no scene rebuilds.** Clicks trickle top-down through the layout tree; tab switches drain as paired show/hide events in a single pass; metrics mutate widgets in place every 500 ms.
@@ -212,11 +212,12 @@ Per-package class diagrams (PlantUML): [Core](assets/core.png) · [GUI](assets/g
 
 `coremetrics.cpp` builds a two-tab system monitor on the GUI library:
 
-- **System tab:** CPU / RAM / GPU bars with live numeric readouts; bars recolor yellow above 60% and red above 80%. Uptime, 1/5/15-minute load average, per-logical-CPU strip, htop-style active / wired / cached / free memory breakdown segments. Optional CPU / RAM / GPU sparklines (`--sparklines`).
-- **Processes tab:** PID / NAME / CPU% / MEM% rows, sorted by memory by default. htop-style controls:
+- **System tab:** CPU / RAM / GPU bars with live numeric readouts; bars recolor yellow above 60% and red above 80%. One-line status row with uptime, 1/5/15-minute load average, and root-volume disk usage (`DISK <used>/<total> GB (NN%)`, same yellow/red thresholds as RAM). Per-logical-CPU strip, htop-style active / wired / cached / free memory breakdown segments. Optional CPU / RAM / GPU sparklines with inline labels (`--sparklines`).
+- **Processes tab:** PID / NAME / CPU% / MEM% / DISK I/O rows, sorted by memory by default. Click any column header to sort by that column. htop-style controls:
   - `/` to filter by case-insensitive name substring, `Esc` to clear
   - `t` to toggle parent/child tree view (or `--tree` on the command line)
   - click a row to select, `Up`/`Down` to move selection, `k` to open the signal menu (TERM / KILL / INT / HUP / STOP / CONT), `Y`/`Enter` to confirm, `N`/`Esc` to cancel
+- **Footer:** live `procs N` counter shows how many processes the monitor is currently tracking.
 
 Tab switching is event-driven: each tab button emits a hide event for the other tab and a show event for its own, both drained in one `processEvents` pass so the switch is atomic. Metrics refresh every 500 ms; the main loop walks the layout tree and mutates bars, rows, and labels in place rather than rebuilding the scene.
 
