@@ -1,256 +1,301 @@
 <div align="center">
 
+<img src="assets/logo.png" alt="CoreMetrics logo" width="360">
+
 # CoreMetrics
 
-**A real-time system process monitor on a from-scratch 2D graphics engine.**
+**Real-time cross-platform system monitor (CPU / RAM / GPU / processes), built on a from-scratch C++23 GUI library over raw SDL3 surfaces.**
 
+[![C++23](https://img.shields.io/badge/C%2B%2B-23-00599C?logo=cplusplus&logoColor=white)](https://en.cppreference.com/w/cpp/23)
+[![SDL3](https://img.shields.io/badge/SDL-3-1a1a1a)](https://www.libsdl.org/)
+[![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Linux-informational)](#architecture)
+[![License: LGPL-2.1](https://img.shields.io/badge/License-LGPL--2.1-blue.svg)](LICENSE)
 [![C/C++ CI](https://github.com/sviatil0/coremetrics/actions/workflows/c-cpp.yml/badge.svg?branch=main)](https://github.com/sviatil0/coremetrics/actions/workflows/c-cpp.yml)
-[![license: LGPL-2.1](https://img.shields.io/badge/license-LGPL--2.1-blue.svg)](LICENSE)
-![C++23](https://img.shields.io/badge/C%2B%2B-23-informational.svg)
-![SDL3](https://img.shields.io/badge/SDL-3-1abc9c.svg)
-![platform: Linux | macOS](https://img.shields.io/badge/platform-Linux%20%7C%20macOS-lightgrey.svg)
-![tests: 80+](https://img.shields.io/badge/tests-80%2B-success.svg)
 
 </div>
 
-CoreMetrics shows live CPU, RAM, and GPU usage and a sortable process table, built in
-**C++23** on a **2D graphics library written from the pixel up**. SDL3 supplies only the
-window and the raw surface; every drawing primitive, layout, widget, event, and sound
-above that lives in this repo: templated vector math, a Bresenham rasterizer, an
-event-driven GUI layer, and a thread pool that parallelizes wide pixel fills.
+> **Visual:** a live application screenshot is not captured yet. The two-tab layout (System: CPU/RAM/GPU bars with load-colored thresholds; Processes: sortable PID / NAME / CPU% / MEM% table) is described under [The demo](#the-demo). Per-package UML renders are in [`assets/`](assets/). A captioned product screenshot will replace this note once a clean frame is grabbed.
 
-![What CoreMetrics is](assets/what-we-built.png)
+---
 
-## What it does
+## Why this is interesting
 
-A developer notices a slowdown, opens CoreMetrics, sees the CPU bar turn red, switches to
-the Processes tab, and finds the offending PID.
+CoreMetrics is two things in one repo: a small **GUI toolkit written directly on SDL3 pixel surfaces** (no Dear ImGui, no Qt, no game framework) and a **real system monitor built on top of it**. A few things worth a look:
 
-![User story](assets/user-story.png)
+- **From-scratch UI stack.** Every widget rasterizes itself onto a raw `SDL_Surface` through one `Screen` primitive layer (`drawPixel` / `drawLine` / `drawBox` / `drawTriangle` / `drawText`). No retained-mode GUI library underneath.
+- **Three native metrics backends, one header.** `SystemMetrics` reads live data from `/proc` + `/sys` on Linux, mach + IOKit on macOS, and PDH + Toolhelp on Windows, selected at compile time via `#ifdef`.
+- **Parallel fills.** Wide `drawBox` / `drawTriangle` operations partition pixel rows across a `ThreadPool` and join on `std::future`s per frame.
+- **Modern C++ on purpose.** A `Cloneable<Derived>` CRTP mixin gives every widget a covariant `clone()` for free; ownership flows through `unique_ptr`; the layout tree is a generic `Tree<T>`.
+- **Event-driven, no scene rebuilds.** Clicks trickle top-down through the layout tree; tab switches drain as paired show/hide events in a single pass; metrics mutate widgets in place every 500 ms.
+- **175 unit tests across 13 suites** and a 3-OS GitHub Actions matrix.
 
-- **Live CPU / RAM / GPU bars**, sampled from real OS sources: `/proc` on Linux, IOKit on
-  macOS, PDH on Windows (one platform file compiled per target).
-- **A sortable process table** (by PID, name, CPU, memory).
-- **A load alarm** that fires with sound past an 80% utilization threshold.
-- **Two tabs**, event-driven switching, click / sort / exit / mute.
+## Quickstart
 
-## My contribution
+Requires a **C++23 compiler** (g++ 13+ or clang 16+), GNU Make, and **SDL3 + SDL3_ttf + SDL3_image**.
 
-Team project (Notre Dame CSE 40232, Software Engineering, Spring 2026): four people, three
-months, a PR-based workflow with code review on every merge (~70 merge commits in the
-history). I was the lead and primary author. `git blame` across every source file:
+```bash
+# 1. clone
+git clone https://github.com/ND-CSE40232-SE/SP26_Team04.git
+cd SP26_Team04
 
-```mermaid
-pie showData
-    title Lines of code by author (git blame, all source files)
-    "Sviatoslav (me)" : 4943
-    "Alicia Melotik" : 1138
-    "mcastel5" : 805
-    "Daniel Rehberg" : 25
-```
-
-```
-me            ███████████████████████████████████░░░░░░░░░░░░░  71%   (4,943 lines)
-Alicia        ████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  16%   (1,138 lines)
-mcastel5      ██████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  12%   (  805 lines)
-```
-
-What is mine: the vector / matrix math, the `Screen` rasterizer (Bresenham lines,
-barycentric triangle fill) and its pixel tests, all three `SystemMetrics` platform
-backends (`/proc`, IOKit, PDH), the GUI element hierarchy and factory, and the parallel
-`drawBox` / `drawTriangle` call-sites. The `ThreadPool` itself and `Cloneable` were
-written by teammates; I wrote the rasterizer code that uses them. Reproduce the per-file
-split yourself:
-
-```sh
-git ls-files '*.cpp' '*.hpp' '*.h' | while read f; do
-  git blame --line-porcelain "$f"; done | grep '^author ' | sort | uniq -c | sort -rn
-```
-
-Released publicly with the team's and instructor's consent under LGPL-2.1.
-
-## Build and run
-
-Dependencies: SDL3, SDL3_ttf, SDL3_image.
-
-```sh
-brew install sdl3 sdl3_ttf sdl3_image                              # macOS
+# 2. install the SDL3 dependencies
+brew install sdl3 sdl3_ttf sdl3_image          # macOS
 # sudo apt install libsdl3-dev libsdl3-ttf-dev libsdl3-image-dev   # Debian/Ubuntu
 
-make            # builds bin/coremetrics
-make test       # 80+ unit tests across 11 suites
-./bin/coremetrics
+# 3. build and run the demo
+make                 # builds bin/coremetrics and launches it
+
+# 4. (optional) watch the bars spike
+./stress.sh          # 30s of CPU + RAM load; bars cross yellow/red thresholds
 ```
 
-Builds clean under C++23 (`g++ -std=c++23 -Wall`); CI is green on Ubuntu and macOS.
+<details>
+<summary>Other build targets, Windows notes, and SDL-from-source</summary>
 
-## Verifying it works
-
-```sh
-make test                        # 80+ unit tests across 11 suites
-./run-cross-platform-tests.sh    # the suite on macOS (native) + Linux (Docker)
-./stress.sh                      # spikes CPU/RAM/GPU so you can watch the bars react
+```bash
+make coremetrics   # build + run the CoreMetrics demo (same as default)
+make test          # build + run the full unit-test suite
+make demo          # build + run the Milestone 005 event demo
+make clean         # remove obj/ and bin/
 ```
 
-`stress.sh` spawns real load (multi-worker CPU burn, a Python RAM allocation, and
-`glmark2` / `stress-ng` on the GPU), so the live bars actually move under pressure; it is
-how the monitor is demoed, not just unit-tested in isolation.
+```bash
+./stress.sh 60 8 1024    # custom: duration(sec) cpu-workers ram-MB
+```
 
-## How it fits together
+**Windows:** download the SDL3, SDL3_ttf, and SDL3_image dev libraries from the [SDL release pages](https://github.com/libsdl-org/SDL/releases), extract them, and point `CXXFLAGS` / `LDFLAGS` in the `Makefile` at your include/lib directories.
+
+**SDL3 not packaged yet on your distro?** Build from source:
+[SDL](https://github.com/libsdl-org/SDL/releases) ·
+[SDL_ttf](https://github.com/libsdl-org/SDL_ttf/releases) ·
+[SDL_image](https://github.com/libsdl-org/SDL_image/releases)
+
+Optional GPU-stress tooling: `glmark2` or `stress-ng --gpu` on Linux; on macOS the script drives a WebGL page in the browser (no install). If none are present, CPU and RAM stress still run and GPU stress is skipped with a log line.
+</details>
+
+## Architecture
+
+The system is four layers. SDL3 hands us a window and a raw pixel surface; `Screen` turns that surface into drawing primitives; the `GUIElement` / `Layout` tree composes those primitives into a UI; and `EventManager` routes input back down the tree.
 
 ```mermaid
 flowchart TD
-    APP["coremetrics.cpp<br/>app + 500ms refresh loop"]
-    SM["SystemMetrics<br/>/proc · IOKit · PDH"]
-    LM["LayoutManager (singleton)<br/>layout tree + painter's algorithm"]
-    EV["EventManager (singleton)<br/>click trickle · show · sound"]
-    GUI["GUI elements<br/>Bar · Row · Label · Button · Selection"]
-    SCR["Screen (rasterizer)<br/>drawPixel · drawLine · drawBox · drawTriangle"]
-    TP["ThreadPool (singleton)<br/>parallel pixel-row fills"]
-    SDL(["SDL3<br/>window + raw surface"])
+    SDL["SDL3 window + SDL_Surface"]
+    Screen["Screen<br/>drawPixel · drawLine · drawBox · drawTriangle · drawText"]
+    Pool["ThreadPool<br/>parallel row fills"]
+    Elements["GUIElement tree<br/>Bar · Row · Label · Button · Image · Selection"]
+    Layout["Layout / LayoutManager<br/>Tree&lt;Layout&gt;, painter's algorithm"]
+    Events["EventManager<br/>Click / Show / Sound, trickle propagation"]
+    Metrics["SystemMetrics<br/>Linux /proc · macOS IOKit · Windows PDH"]
+    App["CoreMetrics demo<br/>System + Processes tabs"]
 
-    APP --> SM
-    APP --> LM
-    APP --> EV
-    LM --> GUI
-    EV --> GUI
-    GUI --> SCR
-    SCR --> TP
-    SCR --> SDL
-
-    classDef mine fill:#eef7ee,stroke:#1d7a3e,color:#111;
-    classDef dep fill:#eef,stroke:#0a4d8c,color:#111;
-    class SM,LM,EV,GUI,SCR,TP mine;
-    class SDL dep;
+    SDL --> Screen
+    Screen --> Pool
+    Screen --> Elements
+    Elements --> Layout
+    Layout --> App
+    Events --> Elements
+    Metrics --> App
+    App --> Events
 ```
 
-Detailed PlantUML class diagrams, grouped by package:
+| Layer | Files | Responsibility |
+|---|---|---|
+| **Math core** | `vec2.hpp`, `vec3.hpp`, `matrix.hpp`, `linear.hpp` | Templated (int/float) vectors and a 3x3 `Matrix`; dot, cross, magnitude, unit, transpose |
+| **Rasterizer** | `screen.hpp` / `screen.cpp`, `ThreadPool.hpp` | Draw primitives onto an `SDL_Surface`; parallelize wide fills |
+| **Widgets** | `GUIElement.hpp`, `Cloneable.hpp`, `Bar`, `Row`, `Label`, `Button`, `Image`, `selection` | Self-drawing UI elements behind one polymorphic `draw(Screen&)` interface |
+| **Layout** | `Tree.hpp`, `Layout.hpp`, `LayoutManager.hpp`, `GUIFile.hpp` | Relative-coordinate layout tree, painter's-algorithm render, XML load/save |
+| **Events** | `Event*.hpp`, `EventManager.hpp`, `SoundPlayer.hpp` | Queue, trickle dispatch, layout show/hide, WAV playback |
+| **Metrics** | `SystemMetrics.hpp` + `SystemMetrics_{linux,mac,win}.cpp` | Live CPU / RAM / GPU / process stats per OS |
+| **App** | `coremetrics.cpp` | The CoreMetrics system-monitor demo built on the above |
 
-| Overview | Core | GUI | Layout | Events | Metrics |
-|---|---|---|---|---|---|
-| [overview](assets/overview.png) | [core](assets/core.png) | [gui](assets/gui.png) | [layout](assets/layout.png) | [events](assets/events.png) | [metrics](assets/metrics.png) |
+Per-package class diagrams (PlantUML): [Core](assets/core.png) · [GUI](assets/gui.png) · [Layout](assets/layout.png) · [Events](assets/events.png) · [Metrics](assets/metrics.png) · [combined overview](assets/overview.png).
 
-![Class Diagram Overview](assets/overview.png)
+## The demo
 
-## Slides
+`coremetrics.cpp` builds a two-tab system monitor on the GUI library:
 
-A short [final presentation](docs/CoreMetrics-Final-Presentation.pdf) walks through the
-architecture, the cross-platform proof, and a demo.
+- **System tab:** CPU and RAM bars with live numeric readouts. Bars recolor yellow above 60% and red above 80% to flag load at a glance.
+- **Processes tab:** a header row plus configurable data rows listing PID / NAME / CPU% / MEM%, sorted by memory usage.
 
-## Engineering highlights
+Tab switching is event-driven: each tab button emits a hide event for the other tab and a show event for its own, both drained in one `processEvents` pass so the switch is atomic. Metrics refresh every 500 ms; the main loop walks the layout tree and mutates bars, rows, and labels in place rather than rebuilding the scene.
 
-- **From-scratch rasterizer.** `Screen` plots pixels, Bresenham lines, filled boxes and
-  triangles directly onto an SDL surface it owns via RAII. No SDL draw calls above the raw
-  surface.
-- **Parallel fills.** `drawBox` / `drawTriangle` partition their pixel rows into disjoint
-  bands and dispatch them across a worker pool, joining on `std::future` (the pool itself
-  is a teammate's; the rasterizer call-sites are mine).
-- **Cross-platform metrics behind one header.** `SystemMetrics` is platform-agnostic at
-  the interface; `_linux` (`/proc`), `_mac` (IOKit / `host_statistics`), and `_win` (PDH /
-  toolhelp) implementations are selected by `#ifdef`, so only one contributes symbols.
-- **Patterns where they pay off.** Singleton (`LayoutManager`, `EventManager`,
-  `ThreadPool`, `SoundPlayer`), factory (`GUIElementFactory`), CRTP prototype
-  (`Cloneable<Derived>` for deep-copying `unique_ptr<GUIElement>` trees), painter's
-  algorithm for the layout tree.
-- **Event-driven, atomic tab switch.** Each tab button emits a hide + a show `ShowEvent`;
-  both drain in one `processEvents` pass.
+## Status
+
+**What works**
+
+- GUI library, rasterizer, event system, layout tree, and the CoreMetrics demo build and run.
+- Live CPU / RAM and per-process stats on macOS, Linux, and Windows.
+- Total GPU usage on Linux (`gpu_busy_percent`), macOS (`IOAccelerator`), and Windows (PDH).
+- 175 unit tests across 13 suites; full 3-OS compile + test matrix in CI.
+
+**Known limitations**
+
+- **Per-process GPU attribution** is not exposed by the cross-platform API yet; only total GPU usage is reported. (NVIDIA NVML on Linux is a backlog item.)
+- **Windows GUI is not visually verified end-to-end.** The Windows metrics layer exists, but mouse/click/tab interaction is verified on macOS and Linux only, so CI is gated on Linux + macOS (the Windows SDL3 + pkg-config toolchain on the runner is also flaky). Local cross-platform verification runs via `./run-cross-platform-tests.sh` (macOS native + Ubuntu in Docker).
+
+## API reference
+
+The math core is the most reused surface; the full per-class reference is folded below to keep this page skimmable.
+
+| Type | Selected public API |
+|---|---|
+| `Tvec2<T>` / `Tvec3<T>` | `dot`, `magnitude`, `unit`, `cross` (vec3), and `==`, `+`, `-`, `*`, `+=`, `-=`, `*=`, `[]`; implicit int↔float conversion. `vec2`/`vec3` = float, `ivec2`/`ivec3` = int |
+| `Matrix` | `operator*` (3x3 multiply), `operator==`, `toTranspose` |
+| `Screen` | `drawPixel`, `drawLine`, `drawBox`, `drawTriangle`, `drawText`, `blitTo`, `clear` |
+| `Tree<T>` | `getData`, `getParent`, `getChildren`, `addChild`, `isRoot`, `isLeaf` |
+| `EventManager` | `getInstance`, `pushEvent`, `processEvents` |
+| `SystemMetrics` | `readCpuPercent`, `readMemPercent`, `topProcesses(n)` |
 
 <details>
-<summary><strong>Full API reference (per-class)</strong></summary>
+<summary><strong>Full class-by-class reference</strong></summary>
 
-### Matrix
-3x3 float matrix. `operator*` (multiply), `operator==`, `toTranspose()`.
+### Math
 
-### Tvec2&lt;T&gt; / Tvec3&lt;T&gt;
-Templated (int or float) vectors with int/float conversion and overloaded `== + - * += -= *= []`.
-`dot`, `magnitude` (Euclidean for float, L1/Manhattan for int), `unit`; `Tvec3` adds `cross`.
+**`Matrix`**: a 3x3 matrix of floats stored as a 2D array.
+- `Matrix operator*(const Matrix&) const`: matrix multiply.
+- `bool operator==(const Matrix&) const`: equality.
+- `Matrix toTranspose() const`: returns the transpose.
 
-### Screen
-Rasterizer over an SDL surface. `drawPixel`, `drawLine` (Bresenham, all orientations),
-`drawBox`, `drawTriangle` (cross-product fill, CW or CCW), `blitTo(SDL_Surface*)`.
+**`Tvec2<T>`**: templated (int or float) 2-component vector. Overloads `==`, `+`, `-`, `*`, `+=`, `-=`, `*=`, `[]`, with implicit int↔float conversion.
+- `T dot(const Tvec2<T>&) const`: dot product.
+- `T magnitude() const`: Euclidean length for float, L1 (Manhattan) for int.
+- `Tvec2<T> unit() const`: unit vector.
 
-### GUIElement (ABC) + Cloneable&lt;Derived&gt;
-Pure-virtual `draw(Screen&)`, `operator()(Event*)` (trickle handler), `clone()`. `Cloneable`
-is a CRTP mixin giving each concrete element `clone()` / covariant `cloneDerived()` for free,
-plus a free `cloneUnique<T>` helper.
+**`Tvec3<T>`**: templated 3-component vector with the same operator set as `Tvec2`.
+- `T dot`, `T magnitude`, `Tvec3<T> unit`: as above, extended to three components.
+- `Tvec3<T> cross(const Tvec3<T>&) const`: cross product.
 
-### Concrete elements: Point, Line, Box, Label, Selection, Image, Button, Bar, Row
-`Point`/`Line`/`Box` draw their primitive. `Label` lays out a box-per-character text
-footprint. `Selection` is a stateful checkbox (`toggle`, `isSelected`). `Image` plots a BMP
-pixel-by-pixel (RGBA8888, transparency-aware). `Button` hit-tests clicks and pushes
-`SoundEvent` / `ShowEvent`. `Bar` is a threshold-colored progress bar (yellow >60%, red
->80%). `Row` is an N-cell tabular strip (PID / NAME / CPU% / MEM%).
+### Rasterizer
 
-### GUIElementFactory
-Static factory mapping a `GUIElementType` to a heap-allocated element: `createPoint`,
-`createLine`, `createBox`, and a generic `create(type, pos1, pos2, color)`.
+**`Screen`**: renders geometric primitives onto an `SDL_Surface`.
+- `void drawPixel(ivec2 pos, vec3 color)`: color a single pixel.
+- `void drawLine(ivec2 start, ivec2 end, vec3 color)`: horizontal, vertical, or diagonal line.
+- `void drawBox(ivec2 min, ivec2 max, vec3 color)`: filled rectangle.
+- `void drawTriangle(ivec2 v1, ivec2 v2, ivec2 v3, vec3 color)`: filled triangle, winding-agnostic.
+- `void drawText(ivec2 pos, vec3 color, std::string text)`: text via the bundled font.
+- `void blitTo(SDL_Surface*)`: copy the internal buffer to a display surface.
 
-### Tree&lt;T&gt; / Layout / LayoutManager
-`Tree<T>`: generic tree, owning `unique_ptr` children + non-owning parent pointer. `Layout`:
-a relative-coordinate (0–1) screen region holding `GUIElement`s, deep-copyable via the CRTP
-`clone`. `LayoutManager` (singleton): owns the root `Tree<Layout>` and renders it with the
-painter's algorithm (parent before children).
+**`ThreadPool`**: singleton worker pool sized to `std::thread::hardware_concurrency`. `drawBox` / `drawTriangle` partition pixel rows across it via `submit` and join on returned futures. Copy/assign deleted; destructor signals stop and joins.
+- `static ThreadPool& getInstance()`, `size_t threadCount() const`, `template<typename F> std::future<void> submit(F&&)`.
 
-### Events: Event (ABC), ClickEvent, ShowEvent, SoundEvent, EventManager
-Typed events (no downcasting). `EventManager` (singleton) drains a queue: clicks trickle
-top-down until consumed, shows toggle a named layout, sounds delegate to `SoundPlayer`.
+### Widgets
 
-### SoundPlayer
-Singleton WAV playback through an SDL3 audio stream (44.1 kHz, mono, f32).
+**`GUIElement`**: abstract base for every renderable UI component.
+- `virtual void draw(Screen&) = 0`: render against a `Screen` (decoupled from the target).
+- `virtual bool operator()(Event*)`: event handler; returns `true` if the event is consumed.
+- `virtual GUIElement* clone() const = 0`: deep copy, supplied by `Cloneable`.
 
-### ThreadPool
-Singleton worker pool (`hardware_concurrency`). `submit(F&&) -> std::future<void>`; callers
-partition pixel rows across it. Copy/assign deleted; destructor signals stop and joins.
+**`Cloneable<Derived>`**: CRTP mixin giving subclasses `clone()` for free.
+- `GUIElement* clone() const override`: heap copy via the derived copy constructor.
+- `Derived* cloneDerived() const`: covariant return, no caller cast.
+- `template<typename T> std::unique_ptr<T> cloneUnique(const T&)`: wraps a clone in `unique_ptr`.
 
-### GUIFile
-Loads / stages / saves GUI layout elements to and from an XML schema. Vectors of
-`Point`/`Line`/`Box`; getters return by value for read-only access; `readFile` clears before
-parsing; `writeFile` emits an indented schema.
+**`Point` / `Line` / `Box`**: concrete `GUIElement`s for a pixel, a segment, and a filled rectangle; each `draw` forwards to the matching `Screen` primitive.
 
-### SystemMetrics
-Static cross-platform metrics. `readCpuPercent()` (delta-based, 0 on first call),
-`readMemPercent()`, `topProcesses(n)` (by memory, each with pid/name/cpuPct/memPct). Linux
-reads `/proc`; macOS uses `host_statistics` + `proc_*`; Windows uses `GetSystemTimes` +
-toolhelp.
+**`GUIElementFactory`**: static factory mapping a `GUIElementType` to a concrete element.
+- `createPoint`, `createLine`, `createBox`, and a generic `create(type, pos1, pos2, color)` (returns `nullptr` + logs to `std::cerr` on unknown types).
 
-### CoreMetrics demo (`coremetrics.cpp`)
-Two-tab monitor. System tab: live CPU/RAM bars with numeric readouts. Processes tab: sortable
-PID/NAME/CPU%/MEM% rows. Tab switching is event-driven and atomic. Metrics refresh every
-500 ms; the loop mutates Bars/Rows/Labels in place (no scene rebuild).
+**`Label`**: text component; currently renders a proportional box per character as a layout placeholder ahead of a full font engine. `draw`, `getText`.
+
+**`Selection`**: stateful checkbox (border, background, conditional check mark). `draw`, `toggle`, `isSelected`.
+
+**`Image`**: renders a BMP by manually plotting non-transparent pixels (RGBA8888) rather than using SDL blit helpers. `draw`, `getFilePath`.
+
+**`Button`**: clickable box with optional sound and target-layout. On a hit it pushes a `SoundEvent` and/or `ShowEvent`. `draw`, `checkToggle(x, y)`, `operator()(Event*)`.
+
+**`Bar`**: horizontal progress bar over `[minVal, maxVal]`; recolors yellow above 60% and red above 80%; optional `metricName` tag. `setValue`, `getValue`, `getMetricName`, `draw`.
+
+**`Row`**: horizontal strip of N text cells with caller-supplied column weights; cells truncate to width. Used for the process table. `setCells`, `getCells`, `draw`.
+
+### Layout
+
+**`Tree<T>`**: generic tree; each node owns `unique_ptr` children and holds a non-owning parent pointer. `getData`, `getParent`, `getChildren`, `addChild`, `isRoot`, `isLeaf`.
+
+**`Layout`**: a screen region in relative (0.0 to 1.0) coordinates; holds a flat list of `GUIElement`s. Deep-copies its elements via `Cloneable::clone()`. `resolveAbsStart/End`, `addElement`, `setActive`, `isActive`, `getStart/End`, `getName`, `draw`.
+
+**`LayoutManager`**: singleton owning the root `Tree<Layout>`; renders with the painter's algorithm (depth-first, parent before children). `getInstance`, `getRoot`, `addChild`, `render`.
+
+**`GUIFile`**: loads/stages/saves GUI layout elements to/from XML. Holds `std::vector<Point/Line/Box>`; clears containers before each load. `setPoint/Line/Box`, `getPoints/Lines/Boxes`, `readFile`, `writeFile`.
+
+### Events
+
+**`Event`**: abstract message carrying an `EventType`. `getType`.
+**`ClickEvent`**: carries click pixel coordinates. `getMouseX`, `getMouseY`.
+**`ShowEvent`**: targets a named layout to show/hide. `getLayoutName`, `getShow`.
+**`SoundEvent`**: requests WAV playback. `getFilePath`.
+**`EventManager`**: singleton owning the event queue; click events trickle top-down, show events toggle a named layout, sound events delegate to `SoundPlayer`. `getInstance`, `pushEvent`, `processEvents`.
+**`SoundPlayer`**: singleton WAV playback through SDL3 (44.1 kHz, mono, float32). `getInstance`, `play`.
+
+### Metrics
+
+**`SystemMetrics`**: static cross-platform reader; platform-agnostic header, `#ifdef`-guarded impls:
+- Linux: `/proc/stat`, `/proc/meminfo`, `/proc/[pid]/{comm,stat,status}`.
+- macOS: `host_statistics(64)`, `sysctl(HW_MEMSIZE)`, `proc_listpids` / `proc_pidinfo` / `proc_name`.
+- Windows: `GetSystemTimes`, `GlobalMemoryStatusEx`, `CreateToolhelp32Snapshot` + `GetProcessMemoryInfo` / `GetProcessTimes`.
+- `static float readCpuPercent()` (first call returns `0.0f`, no baseline), `static float readMemPercent()`, `static std::vector<ProcessInfo> topProcesses(std::size_t n = 20)`.
 
 </details>
 
-<details>
-<summary><strong>Original course engineering spec</strong> (requirements the team built against)</summary>
+## Team
 
-### Design and architecture rules
-- Avoid code smell; keep non-public helpers private.
-- `#ifndef` header guards (no `#pragma once`).
-- No exceptions or assertions; print to `std::cerr` and handle every corner case without crashing.
-- No print statements in production code.
-- File-local helpers are `static`.
+A 4-person Notre Dame CSE 40232 software-engineering project (SP26 Team 04). Contributions are git-verifiable via `git shortlog -sne` and `git blame`.
+
+| Contributor | Owned |
+|---|---|
+| **Stefan (Sviatoslav) Oleksiienko** | Event system, layout engine, cross-platform `SystemMetrics`, the CoreMetrics demo app, CI, and tooling. **~71% of tracked C++/header lines** (`git blame`: 4,943 / 6,911). |
+| **Alicia Melotik** | XML parser and `GUIFile`, `Cloneable`/CRTP clone path, Windows GPU, layout helpers, refactors. |
+| **Martin Castellanos** | `Layout` core methods, `Button` event functor, `ThreadPool`, drawing parallelism. |
+| **Daniel Rehberg** | Early scaffolding and review. |
+
+The team ran a PR-template + required-review workflow with a Trello board and per-developer branches; code review caught real bugs before merge (for example a strict-weak-ordering crash in the process sort).
+
+## Contributing
+
+Coding standards (Allman braces, `#ifndef` guards, no lambdas, no exceptions, camelCase, no magic numbers) and the PR/review process are documented in the collapsible below; fill out [`PULL_REQUEST_TEMPLATE.md`](PULL_REQUEST_TEMPLATE.md) for every PR.
+
+<details>
+<summary>Coding standards and team process</summary>
+
+**Design and architecture**
+- Keep non-public helpers private; avoid code smells.
+- Header guards via `#ifndef`, not `#pragma once`.
+- No exceptions or assertions; handle every corner case and log to `std::cerr` instead of crashing.
+- No `print` statements in production code; mark file-local functions `static`.
 - No lambda functions.
 
-### Style
-camelCase variables/free-functions, PascalCase classes, `CAPITALIZED_SNAKE_CASE` constants,
-no magic numbers (`const`/`constexpr`), Allman braces, full braces on every control block.
+**SDL3**
+- Link SDL3 dynamically; do not compile it into source.
+- SDL3 sits between Layer 1 (window + GPU pixel output) and Layer 2 (UI layout and interaction).
 
-### Cross-platform notes
-- `SystemMetrics` splits into `_linux` / `_mac` / `_win` source files, guarded by
-  `#ifdef __linux__` / `__APPLE__` / `_WIN32`.
-- macOS links `-framework IOKit -framework CoreFoundation` for GPU via `IOServiceMatching("IOAccelerator")`.
-- Linux GPU usage from `/sys/class/drm/card0/device/gpu_busy_percent` (AMD; NVIDIA/NVML is backlog).
-- Windows GPU usage via PDH `\GPU Engine(*)\Utilization Percentage`.
+**Style**
 
-### Known limitations
-- Per-process GPU attribution is not exposed (only total GPU usage per platform).
-- The Windows GUI is not visually verified end-to-end; visual interaction is verified on
-  macOS and Linux. CI is gated on Linux + macOS for this reason.
+| Category | Convention |
+|---|---|
+| Variables, free functions | camelCase |
+| Class names | PascalCase |
+| Vector aliases | `vecX`, `ivecX` |
+| Constants | CAPITALIZED_SNAKE_CASE |
+| Magic numbers | Not allowed; use `const` / `constexpr` |
+| Indentation | Allman style |
+| Control one-liners | Not allowed; always full braces |
 
-### Team workflow
-- A PR per change using the repo's PR template; every PR reviewed by a teammate before merge.
-- Trello board: Backlog → Active → Review → merge; full test suite run locally before pushing.
+```cpp
+// not allowed
+if (x) doSomething();
 
+// required (Allman)
+if (x)
+{
+    doSomething();
+}
+```
+
+**UML diagrams** are PlantUML, compiled by `compile-uml.sh`: `-` private, `+` public, `name: type` fields, a dividing line between fields and methods.
+
+**Team process**
+- Every PR uses the template and gets a written review before merge.
+- Trello flow: Backlog -> Active (assigned) -> Review (PR). Address corrections, re-review, then the reviewer merges. The team reviews all changes together at each milestone.
+- Run the full test suite locally before pushing.
 </details>
 
 ## License
