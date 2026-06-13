@@ -1,4 +1,7 @@
 #include <algorithm>
+#include <atomic>
+#include <csignal>
+#include <cstdlib>
 #include <fstream>
 #include <iostream>
 #include <memory>
@@ -58,6 +61,16 @@ static bool g_cpuAlarmActive = false;
 static bool g_ramAlarmActive = false;
 static bool g_gpuAlarmActive = false;
 
+// Set by SIGINT/SIGTERM and checked by the main loop. The main loop also
+// exits on its own once an optional --duration is exceeded; this flag covers
+// Ctrl-C from a terminal and `kill` from a parent process or CI.
+static std::atomic<bool> g_shutdownRequested{false};
+
+static void handleShutdownSignal(int)
+{
+    g_shutdownRequested.store(true);
+}
+
 static SortColumn g_sortColumn = SORT_MEM;
 static bool g_sortAscending = false;
 static Row *g_headerRow = nullptr;
@@ -80,18 +93,7 @@ static ivec2 g_exitBtnMax;
 
 static bool compareProcesses(const ProcessInfo &a, const ProcessInfo &b)
 {
-    switch (g_sortColumn)
-    {
-    case SORT_PID:
-        return g_sortAscending ? (a.pid < b.pid) : (a.pid > b.pid);
-    case SORT_NAME:
-        return g_sortAscending ? (a.name < b.name) : (a.name > b.name);
-    case SORT_CPU:
-        return g_sortAscending ? (a.cpuPct < b.cpuPct) : (a.cpuPct > b.cpuPct);
-    case SORT_MEM:
-        return g_sortAscending ? (a.memPct < b.memPct) : (a.memPct > b.memPct);
-    }
-    return false;
+    return compareProcessByColumn(a, b, g_sortColumn, g_sortAscending);
 }
 
 static void buildScene()
@@ -283,17 +285,32 @@ int main(int argc, char **argv)
     // Optional headless screenshot mode: `coremetrics --screenshot out.bmp`
     // renders one frame to an offscreen surface and saves it, no window needed.
     std::string screenshotPath;
+    // Optional `--duration <seconds>` cleanly exits the live UI after N
+    // seconds. Useful for backgrounded smoke tests and screenshot capture
+    // pipelines that need a guaranteed-finite run. 0 means "run forever".
+    double durationSeconds = 0.0;
     for (int i = 1; i < argc; ++i)
     {
         if (std::string(argv[i]) == "--screenshot" && i + 1 < argc)
         {
             screenshotPath = argv[i + 1];
         }
+        if (std::string(argv[i]) == "--duration" && i + 1 < argc)
+        {
+            durationSeconds = std::atof(argv[i + 1]);
+            if (durationSeconds < 0.0)
+            {
+                durationSeconds = 0.0;
+            }
+        }
         if (std::string(argv[i]) == "--sparklines")
         {
             g_sparklinesEnabled = true;
         }
     }
+
+    std::signal(SIGINT, handleShutdownSignal);
+    std::signal(SIGTERM, handleShutdownSignal);
 
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO))
     {
@@ -322,12 +339,24 @@ int main(int argc, char **argv)
             // Prime the sparklines so a single headless --screenshot frame has
             // enough history to draw a visible polyline. Without this, getSize()
             // is 1 and Sparkline::draw returns early. 30 samples at 50ms each
-            // makes the chart read as ~1.5s of recent activity in the shot.
+            // makes the chart read as ~1.5s of recent activity in the shot, and
+            // also satisfies the per-process delta requirement below.
             for (int i = 0; i < 30; ++i)
             {
                 pollMetrics();
                 SDL_Delay(50);
             }
+        }
+        else
+        {
+            // Per-process CPU% is a delta between two samples: a single
+            // pollMetrics call always reports 0.0% because there is no previous
+            // sample to diff against. Take a priming sample, sleep ~1.1s
+            // (enough that a typical process accumulates measurable ticks),
+            // then sample again before rendering. The aggregate CPU bar
+            // benefits the same way.
+            pollMetrics();
+            SDL_Delay(1100);
         }
         pollMetrics();
 
@@ -354,7 +383,25 @@ int main(int argc, char **argv)
             return -3;
         }
         shot.blitTo(out);
-        if (!SDL_SaveBMP(out, screenshotPath.c_str()))
+
+        // Pick the writer by extension so the same flag produces what the
+        // README expects (PNG hero images) without forcing callers to run an
+        // external converter step. Falls back to BMP for any other suffix.
+        auto endsWith = [](const std::string &s, const std::string &suffix)
+        {
+            return s.size() >= suffix.size()
+                   && s.compare(s.size() - suffix.size(), suffix.size(), suffix) == 0;
+        };
+        bool saved = false;
+        if (endsWith(screenshotPath, ".png") || endsWith(screenshotPath, ".PNG"))
+        {
+            saved = IMG_SavePNG(out, screenshotPath.c_str());
+        }
+        else
+        {
+            saved = SDL_SaveBMP(out, screenshotPath.c_str());
+        }
+        if (!saved)
         {
             std::cerr << "Failed to save screenshot: " << SDL_GetError() << '\n';
         }
@@ -396,11 +443,25 @@ int main(int argc, char **argv)
     pollMetrics();
 
     Uint64 lastPoll = SDL_GetTicks();
+    Uint64 startTicks = SDL_GetTicks();
+    Uint64 durationMs = (durationSeconds > 0.0)
+                            ? static_cast<Uint64>(durationSeconds * 1000.0)
+                            : 0;
     SDL_Event event;
     bool end = false;
 
     while (!end)
     {
+        if (g_shutdownRequested.load())
+        {
+            end = true;
+            break;
+        }
+        if (durationMs != 0 && SDL_GetTicks() - startTicks >= durationMs)
+        {
+            end = true;
+            break;
+        }
         while (SDL_PollEvent(&event))
         {
             switch (event.type)
