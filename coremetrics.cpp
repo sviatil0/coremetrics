@@ -6,6 +6,8 @@
 #include <iostream>
 #include <memory>
 #include <string>
+#include <unordered_map>
+#include <unordered_set>
 #include <vector>
 #include <SDL3/SDL.h>
 #include <SDL3_image/SDL_image.h>
@@ -123,6 +125,12 @@ constexpr Uint64 STATUS_FLASH_DURATION_MS = 2500;
 // usual row navigation (filter applied but no longer being edited).
 static std::string g_filterText;
 static bool g_filterInputActive = false;
+
+// Tree mode: when on, the Processes table groups parent/child pairs
+// depth-first and indents the name cell with tree connectors. Toggled
+// by 't' on the Processes tab. When off the table sorts by the active
+// column the way it has since the SAFE wave.
+static bool g_treeMode = false;
 
 static void flashStatus(const std::string &text)
 {
@@ -463,7 +471,96 @@ static void pollMetrics()
     // has enough candidates to surface meaningful matches even when the
     // user filters to a tail of the list.
     std::vector<ProcessInfo> procs = SystemMetrics::topProcesses(dataRowCount * 3);
-    std::sort(procs.begin(), procs.end(), compareProcesses);
+    // Parallel array of indent depths produced when tree mode flattens
+    // the parent/child graph; stays empty in flat mode. Same length as
+    // procs after the sort+filter+truncate pass below.
+    std::vector<int> procDepth;
+    if (g_treeMode)
+    {
+        // Build a parent -> children index. Roots are entries whose parentPid
+        // isn't itself a pid we have a record for. Children inside each
+        // bucket sort by memPct desc so the heaviest child surfaces first.
+        std::unordered_map<int, std::vector<std::size_t>> childIndices;
+        std::unordered_set<int> knownPids;
+        knownPids.reserve(procs.size());
+        for (const auto &p : procs)
+        {
+            knownPids.insert(p.pid);
+        }
+        for (std::size_t i = 0; i < procs.size(); ++i)
+        {
+            childIndices[procs[i].parentPid].push_back(i);
+        }
+        for (auto &kv : childIndices)
+        {
+            std::sort(kv.second.begin(), kv.second.end(),
+                [&procs](std::size_t a, std::size_t b) {
+                    return procs[a].memPct > procs[b].memPct;
+                });
+        }
+
+        std::vector<ProcessInfo> flat;
+        flat.reserve(procs.size());
+        procDepth.reserve(procs.size());
+
+        // Iterative DFS so we don't recurse into a kernel-thread chain that
+        // could be thousands deep on weird hosts.
+        std::vector<std::pair<std::size_t, int>> stack;
+        for (std::size_t i = 0; i < procs.size(); ++i)
+        {
+            if (knownPids.find(procs[i].parentPid) == knownPids.end())
+            {
+                stack.push_back({i, 0});
+            }
+        }
+        // Roots also sort by mem desc so the densest tree surfaces first.
+        std::sort(stack.begin(), stack.end(),
+            [&procs](const std::pair<std::size_t, int> &a,
+                     const std::pair<std::size_t, int> &b) {
+                return procs[a.first].memPct > procs[b.first].memPct;
+            });
+        std::vector<bool> emitted(procs.size(), false);
+        while (!stack.empty())
+        {
+            auto [idx, depth] = stack.back();
+            stack.pop_back();
+            if (emitted[idx])
+            {
+                continue;
+            }
+            emitted[idx] = true;
+            flat.push_back(procs[idx]);
+            procDepth.push_back(depth);
+            auto it = childIndices.find(procs[idx].pid);
+            if (it != childIndices.end())
+            {
+                // Push in reverse so the highest-mem child is popped first.
+                for (auto rit = it->second.rbegin(); rit != it->second.rend(); ++rit)
+                {
+                    if (!emitted[*rit])
+                    {
+                        stack.push_back({*rit, depth + 1});
+                    }
+                }
+            }
+        }
+        // Append any procs the DFS missed (cycles, ppid pointing at an
+        // already-emitted node, etc.) at depth 0 so the table never
+        // silently drops rows.
+        for (std::size_t i = 0; i < procs.size(); ++i)
+        {
+            if (!emitted[i])
+            {
+                flat.push_back(procs[i]);
+                procDepth.push_back(0);
+            }
+        }
+        procs = std::move(flat);
+    }
+    else
+    {
+        std::sort(procs.begin(), procs.end(), compareProcesses);
+    }
     if (!g_filterText.empty())
     {
         std::string needle;
@@ -502,9 +599,29 @@ static void pollMetrics()
         {
             const ProcessInfo &info = procs[i];
             g_visiblePids.push_back(info.pid);
+            // Tree mode: prefix the NAME cell with indent + connector so
+            // the parent/child relationship is visible. Cap depth at 6 to
+            // avoid pushing the name out of its column on a deeply nested
+            // chain (which is rare in practice).
+            std::string nameCell = info.name;
+            if (g_treeMode && i < procDepth.size())
+            {
+                int depth = procDepth[i];
+                if (depth > 6) depth = 6;
+                std::string prefix;
+                for (int d = 0; d < depth; ++d)
+                {
+                    prefix += "  ";
+                }
+                if (depth > 0)
+                {
+                    prefix += "|- ";
+                }
+                nameCell = prefix + info.name;
+            }
             std::vector<std::string> cells = {
                 std::to_string(info.pid),
-                info.name,
+                nameCell,
                 formatPct(info.cpuPct),
                 formatPct(info.memPct)
             };
@@ -1017,6 +1134,14 @@ int main(int argc, char **argv)
                     // existing text so the user can keep typing.
                     g_filterInputActive = true;
                     SDL_StartTextInput(window);
+                }
+                else if (key == SDLK_T)
+                {
+                    // 't' toggles tree mode. When the user is editing a
+                    // filter the key path was already swallowed above, so
+                    // the toggle only fires when input is idle.
+                    g_treeMode = !g_treeMode;
+                    flashStatus(g_treeMode ? "tree mode on" : "tree mode off");
                 }
                 break;
             }
