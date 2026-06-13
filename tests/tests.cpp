@@ -12,6 +12,7 @@
 #include "BarTest.hpp"
 #include "RowTest.hpp"
 #include "SystemMetricsTest.hpp"
+#include "RingBufferTest.hpp"
 #include "CloneableTest.hpp"
 
 int main(int argc, char **argv)
@@ -34,6 +35,7 @@ int main(int argc, char **argv)
 	barTestSuite();
 	rowTestSuite();
 	systemMetricsTestSuite();
+	ringBufferTestSuite();
 	cloneableTestSuite();
 
 	SDL_Quit();
