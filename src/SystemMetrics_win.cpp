@@ -90,6 +90,24 @@ std::vector<float> SystemMetrics::readLoadAverages()
     return std::vector<float>{0.0f, 0.0f, 0.0f};
 }
 
+DiskUsage SystemMetrics::readDiskUsage()
+{
+    DiskUsage out{0, 0};
+    ULARGE_INTEGER freeAvailable;
+    ULARGE_INTEGER totalBytes;
+    ULARGE_INTEGER totalFree;
+    // "C:\\" is the historical Windows root volume; on systems where C:
+    // is not the OS drive the user can still see relative space pressure
+    // on their main data volume, which is the useful signal here.
+    if (!GetDiskFreeSpaceExA("C:\\", &freeAvailable, &totalBytes, &totalFree))
+    {
+        return out;
+    }
+    out.totalKb = totalBytes.QuadPart / 1024ULL;
+    out.freeKb = freeAvailable.QuadPart / 1024ULL;
+    return out;
+}
+
 MemBreakdown SystemMetrics::readMemBreakdown()
 {
     MemBreakdown out{0, 0, 0, 0, 0};

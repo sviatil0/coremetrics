@@ -163,6 +163,11 @@ constexpr int PERCORE_GAP = 4;
 static MemBreakdown g_memBreakdown{0, 0, 0, 0, 0};
 static unsigned long long g_uptimeSeconds = 0;
 static std::vector<float> g_loadAverages;
+// Root volume capacity sampled every poll. UI shows
+// "DISK <used>/<total> GB (NN%)" with the same yellow/red threshold
+// recolor as the RAM bar so a full root volume reads as visually
+// urgent. Zero totalKb means the backend failed; the strip is hidden.
+static DiskUsage g_diskUsage{0, 0};
 constexpr int MEMSEG_X0 = 84;
 constexpr int MEMSEG_X1 = 864;
 // Sit between RAM bar bottom (y=160) and GPU bar top (y=184). 14px tall
@@ -286,6 +291,42 @@ static void renderUptimeAndLoad(Screen &dest)
     const vec3 dimColor(0.55f, 0.55f, 0.55f);
     Font::drawText(dest, formatUptime(g_uptimeSeconds), ivec2(24, 44), dimColor);
     Font::drawText(dest, formatLoadAverages(), ivec2(220, 56), dimColor);
+}
+
+static std::string formatGb(unsigned long long kb)
+{
+    // Two-digit precision: 234GB, 1.4TB-equivalent values render as 1457GB
+    // (we don't switch units at 1024 because the surrounding text is in
+    // GB, and mixed-unit readouts are harder to compare at a glance).
+    unsigned long long gb = kb / (1024ULL * 1024ULL);
+    return std::to_string(gb);
+}
+
+static void renderDiskUsage(Screen &dest)
+{
+    if (g_diskUsage.totalKb == 0)
+    {
+        return;
+    }
+    unsigned long long usedKb = (g_diskUsage.totalKb > g_diskUsage.freeKb)
+                                    ? g_diskUsage.totalKb - g_diskUsage.freeKb
+                                    : 0;
+    float pct = 100.0f * static_cast<float>(usedKb) / static_cast<float>(g_diskUsage.totalKb);
+    if (pct < 0.0f) pct = 0.0f;
+    if (pct > 100.0f) pct = 100.0f;
+
+    vec3 color(0.55f, 0.55f, 0.55f);
+    if (pct >= 80.0f) color = vec3(0.95f, 0.35f, 0.35f);
+    else if (pct >= 60.0f) color = vec3(0.95f, 0.82f, 0.40f);
+
+    std::string text = "DISK " + formatGb(usedKb) + " / "
+                       + formatGb(g_diskUsage.totalKb) + " GB ("
+                       + formatPct(pct) + "%)";
+    // Right side of the status row at y=44, mirroring the Up + Load
+    // string on the left. x=560 leaves room for a long string ("DISK
+    // 1457 / 2048 GB (71.1%)") without clipping the SOUND ON button at
+    // x=812.
+    Font::drawText(dest, text, ivec2(560, 44), color);
 }
 
 static void renderMemBreakdownStrip(Screen &dest)
@@ -444,6 +485,7 @@ static void pollMetrics()
     g_memBreakdown = SystemMetrics::readMemBreakdown();
     g_uptimeSeconds = SystemMetrics::readUptimeSeconds();
     g_loadAverages = SystemMetrics::readLoadAverages();
+    g_diskUsage = SystemMetrics::readDiskUsage();
 
     bool cpuNowAlarm = cpuPct >= ALARM_THRESHOLD;
     bool ramNowAlarm = memPct >= ALARM_THRESHOLD;
@@ -765,6 +807,7 @@ int main(int argc, char **argv)
         if (tab != "processes")
         {
             renderUptimeAndLoad(shot);
+            renderDiskUsage(shot);
             renderMemBreakdownStrip(shot);
             renderPerCoreStrip(shot);
             if (g_sparklinesEnabled)
@@ -1199,6 +1242,7 @@ int main(int argc, char **argv)
             if (systemNode != nullptr && systemNode->getData().isActive())
             {
                 renderUptimeAndLoad(screen);
+                renderDiskUsage(screen);
                 renderMemBreakdownStrip(screen);
                 renderPerCoreStrip(screen);
                 if (g_sparklinesEnabled)
