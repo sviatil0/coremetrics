@@ -176,8 +176,8 @@ constexpr int MEMSEG_X1 = 864;
 constexpr int MEMSEG_Y0 = 164;
 constexpr int MEMSEG_Y1 = 178;
 
-static ivec2 g_headerColMin[4];
-static ivec2 g_headerColMax[4];
+static ivec2 g_headerColMin[5];
+static ivec2 g_headerColMax[5];
 static ivec2 g_muteBtnMin;
 static ivec2 g_muteBtnMax;
 static ivec2 g_exitBtnMin;
@@ -201,10 +201,10 @@ static void buildScene()
     g_exitBtnMax = ivec2(944, 524);
 
     int rowY = 64;
-    std::vector<float> weights = {0.15f, 0.5f, 0.175f, 0.175f};
+    std::vector<float> weights = {0.10f, 0.42f, 0.12f, 0.12f, 0.24f};
     int headerRowWidth = 936 - 24;
     int colX = 24;
-    for (int c = 0; c < 4; ++c)
+    for (int c = 0; c < 5; ++c)
     {
         int colW = static_cast<int>(weights[c] * static_cast<float>(headerRowWidth));
         g_headerColMin[c] = ivec2(colX, rowY);
@@ -673,13 +673,14 @@ static void pollMetrics()
                 std::to_string(info.pid),
                 nameCell,
                 formatPct(info.cpuPct),
-                formatPct(info.memPct)
+                formatPct(info.memPct),
+                formatDiskIo(info.diskReadKbPerSec, info.diskWriteKbPerSec)
             };
             row->setCells(cells);
         }
         else
         {
-            row->setCells({"", "", "", ""});
+            row->setCells({"", "", "", "", ""});
         }
     }
 
@@ -984,7 +985,7 @@ int main(int argc, char **argv)
                 else
                 {
                     bool headerHit = false;
-                    for (int c = 0; c < 4; ++c)
+                    for (int c = 0; c < 5; ++c)
                     {
                         if (mx >= g_headerColMin[c].x && mx <= g_headerColMax[c].x
                             && my >= g_headerColMin[c].y && my <= g_headerColMax[c].y)
@@ -1002,7 +1003,7 @@ int main(int argc, char **argv)
                             if (g_headerRow != nullptr)
                             {
                                 const char *arrow = g_sortAscending ? " ^" : " v";
-                                std::vector<std::string> hdr = {"PID", "NAME", "CPU%", "MEM%"};
+                                std::vector<std::string> hdr = {"PID", "NAME", "CPU%", "MEM%", "DISK I/O"};
                                 hdr[clicked] += arrow;
                                 g_headerRow->setCells(hdr);
                             }

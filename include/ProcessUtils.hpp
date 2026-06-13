@@ -11,8 +11,15 @@ enum SortColumn
     SORT_PID = 0,
     SORT_NAME = 1,
     SORT_CPU = 2,
-    SORT_MEM = 3
+    SORT_MEM = 3,
+    SORT_DISK = 4
 };
+
+// Format an aggregate disk-I/O throughput (read+write summed) as a short
+// cell string: "X.X MB/s" for >= 1 MB/s, "XXX KB/s" for >= 1 KB/s,
+// otherwise an empty string so idle processes do not crowd the column.
+std::string formatDiskIo(unsigned long long readKbPerSec,
+                         unsigned long long writeKbPerSec);
 
 std::string formatPct(float value);
 
