@@ -3,6 +3,9 @@
 #if defined(__APPLE__) || defined(__linux__)
 #include <signal.h>
 #include <errno.h>
+#elif defined(_WIN32)
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
 #endif
 
 namespace SignalUtils
@@ -82,6 +85,65 @@ SendStatus send(int pid, Signal s)
     case EINVAL: return SendStatus::InvalidSignal;
     default:    return SendStatus::PermissionDenied;
     }
+#elif defined(_WIN32)
+    // Windows has no POSIX signals. Map the menu entries to the closest
+    // analogs:
+    //   TERM, KILL, INT, HUP -> TerminateProcess(handle, exitcode)
+    //   STOP                 -> DebugBreakProcess(handle) (best-effort
+    //                            "pause"; only works for processes the
+    //                            current user can attach a debugger to)
+    //   CONT                 -> rejected as Unsupported (no clean analog
+    //                            without keeping a debugger attached, which
+    //                            is well past this feature's scope)
+    if (s == Signal::Cont)
+    {
+        return SendStatus::Unsupported;
+    }
+
+    DWORD access = PROCESS_TERMINATE;
+    if (s == Signal::Stop)
+    {
+        access = PROCESS_ALL_ACCESS;
+    }
+    HANDLE h = OpenProcess(access, FALSE, static_cast<DWORD>(pid));
+    if (h == nullptr)
+    {
+        DWORD err = GetLastError();
+        if (err == ERROR_INVALID_PARAMETER)
+        {
+            return SendStatus::NoSuchProcess;
+        }
+        if (err == ERROR_ACCESS_DENIED)
+        {
+            return SendStatus::PermissionDenied;
+        }
+        return SendStatus::PermissionDenied;
+    }
+
+    BOOL ok = FALSE;
+    if (s == Signal::Stop)
+    {
+        ok = DebugBreakProcess(h);
+    }
+    else
+    {
+        // Exit code 1 mirrors what `taskkill /F /PID <pid>` uses by default
+        // so the killed process's exit reason looks the same to anything
+        // watching its handle.
+        ok = TerminateProcess(h, 1);
+    }
+    DWORD err = GetLastError();
+    CloseHandle(h);
+
+    if (ok)
+    {
+        return SendStatus::Ok;
+    }
+    if (err == ERROR_ACCESS_DENIED)
+    {
+        return SendStatus::PermissionDenied;
+    }
+    return SendStatus::PermissionDenied;
 #else
     (void)s;
     return SendStatus::Unsupported;
