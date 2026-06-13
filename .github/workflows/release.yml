@@ -144,8 +144,27 @@ jobs:
             dist/coremetrics_*.deb
           if-no-files-found: warn
 
-  release:
+  codesign-macos:
+    # Optional Developer ID codesign + notarize pass for the macOS arm64
+    # tarball. The called workflow is a no-op when the secrets are absent,
+    # so this job stays green before Apple Developer Program enrollment.
+    # Once the secrets are in place, every v* tag produces a second
+    # *-signed tarball alongside the unsigned one.
     needs: build
+    uses: ./.github/workflows/macos-codesign.yml
+    with:
+      tarball_name: coremetrics-${{ needs.build.outputs.tag || github.ref_name }}-macos-arm64.tar.gz
+      tag: ${{ needs.build.outputs.tag || github.ref_name }}
+    secrets:
+      codesign_identity_p12: ${{ secrets.MACOS_CODESIGN_IDENTITY_P12 }}
+      codesign_identity_password: ${{ secrets.MACOS_CODESIGN_IDENTITY_PASSWORD }}
+      codesign_identity_name: ${{ secrets.MACOS_CODESIGN_IDENTITY_NAME }}
+      notarization_apple_id: ${{ secrets.MACOS_NOTARIZATION_APPLE_ID }}
+      notarization_app_password: ${{ secrets.MACOS_NOTARIZATION_APP_PASSWORD }}
+      notarization_team_id: ${{ secrets.MACOS_NOTARIZATION_TEAM_ID }}
+
+  release:
+    needs: [build, codesign-macos]
     runs-on: ubuntu-latest
 
     steps:
@@ -159,6 +178,10 @@ jobs:
       - name: Flatten artifact tree
         run: |
           mkdir -p release-assets
+          # Pull every tarball (signed + unsigned) and every .deb the matrix
+          # produced. The signed tarball is optional and only present when
+          # the Developer ID secrets are configured; -true keeps find quiet
+          # when nothing matches.
           find dist -type f \( -name 'coremetrics-*.tar.gz' -o -name 'coremetrics_*.deb' \) -print -exec cp {} release-assets/ \;
           ls -la release-assets
 
