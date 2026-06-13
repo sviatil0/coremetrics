@@ -1,4 +1,7 @@
 #include <algorithm>
+#include <atomic>
+#include <csignal>
+#include <cstdlib>
 #include <fstream>
 #include <iostream>
 #include <memory>
@@ -19,6 +22,8 @@
 #include "SystemMetrics.hpp"
 #include "LayoutUtils.hpp"
 #include "ProcessUtils.hpp"
+#include "Sparkline.hpp"
+#include "AssetPath.hpp"
 
 constexpr int RESX = 960;
 constexpr int RESY = 540;
@@ -26,7 +31,7 @@ constexpr int PROCESS_ROW_HEIGHT = 20;
 constexpr Uint64 POLL_INTERVAL_MS = 500;
 
 constexpr float ALARM_THRESHOLD = 80.0f;
-constexpr const char *ALARM_SOUND_PATH = "assets/click.wav";
+static const std::string ALARM_SOUND_PATH = AssetPath::resolve("assets/click.wav");
 
 static const vec3 COLOR_ACCENT_GREEN(0.871f, 1.0f, 0.608f);
 static const vec3 COLOR_WHITE(1.0f, 1.0f, 1.0f);
@@ -57,9 +62,29 @@ static bool g_cpuAlarmActive = false;
 static bool g_ramAlarmActive = false;
 static bool g_gpuAlarmActive = false;
 
+// Set by SIGINT/SIGTERM and checked by the main loop. The main loop also
+// exits on its own once an optional --duration is exceeded; this flag covers
+// Ctrl-C from a terminal and `kill` from a parent process or CI.
+static std::atomic<bool> g_shutdownRequested{false};
+
+static void handleShutdownSignal(int)
+{
+    g_shutdownRequested.store(true);
+}
+
 static SortColumn g_sortColumn = SORT_MEM;
 static bool g_sortAscending = false;
 static Row *g_headerRow = nullptr;
+
+// Sparklines are moonshot UI: a rolling time-series chart per metric drawn
+// over the System tab's lower half. Behind a flag (--sparklines) so the
+// default install matches the audit baseline; with the flag the System tab
+// gains 3 live polylines fed by RingBuffer<float> samples.
+static bool g_sparklinesEnabled = false;
+constexpr std::size_t SPARKLINE_CAPACITY = 64;
+static Sparkline *g_cpuSparkline = nullptr;
+static Sparkline *g_ramSparkline = nullptr;
+static Sparkline *g_gpuSparkline = nullptr;
 static ivec2 g_headerColMin[4];
 static ivec2 g_headerColMax[4];
 static ivec2 g_muteBtnMin;
@@ -69,25 +94,14 @@ static ivec2 g_exitBtnMax;
 
 static bool compareProcesses(const ProcessInfo &a, const ProcessInfo &b)
 {
-    switch (g_sortColumn)
-    {
-    case SORT_PID:
-        return g_sortAscending ? (a.pid < b.pid) : (a.pid > b.pid);
-    case SORT_NAME:
-        return g_sortAscending ? (a.name < b.name) : (a.name > b.name);
-    case SORT_CPU:
-        return g_sortAscending ? (a.cpuPct < b.cpuPct) : (a.cpuPct > b.cpuPct);
-    case SORT_MEM:
-        return g_sortAscending ? (a.memPct < b.memPct) : (a.memPct > b.memPct);
-    }
-    return false;
+    return compareProcessByColumn(a, b, g_sortColumn, g_sortAscending);
 }
 
 static void buildScene()
 {
     LayoutManager &manager = LayoutManager::getInstance();
     GUIFile g;
-    g.readFile("base.xml", manager);
+    g.readFile(AssetPath::resolve("base.xml"), manager);
 
     g_muteBtnMin = ivec2(812, 8);
     g_muteBtnMax = ivec2(952, 40);
@@ -138,6 +152,31 @@ static void cacheElementPointers()
     }
 }
 
+static void buildSparklines()
+{
+    // Stacked sparklines in the System tab's empty lower half. Each row spans
+    // the same horizontal range as the bars above (x in [24, 864]) and
+    // matches the same accent color, so the polyline reads as a continuation
+    // of its bar. Heights are 56px / row with 12px gaps.
+    const vec3 accent(0.871f, 1.0f, 0.608f);
+    g_cpuSparkline = new Sparkline(ivec2(24, 240), ivec2(864, 296), accent,
+                                   0.0f, 100.0f, SPARKLINE_CAPACITY);
+    g_ramSparkline = new Sparkline(ivec2(24, 308), ivec2(864, 364), accent,
+                                   0.0f, 100.0f, SPARKLINE_CAPACITY);
+    g_gpuSparkline = new Sparkline(ivec2(24, 376), ivec2(864, 432), accent,
+                                   0.0f, 100.0f, SPARKLINE_CAPACITY);
+}
+
+static void destroySparklines()
+{
+    delete g_cpuSparkline;
+    delete g_ramSparkline;
+    delete g_gpuSparkline;
+    g_cpuSparkline = nullptr;
+    g_ramSparkline = nullptr;
+    g_gpuSparkline = nullptr;
+}
+
 static void pollMetrics()
 {
     float cpuPct = SystemMetrics::readCpuPercent();
@@ -167,6 +206,19 @@ static void pollMetrics()
     if (g_gpuReadout != nullptr)
     {
         g_gpuReadout->setText(formatPct(gpuPct) + "%");
+    }
+
+    if (g_cpuSparkline != nullptr)
+    {
+        g_cpuSparkline->push(cpuPct);
+    }
+    if (g_ramSparkline != nullptr)
+    {
+        g_ramSparkline->push(memPct);
+    }
+    if (g_gpuSparkline != nullptr)
+    {
+        g_gpuSparkline->push(gpuPct);
     }
 
     bool cpuNowAlarm = cpuPct >= ALARM_THRESHOLD;
@@ -234,13 +286,32 @@ int main(int argc, char **argv)
     // Optional headless screenshot mode: `coremetrics --screenshot out.bmp`
     // renders one frame to an offscreen surface and saves it, no window needed.
     std::string screenshotPath;
+    // Optional `--duration <seconds>` cleanly exits the live UI after N
+    // seconds. Useful for backgrounded smoke tests and screenshot capture
+    // pipelines that need a guaranteed-finite run. 0 means "run forever".
+    double durationSeconds = 0.0;
     for (int i = 1; i < argc; ++i)
     {
         if (std::string(argv[i]) == "--screenshot" && i + 1 < argc)
         {
             screenshotPath = argv[i + 1];
         }
+        if (std::string(argv[i]) == "--duration" && i + 1 < argc)
+        {
+            durationSeconds = std::atof(argv[i + 1]);
+            if (durationSeconds < 0.0)
+            {
+                durationSeconds = 0.0;
+            }
+        }
+        if (std::string(argv[i]) == "--sparklines")
+        {
+            g_sparklinesEnabled = true;
+        }
     }
+
+    std::signal(SIGINT, handleShutdownSignal);
+    std::signal(SIGTERM, handleShutdownSignal);
 
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO))
     {
@@ -263,6 +334,30 @@ int main(int argc, char **argv)
         Screen shot(RESX, RESY);
         buildScene();
         cacheElementPointers();
+        if (g_sparklinesEnabled)
+        {
+            buildSparklines();
+            // Prime the sparklines so a single headless --screenshot frame has
+            // enough history to draw a visible polyline. 64 samples at 50ms
+            // each (~3.2s) fills the rolling window exactly and also gives the
+            // per-process CPU% delta a wide enough sampling window that idle
+            // processes still register measurable ticks.
+            for (std::size_t i = 0; i < SPARKLINE_CAPACITY; ++i)
+            {
+                pollMetrics();
+                SDL_Delay(50);
+            }
+        }
+        else
+        {
+            // Per-process CPU% is a delta between two samples. 1.1s was too
+            // tight: many processes accumulate sub-tick activity in that
+            // window and round to 0.0% in the shot. 3s captures everything
+            // that is doing real work without making the screenshot path
+            // feel sluggish.
+            pollMetrics();
+            SDL_Delay(3000);
+        }
         pollMetrics();
 
         if (tab == "processes")
@@ -274,6 +369,12 @@ int main(int argc, char **argv)
 
         shot.clear();
         LayoutManager::getInstance().render(shot, ivec2(0, 0), ivec2(RESX - 1, RESY - 1));
+        if (g_sparklinesEnabled && tab != "processes")
+        {
+            if (g_cpuSparkline != nullptr) g_cpuSparkline->draw(shot);
+            if (g_ramSparkline != nullptr) g_ramSparkline->draw(shot);
+            if (g_gpuSparkline != nullptr) g_gpuSparkline->draw(shot);
+        }
         SDL_Surface *out = SDL_CreateSurface(RESX, RESY, SDL_PIXELFORMAT_RGBA32);
         if (out == nullptr)
         {
@@ -282,7 +383,25 @@ int main(int argc, char **argv)
             return -3;
         }
         shot.blitTo(out);
-        if (!SDL_SaveBMP(out, screenshotPath.c_str()))
+
+        // Pick the writer by extension so the same flag produces what the
+        // README expects (PNG hero images) without forcing callers to run an
+        // external converter step. Falls back to BMP for any other suffix.
+        auto endsWith = [](const std::string &s, const std::string &suffix)
+        {
+            return s.size() >= suffix.size()
+                   && s.compare(s.size() - suffix.size(), suffix.size(), suffix) == 0;
+        };
+        bool saved = false;
+        if (endsWith(screenshotPath, ".png") || endsWith(screenshotPath, ".PNG"))
+        {
+            saved = IMG_SavePNG(out, screenshotPath.c_str());
+        }
+        else
+        {
+            saved = SDL_SaveBMP(out, screenshotPath.c_str());
+        }
+        if (!saved)
         {
             std::cerr << "Failed to save screenshot: " << SDL_GetError() << '\n';
         }
@@ -306,7 +425,7 @@ int main(int argc, char **argv)
     SDL_SetWindowMinimumSize(window, RESX / 2, RESY / 2);
     SDL_SetWindowMaximumSize(window, RESX * 3, RESY * 3);
 
-    SDL_Surface *iconSurface = IMG_Load("assets/logo.png");
+    SDL_Surface *iconSurface = IMG_Load(AssetPath::resolve("assets/logo.png").c_str());
     if (iconSurface != nullptr)
     {
         SDL_SetWindowIcon(window, iconSurface);
@@ -317,14 +436,32 @@ int main(int argc, char **argv)
 
     buildScene();
     cacheElementPointers();
+    if (g_sparklinesEnabled)
+    {
+        buildSparklines();
+    }
     pollMetrics();
 
     Uint64 lastPoll = SDL_GetTicks();
+    Uint64 startTicks = SDL_GetTicks();
+    Uint64 durationMs = (durationSeconds > 0.0)
+                            ? static_cast<Uint64>(durationSeconds * 1000.0)
+                            : 0;
     SDL_Event event;
     bool end = false;
 
     while (!end)
     {
+        if (g_shutdownRequested.load())
+        {
+            end = true;
+            break;
+        }
+        if (durationMs != 0 && SDL_GetTicks() - startTicks >= durationMs)
+        {
+            end = true;
+            break;
+        }
         while (SDL_PollEvent(&event))
         {
             switch (event.type)
@@ -444,10 +581,25 @@ int main(int argc, char **argv)
 
         screen.clear();
         LayoutManager::getInstance().render(screen, ivec2(0, 0), ivec2(RESX - 1, RESY - 1));
+        if (g_sparklinesEnabled)
+        {
+            // Only paint sparklines while the System tab is the active layout;
+            // when the user is on Processes the rows already occupy the same
+            // pixel range, so a sparkline would overdraw the table.
+            Tree<Layout> *systemNode = EventManager::findLayoutByName(
+                LayoutManager::getInstance().getRoot(), "system");
+            if (systemNode != nullptr && systemNode->getData().isActive())
+            {
+                if (g_cpuSparkline != nullptr) g_cpuSparkline->draw(screen);
+                if (g_ramSparkline != nullptr) g_ramSparkline->draw(screen);
+                if (g_gpuSparkline != nullptr) g_gpuSparkline->draw(screen);
+            }
+        }
         screen.blitTo(SDL_GetWindowSurface(window));
         SDL_UpdateWindowSurface(window);
     }
 
+    destroySparklines();
     SoundPlayer::getInstance().shutdown();
     Font::shutdown();
     SDL_DestroyWindow(window);

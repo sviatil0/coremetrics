@@ -11,15 +11,17 @@
 [![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Linux-informational)](#architecture)
 [![License: LGPL-2.1](https://img.shields.io/badge/License-LGPL--2.1-blue.svg)](LICENSE)
 [![C/C++ CI](https://github.com/sviatil0/coremetrics/actions/workflows/c-cpp.yml/badge.svg?branch=main)](https://github.com/sviatil0/coremetrics/actions/workflows/c-cpp.yml)
+[![Stefan's code](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fsviatil0%2Fcoremetrics%2Fmain%2F.github%2Fbadges%2Fcontribution.json)](#team-and-my-contribution)
+[![Latest release](https://img.shields.io/github/v/release/sviatil0/coremetrics?label=release)](https://github.com/sviatil0/coremetrics/releases/latest)
 
 </div>
 
 | System tab | Processes tab |
 |:---:|:---:|
 | ![System tab](assets/screenshot-system.png) | ![Processes tab](assets/screenshot-processes.png) |
-| CPU / RAM / GPU bars, load-colored (RAM red past 80%) | Sortable PID / NAME / CPU% / MEM% table |
+| CPU / RAM / GPU bars, load-colored (RAM red past 80%), plus rolling sparklines under `--sparklines` | Sortable PID / NAME / CPU% / MEM% table |
 
-> Both frames are rendered by the app itself, headlessly: `coremetrics --screenshot out.bmp [system|processes]` runs one render pass to an offscreen surface and saves it, no window required.
+> Both frames are rendered by the app itself, headlessly: `coremetrics --screenshot out.png [system|processes]` runs one render pass to an offscreen surface and saves it, no window required. The extension picks the writer (`.png` via `IMG_SavePNG`, anything else via `SDL_SaveBMP`).
 
 New here? [**DOCS.md**](DOCS.md) maps the whole repo; [**API.md**](API.md) is the full public library reference (every class and method).
 
@@ -34,11 +36,34 @@ CoreMetrics is two things in one repo: a small **GUI toolkit written directly on
 - **Event-driven, no scene rebuilds.** Clicks trickle top-down through the layout tree; tab switches drain as paired show/hide events in a single pass; metrics mutate widgets in place every 500 ms.
 - **Modern C++ on purpose.** A `Cloneable<Derived>` CRTP mixin gives every widget a covariant `clone()` for free; ownership flows through `unique_ptr`; the layout tree is a generic `Tree<T>`.
 - **Parallel fills.** Wide `drawBox` / `drawTriangle` operations partition pixel rows across a `ThreadPool` and join on `std::future`s per frame (a teammate's work; see the contribution table).
-- **175 unit tests across 13 suites** and a Linux + macOS GitHub Actions matrix.
+- **214 unit tests across 16 suites** and a Linux + macOS GitHub Actions matrix, plus a non-blocking AddressSanitizer + UndefinedBehaviorSanitizer leg (`make asan`, `make ubsan`).
 
-> This is a 4-person team project, and I was the lead and primary author: **~72% of the source by line** (git-blame verified, 5,034 of 7,001). See [Team and my contribution](#team-and-my-contribution) for the per-file breakdown.
+> This is a 4-person team project, and I was the lead and primary author. The "Stefan's code" badge at the top is computed by a CI job that runs `git blame -w -C -M` across `src/`, `include/`, `bench/`, and `coremetrics.cpp` on every push to `main`, so the percentage is always current and never hand-typed. See [Team and my contribution](#team-and-my-contribution) for the per-file breakdown, and `scripts/compute-contributions.sh` for the exact logic.
 
-## Quickstart
+## Install (prebuilt)
+
+No build toolchain required.
+
+```bash
+# macOS (Homebrew, Apple Silicon)
+brew tap sviatil0/coremetrics
+brew trust sviatil0/coremetrics   # one-time: Homebrew requires explicit trust for third-party taps
+brew install coremetrics
+
+# Debian / Ubuntu
+curl -L https://github.com/sviatil0/coremetrics/releases/latest/download/coremetrics_amd64.deb -o /tmp/coremetrics.deb
+sudo apt install /tmp/coremetrics.deb
+
+# Any platform (tarball)
+curl -LO https://github.com/sviatil0/coremetrics/releases/latest/download/coremetrics-<version>-<platform>.tar.gz
+tar xf coremetrics-<version>-<platform>.tar.gz
+cd coremetrics-<version>-<platform>
+./coremetrics
+```
+
+The Homebrew formula pulls SDL3 + SDL3_ttf + SDL3_image as dependencies. The `.deb` declares the equivalent apt dependencies. The tarball assumes SDL3 is already installed.
+
+## Quickstart (from source)
 
 Requires a **C++23 compiler** (g++ 13+ or clang 16+), GNU Make, and **SDL3 + SDL3_ttf + SDL3_image**.
 
@@ -58,7 +83,10 @@ make                 # builds bin/coremetrics and launches it
 ./stress.sh          # 30s of CPU + RAM load; bars cross yellow/red thresholds
 
 # (optional) render a frame headlessly, no window needed
-./bin/coremetrics --screenshot shot.bmp
+./bin/coremetrics --screenshot shot.png             # System tab
+./bin/coremetrics --screenshot shot.png processes   # Processes tab
+./bin/coremetrics --sparklines                      # adds rolling CPU/RAM/GPU charts
+./bin/coremetrics --duration 5                      # auto-quit after 5s (for CI smoke tests)
 ```
 
 <details>
