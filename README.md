@@ -6,10 +6,19 @@ Windows) with templated vector math, a Bresenham rasterizer, an event-driven GUI
 layer, and a thread-pool that parallelizes wide fills.
 
 **Team project (Notre Dame CSE 40232, Software Engineering, Spring 2026).** Built by a
-four-person team; I was the lead and majority contributor (the git history shows my
-commits as the plurality of the ~200 total). Teammates: Alicia Melotik, mcastel5;
-instructor: Prof. Daniel Rehberg. Released publicly with the team's and instructor's
-consent under LGPL-2.1.
+four-person team over three months. I was the lead and primary author: `git blame`
+across the source attributes roughly 72% of the surviving lines (about 4,900 of 6,900)
+to me, including the graphics core (vector math, the `Screen` rasterizer, the thread
+pool), the event system, and the system-metrics layer. Teammates: Alicia Melotik and
+mcastel5; instructor: Prof. Daniel Rehberg. Released publicly with the team's and
+instructor's consent under LGPL-2.1.
+
+Verify authorship yourself:
+
+```sh
+git ls-files '*.cpp' '*.hpp' '*.h' | while read f; do
+  git blame --line-porcelain "$f"; done | grep '^author ' | sort | uniq -c | sort -rn
+```
 
 ## Class Diagram
 
