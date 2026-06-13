@@ -1,6 +1,7 @@
 #ifdef __linux__
 
 #include "SystemMetrics.hpp"
+#include "ProcParsers.hpp"
 #include "ProcessUtils.hpp"
 #include <algorithm>
 #include <cstdlib>
@@ -19,33 +20,21 @@ static unsigned long long g_lastIdle = 0;
 static std::map<int, unsigned long long> g_lastProcTicks;
 static unsigned long long g_lastProcSampleTotal = 0;
 
-static bool readProcStatTotals(unsigned long long &total, unsigned long long &idle)
+static std::string slurpFile(const std::string &path)
 {
-    std::ifstream file("/proc/stat");
+    std::ifstream file(path);
     if (!file.is_open())
     {
-        return false;
+        return "";
     }
-    std::string label;
-    file >> label;
-    if (label != "cpu")
-    {
-        return false;
-    }
+    std::ostringstream buffer;
+    buffer << file.rdbuf();
+    return buffer.str();
+}
 
-    unsigned long long user = 0;
-    unsigned long long nice = 0;
-    unsigned long long system = 0;
-    unsigned long long idleVal = 0;
-    unsigned long long iowait = 0;
-    unsigned long long irq = 0;
-    unsigned long long softirq = 0;
-    unsigned long long steal = 0;
-    file >> user >> nice >> system >> idleVal >> iowait >> irq >> softirq >> steal;
-
-    idle = idleVal + iowait;
-    total = user + nice + system + idle + irq + softirq + steal;
-    return true;
+static bool readProcStatTotals(unsigned long long &total, unsigned long long &idle)
+{
+    return ProcParsers::parseProcStat(slurpFile("/proc/stat"), total, idle);
 }
 
 static bool isPidDir(const std::string &name)
@@ -68,68 +57,34 @@ static std::string readProcComm(int pid)
 {
     std::ostringstream path;
     path << "/proc/" << pid << "/comm";
-    std::ifstream file(path.str());
-    if (!file.is_open())
+    std::string content = slurpFile(path.str());
+    if (content.empty())
     {
         return "";
     }
-    std::string name;
-    std::getline(file, name);
-    return name;
+    if (!content.empty() && content.back() == '\n')
+    {
+        content.pop_back();
+    }
+    return content;
 }
 
 static unsigned long long readProcCpuTicks(int pid)
 {
     std::ostringstream path;
     path << "/proc/" << pid << "/stat";
-    std::ifstream file(path.str());
-    if (!file.is_open())
-    {
-        return 0;
-    }
-    std::string content;
-    std::getline(file, content);
-    std::size_t rparen = content.rfind(')');
-    if (rparen == std::string::npos)
-    {
-        return 0;
-    }
-    std::istringstream iss(content.substr(rparen + 1));
-    std::string token;
-    for (int i = 0; i < 12; ++i)
-    {
-        if (!(iss >> token))
-        {
-            return 0;
-        }
-    }
-    unsigned long long utime = 0;
-    unsigned long long stime = 0;
-    iss >> utime >> stime;
-    return utime + stime;
+    unsigned long long ticks = 0;
+    ProcParsers::parseProcPidStatCpuTicks(slurpFile(path.str()), ticks);
+    return ticks;
 }
 
 static unsigned long long readProcMemKb(int pid)
 {
     std::ostringstream path;
     path << "/proc/" << pid << "/status";
-    std::ifstream file(path.str());
-    if (!file.is_open())
-    {
-        return 0;
-    }
-    std::string line;
-    while (std::getline(file, line))
-    {
-        if (line.rfind("VmRSS:", 0) == 0)
-        {
-            std::istringstream iss(line.substr(6));
-            unsigned long long kb = 0;
-            iss >> kb;
-            return kb;
-        }
-    }
-    return 0;
+    unsigned long long kb = 0;
+    ProcParsers::parseProcStatusVmRssKb(slurpFile(path.str()), kb);
+    return kb;
 }
 
 float SystemMetrics::readCpuPercent()
