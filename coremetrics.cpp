@@ -467,10 +467,13 @@ static void pollMetrics()
     }
 
     std::size_t dataRowCount = g_processRows.size() - 1;
-    // Over-fetch by 3x dataRowCount so the case-insensitive substring filter
-    // has enough candidates to surface meaningful matches even when the
-    // user filters to a tail of the list.
-    std::vector<ProcessInfo> procs = SystemMetrics::topProcesses(dataRowCount * 3);
+    // Tree mode walks the parent/child graph; if parents fall outside the
+    // top-N memory window the chain breaks and most rows render at depth 0,
+    // so we fetch a much larger sample when tree mode is on. Flat mode's
+    // 3x over-fetch is enough for the substring filter alone.
+    std::size_t fetchN = g_treeMode ? std::max<std::size_t>(500, dataRowCount * 30)
+                                    : dataRowCount * 3;
+    std::vector<ProcessInfo> procs = SystemMetrics::topProcesses(fetchN);
     // Parallel array of indent depths produced when tree mode flattens
     // the parent/child graph; stays empty in flat mode. Same length as
     // procs after the sort+filter+truncate pass below.
