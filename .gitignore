@@ -7,3 +7,4 @@ uml/*.png
 a.out
 build_warnings.txt
 *.bmp
+OVERNIGHT_BUILD_SPEC.md
