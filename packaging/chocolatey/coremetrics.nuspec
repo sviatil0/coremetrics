@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
+  <metadata>
+    <id>coremetrics</id>
+    <version>0.1.1</version>
+    <title>CoreMetrics</title>
+    <authors>Sviatoslav Oleksiienko</authors>
+    <owners>sviatil0</owners>
+    <licenseUrl>https://raw.githubusercontent.com/sviatil0/coremetrics/main/LICENSE</licenseUrl>
+    <projectUrl>https://github.com/sviatil0/coremetrics</projectUrl>
+    <iconUrl>https://raw.githubusercontent.com/sviatil0/coremetrics/main/assets/logo.png</iconUrl>
+    <projectSourceUrl>https://github.com/sviatil0/coremetrics</projectSourceUrl>
+    <bugTrackerUrl>https://github.com/sviatil0/coremetrics/issues</bugTrackerUrl>
+    <docsUrl>https://github.com/sviatil0/coremetrics/blob/main/README.md</docsUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <summary>Cross-platform desktop system metrics monitor (CPU / RAM / GPU / processes)</summary>
+    <description>
+CoreMetrics is a small C++23 system monitor built directly on raw SDL3 pixel surfaces.
+It shows live CPU, RAM, GPU, and per-process resource usage with an optional rolling
+sparklines view and an htop-style kill flow on the Processes tab.
+
+No Qt, no Electron, no JavaScript runtime. Every widget is hand-rasterized by code in
+the upstream repository. Three native metrics backends (Linux /proc, macOS Mach + IOKit,
+Windows PDH) are selected at compile time so the same source tree builds the same UI
+on each platform.
+    </description>
+    <releaseNotes>https://github.com/sviatil0/coremetrics/releases/tag/v0.1.1</releaseNotes>
+    <tags>system monitor cpu ram gpu process htop sdl3 native cross-platform</tags>
+  </metadata>
+  <files>
+    <file src="tools\**" target="tools" />
+  </files>
+</package>
