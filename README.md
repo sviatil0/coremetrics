@@ -211,8 +211,11 @@ Per-package class diagrams (PlantUML): [Core](assets/core.png) · [GUI](assets/g
 
 `coremetrics.cpp` builds a two-tab system monitor on the GUI library:
 
-- **System tab:** CPU and RAM bars with live numeric readouts. Bars recolor yellow above 60% and red above 80% to flag load at a glance.
-- **Processes tab:** a header row plus configurable data rows listing PID / NAME / CPU% / MEM%, sorted by memory usage.
+- **System tab:** CPU / RAM / GPU bars with live numeric readouts; bars recolor yellow above 60% and red above 80%. Uptime, 1/5/15-minute load average, per-logical-CPU strip, htop-style active / wired / cached / free memory breakdown segments. Optional CPU / RAM / GPU sparklines (`--sparklines`).
+- **Processes tab:** PID / NAME / CPU% / MEM% rows, sorted by memory by default. htop-style controls:
+  - `/` to filter by case-insensitive name substring, `Esc` to clear
+  - `t` to toggle parent/child tree view (or `--tree` on the command line)
+  - click a row to select, `Up`/`Down` to move selection, `k` to open the signal menu (TERM / KILL / INT / HUP / STOP / CONT), `Y`/`Enter` to confirm, `N`/`Esc` to cancel
 
 Tab switching is event-driven: each tab button emits a hide event for the other tab and a show event for its own, both drained in one `processEvents` pass so the switch is atomic. Metrics refresh every 500 ms; the main loop walks the layout tree and mutates bars, rows, and labels in place rather than rebuilding the scene.
 
