@@ -303,7 +303,7 @@ static void renderUptimeAndLoad(Screen &dest)
 {
     // Dim white for the labels, accent green so it reads as a status row.
     const vec3 dimColor(0.55f, 0.55f, 0.55f);
-    Font::drawText(dest, formatUptime(g_uptimeSeconds), ivec2(24, 56), dimColor);
+    Font::drawText(dest, formatUptime(g_uptimeSeconds), ivec2(24, 44), dimColor);
     Font::drawText(dest, formatLoadAverages(), ivec2(220, 56), dimColor);
 }
 
@@ -678,6 +678,20 @@ int main(int argc, char **argv)
         {
             g_sparklinesEnabled = true;
         }
+        // --tree opens the Processes tab in parent/child indented hierarchy
+        // mode, same as pressing 't' on that tab interactively. Lets the
+        // screenshot pipeline capture tree mode without simulating keystrokes.
+        if (std::string(argv[i]) == "--tree")
+        {
+            g_treeMode = true;
+        }
+        // --filter <substring> seeds the Processes-tab name filter so the
+        // screenshot pipeline can demonstrate search. Case-insensitive
+        // substring match against process names, applied during pollMetrics.
+        if (std::string(argv[i]) == "--filter" && i + 1 < argc)
+        {
+            g_filterText = argv[i + 1];
+        }
     }
 
     std::signal(SIGINT, handleShutdownSignal);
@@ -750,6 +764,13 @@ int main(int argc, char **argv)
                 if (g_ramSparkline != nullptr) g_ramSparkline->draw(shot);
                 if (g_gpuSparkline != nullptr) g_gpuSparkline->draw(shot);
             }
+        }
+        else if (!g_filterText.empty())
+        {
+            const vec3 labelColor(0.871f, 1.0f, 0.608f);
+            const vec3 textColor(1.0f, 1.0f, 1.0f);
+            Font::drawText(shot, "filter: ", ivec2(24, 44), labelColor);
+            Font::drawText(shot, g_filterText, ivec2(120, 44), textColor);
         }
         SDL_Surface *out = SDL_CreateSurface(RESX, RESY, SDL_PIXELFORMAT_RGBA32);
         if (out == nullptr)
@@ -1197,11 +1218,11 @@ int main(int argc, char **argv)
             {
                 body += "_";
             }
-            Font::drawText(screen, prefix, ivec2(24, 56), labelColor);
-            Font::drawText(screen, body, ivec2(120, 56), textColor);
+            Font::drawText(screen, prefix, ivec2(24, 44), labelColor);
+            Font::drawText(screen, body, ivec2(120, 44), textColor);
             if (!g_filterInputActive && !g_filterText.empty())
             {
-                Font::drawText(screen, "Esc clears", ivec2(800, 56), hintColor);
+                Font::drawText(screen, "Esc clears", ivec2(800, 44), hintColor);
             }
         }
 
