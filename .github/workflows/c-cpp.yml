@@ -84,12 +84,18 @@ jobs:
       env:
         SDL_VIDEO_DRIVER: dummy
       run: |
-        which pkg-config || pacman -S --noconfirm mingw-w64-x86_64-pkgconf || true
-        echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH"
-        pkg-config --cflags sdl3 sdl3-ttf sdl3-image || true
+        # Bypass pkg-config on Windows: the setup-sdl action sets
+        # SDL3_ROOT / SDL3_ttf_ROOT / SDL3_image_ROOT, and using those
+        # directly avoids the Windows-vs-MSYS path translation that left
+        # the prior pkg-config based CXXFLAGS empty (so g++ never saw
+        # the SDL3 include directory and the build failed at
+        # screen.hpp's #include <SDL3/SDL.h>).
+        SDL_CFLAGS="-I${SDL3_ROOT}/include -I${SDL3_ttf_ROOT}/include -I${SDL3_image_ROOT}/include"
+        SDL_LIBS="-L${SDL3_ROOT}/lib -L${SDL3_ttf_ROOT}/lib -L${SDL3_image_ROOT}/lib -lSDL3 -lSDL3_ttf -lSDL3_image"
+        echo "Resolved SDL_CFLAGS: $SDL_CFLAGS"
         make CXX=g++ \
-             CXXFLAGS="-std=c++23 -Wall -I ./include $(pkg-config --cflags sdl3 sdl3-ttf sdl3-image)" \
-             LDFLAGS="$(pkg-config --libs sdl3 sdl3-ttf sdl3-image)" \
+             CXXFLAGS="-std=c++23 -Wall -I ./include $SDL_CFLAGS" \
+             LDFLAGS="$SDL_LIBS" \
              test
 
   sanitizers:
