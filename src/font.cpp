@@ -1,4 +1,5 @@
 #include "font.hpp"
+#include "AssetPath.hpp"
 #include <SDL3_ttf/SDL_ttf.h>
 #include <iostream>
 
@@ -26,10 +27,11 @@ static TTF_Font *ensureFont()
         std::cerr << "TTF_Init failed: " << SDL_GetError() << '\n';
         return nullptr;
     }
-    g_font = TTF_OpenFont(DEFAULT_FONT_PATH, DEFAULT_FONT_SIZE);
+    std::string resolved = AssetPath::resolve(DEFAULT_FONT_PATH);
+    g_font = TTF_OpenFont(resolved.c_str(), DEFAULT_FONT_SIZE);
     if (g_font == nullptr)
     {
-        std::cerr << "TTF_OpenFont failed for " << DEFAULT_FONT_PATH << ": " << SDL_GetError() << '\n';
+        std::cerr << "TTF_OpenFont failed for " << resolved << ": " << SDL_GetError() << '\n';
         return nullptr;
     }
     // Hinting LIGHT keeps Roboto's stems straight on a dark background without

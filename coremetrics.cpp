@@ -23,6 +23,7 @@
 #include "LayoutUtils.hpp"
 #include "ProcessUtils.hpp"
 #include "Sparkline.hpp"
+#include "AssetPath.hpp"
 
 constexpr int RESX = 960;
 constexpr int RESY = 540;
@@ -30,7 +31,7 @@ constexpr int PROCESS_ROW_HEIGHT = 20;
 constexpr Uint64 POLL_INTERVAL_MS = 500;
 
 constexpr float ALARM_THRESHOLD = 80.0f;
-constexpr const char *ALARM_SOUND_PATH = "assets/click.wav";
+static const std::string ALARM_SOUND_PATH = AssetPath::resolve("assets/click.wav");
 
 static const vec3 COLOR_ACCENT_GREEN(0.871f, 1.0f, 0.608f);
 static const vec3 COLOR_WHITE(1.0f, 1.0f, 1.0f);
@@ -100,7 +101,7 @@ static void buildScene()
 {
     LayoutManager &manager = LayoutManager::getInstance();
     GUIFile g;
-    g.readFile("base.xml", manager);
+    g.readFile(AssetPath::resolve("base.xml"), manager);
 
     g_muteBtnMin = ivec2(812, 8);
     g_muteBtnMax = ivec2(952, 40);
@@ -424,7 +425,7 @@ int main(int argc, char **argv)
     SDL_SetWindowMinimumSize(window, RESX / 2, RESY / 2);
     SDL_SetWindowMaximumSize(window, RESX * 3, RESY * 3);
 
-    SDL_Surface *iconSurface = IMG_Load("assets/logo.png");
+    SDL_Surface *iconSurface = IMG_Load(AssetPath::resolve("assets/logo.png").c_str());
     if (iconSurface != nullptr)
     {
         SDL_SetWindowIcon(window, iconSurface);
