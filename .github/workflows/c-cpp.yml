@@ -96,15 +96,25 @@ jobs:
         # no extra -L is needed; naming the libs by short name is enough.
         SDL_LIBS="-L${SDL3_ROOT}/lib -L${SDL3_ttf_ROOT}/lib -L${SDL3_image_ROOT}/lib -lSDL3 -lSDL3_ttf -lSDL3_image -lpdh -lpsapi"
         echo "Resolved SDL_CFLAGS: $SDL_CFLAGS"
-        # SDL3 dlls live next to the .lib in setupsdl's package/lib but
-        # the dynamic loader searches PATH, not LDFLAGS' -L. Put the
-        # three lib directories on PATH so ./bin/tests can resolve
-        # SDL3.dll / SDL3_ttf.dll / SDL3_image.dll at startup.
-        export PATH="${SDL3_ROOT}/lib:${SDL3_ttf_ROOT}/lib:${SDL3_image_ROOT}/lib:${SDL3_ROOT}/bin:${SDL3_ttf_ROOT}/bin:${SDL3_image_ROOT}/bin:$PATH"
+        # Build first (without running tests), then copy the SDL3 DLLs
+        # next to bin/tests so the Windows dynamic loader can find them
+        # (-L only helps the linker; runtime uses PATH and the exe
+        # directory). The setup-sdl layout has dlls in bin/ in some
+        # versions and lib/ in others; search both.
+        mkdir -p bin
         make CXX=g++ \
              CXXFLAGS="-std=c++23 -Wall -I ./include $SDL_CFLAGS" \
              LDFLAGS="$SDL_LIBS" \
-             test
+             bin/tests
+        for dir in "${SDL3_ROOT}" "${SDL3_ttf_ROOT}" "${SDL3_image_ROOT}"; do
+          for sub in bin lib; do
+            for dll in "$dir/$sub"/SDL3*.dll; do
+              [ -f "$dll" ] && cp -v "$dll" bin/ || true
+            done
+          done
+        done
+        ls -la bin/
+        ./bin/tests
 
   sanitizers:
     # Re-run the test suite under AddressSanitizer and UndefinedBehaviorSanitizer
