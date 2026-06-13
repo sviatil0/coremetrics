@@ -114,7 +114,13 @@ jobs:
           done
         done
         ls -la bin/
-        ./bin/tests
+        # Windows binaries have a .exe suffix; bin/tests on disk is
+        # actually bin/tests.exe.
+        if [ -f bin/tests.exe ]; then
+          ./bin/tests.exe
+        else
+          ./bin/tests
+        fi
 
   sanitizers:
     # Re-run the test suite under AddressSanitizer and UndefinedBehaviorSanitizer
