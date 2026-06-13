@@ -145,6 +145,8 @@ constexpr int PERCORE_GAP = 4;
 // at the same horizontal extent so they read as a continuation. htop
 // colors: active = red, wired = orange, cached = blue, free = dark.
 static MemBreakdown g_memBreakdown{0, 0, 0, 0, 0};
+static unsigned long long g_uptimeSeconds = 0;
+static std::vector<float> g_loadAverages;
 constexpr int MEMSEG_X0 = 84;
 constexpr int MEMSEG_X1 = 864;
 // Sit between RAM bar bottom (y=160) and GPU bar top (y=184). 14px tall
@@ -243,6 +245,50 @@ static void destroySparklines()
     g_cpuSparkline = nullptr;
     g_ramSparkline = nullptr;
     g_gpuSparkline = nullptr;
+}
+
+static std::string formatUptime(unsigned long long secs)
+{
+    if (secs == 0)
+    {
+        return "Up --";
+    }
+    unsigned long long days = secs / 86400;
+    secs %= 86400;
+    unsigned long long hrs = secs / 3600;
+    secs %= 3600;
+    unsigned long long mins = secs / 60;
+    std::string out = "Up ";
+    if (days > 0)
+    {
+        out += std::to_string(days) + "d ";
+    }
+    if (days > 0 || hrs > 0)
+    {
+        out += std::to_string(hrs) + "h ";
+    }
+    out += std::to_string(mins) + "m";
+    return out;
+}
+
+static std::string formatLoadAverages()
+{
+    if (g_loadAverages.size() < 3)
+    {
+        return "Load --";
+    }
+    char buf[64];
+    std::snprintf(buf, sizeof(buf), "Load %.2f %.2f %.2f",
+                  g_loadAverages[0], g_loadAverages[1], g_loadAverages[2]);
+    return std::string(buf);
+}
+
+static void renderUptimeAndLoad(Screen &dest)
+{
+    // Dim white for the labels, accent green so it reads as a status row.
+    const vec3 dimColor(0.55f, 0.55f, 0.55f);
+    Font::drawText(dest, formatUptime(g_uptimeSeconds), ivec2(24, 56), dimColor);
+    Font::drawText(dest, formatLoadAverages(), ivec2(220, 56), dimColor);
 }
 
 static void renderMemBreakdownStrip(Screen &dest)
@@ -374,6 +420,8 @@ static void pollMetrics()
 
     g_perCoreCpu = SystemMetrics::readPerCoreCpu();
     g_memBreakdown = SystemMetrics::readMemBreakdown();
+    g_uptimeSeconds = SystemMetrics::readUptimeSeconds();
+    g_loadAverages = SystemMetrics::readLoadAverages();
 
     bool cpuNowAlarm = cpuPct >= ALARM_THRESHOLD;
     bool ramNowAlarm = memPct >= ALARM_THRESHOLD;
@@ -546,6 +594,7 @@ int main(int argc, char **argv)
         LayoutManager::getInstance().render(shot, ivec2(0, 0), ivec2(RESX - 1, RESY - 1));
         if (tab != "processes")
         {
+            renderUptimeAndLoad(shot);
             renderMemBreakdownStrip(shot);
             renderPerCoreStrip(shot);
             if (g_sparklinesEnabled)
@@ -900,6 +949,7 @@ int main(int argc, char **argv)
                 LayoutManager::getInstance().getRoot(), "system");
             if (systemNode != nullptr && systemNode->getData().isActive())
             {
+                renderUptimeAndLoad(screen);
                 renderMemBreakdownStrip(screen);
                 renderPerCoreStrip(screen);
                 if (g_sparklinesEnabled)

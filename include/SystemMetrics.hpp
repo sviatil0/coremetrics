@@ -47,6 +47,13 @@ public:
     // the htop-style segmented bar under the RAM row. Returns a zeroed
     // struct if the platform call fails.
     static MemBreakdown readMemBreakdown();
+    // Seconds the system has been up. Returns 0 on platforms where the
+    // call fails (no signal value other than 'unknown', the UI hides the
+    // strip in that case).
+    static unsigned long long readUptimeSeconds();
+    // 1-, 5-, 15-minute load averages. Vector size is always 3. Falls
+    // back to {0, 0, 0} on Windows since there is no portable analog.
+    static std::vector<float> readLoadAverages();
     static std::vector<ProcessInfo> topProcesses(std::size_t n = 20);
 };
 
