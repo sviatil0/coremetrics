@@ -1,5 +1,6 @@
 #include "screen.hpp"
 #include "ThreadPool.hpp"
+#include "font.hpp"
 
 Screen::Screen(unsigned int w, unsigned int h) : width(w), height(h), surface(nullptr)
 {
@@ -302,8 +303,10 @@ void Screen::drawTriangle(const Tvec2<int> &v1, const Tvec2<int> &v2, const Tvec
 
 void Screen::drawText(const Tvec2<int> &pos, const Tvec3<float> &color, std::string text)
 {
-    SDL_SetRenderDrawColor(this->renderer, static_cast<Uint8>(color.x * 255),
-                                            static_cast<Uint8>(color.y * 255),
-                                            static_cast<Uint8>(color.z * 255), 255);
-    SDL_RenderDebugText(this->renderer, pos.x, pos.y, text.c_str());
+    // Route through the TTF Font path so every text path in the app shares one
+    // renderer. The old body called SDL_RenderDebugText (the SDL-provided 8x8
+    // pixel font); nothing in the app uses this entry point any more, but
+    // keeping the public method and delegating means any caller that comes
+    // back gets crisp TTF text for free.
+    Font::drawText(*this, text, pos, color);
 }

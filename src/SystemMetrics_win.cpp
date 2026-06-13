@@ -1,6 +1,7 @@
 #ifdef _WIN32
 
 #include "SystemMetrics.hpp"
+#include "ProcessUtils.hpp"
 #include <algorithm>
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -207,14 +208,13 @@ std::vector<ProcessInfo> SystemMetrics::topProcesses(std::size_t n)
             {
                 ULONGLONG procTicks = fileTimeToULL(kernelFt) + fileTimeToULL(userFt);
                 currentProcTicks[entry.th32ProcessID] = procTicks;
-                if (sysTotalDiff > 0)
+                auto prev = g_lastProcTicks.find(entry.th32ProcessID);
+                if (prev != g_lastProcTicks.end())
                 {
-                    auto prev = g_lastProcTicks.find(entry.th32ProcessID);
-                    if (prev != g_lastProcTicks.end() && procTicks >= prev->second)
-                    {
-                        ULONGLONG procDiff = procTicks - prev->second;
-                        info.cpuPct = (static_cast<float>(procDiff) / static_cast<float>(sysTotalDiff)) * 100.0f;
-                    }
+                    info.cpuPct = computeCpuPercentDelta(
+                        static_cast<std::uint64_t>(procTicks),
+                        static_cast<std::uint64_t>(prev->second),
+                        static_cast<std::uint64_t>(sysTotalDiff));
                 }
             }
             CloseHandle(hProc);
