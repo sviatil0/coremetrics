@@ -4,7 +4,7 @@
 
 **A real-time system process monitor on a from-scratch 2D graphics engine.**
 
-[![C/C++ CI](https://github.com/sviatil0/coremetrics/actions/workflows/c-cpp.yml/badge.svg)](https://github.com/sviatil0/coremetrics/actions/workflows/c-cpp.yml)
+[![C/C++ CI](https://github.com/sviatil0/coremetrics/actions/workflows/c-cpp.yml/badge.svg?branch=main)](https://github.com/sviatil0/coremetrics/actions/workflows/c-cpp.yml)
 [![license: LGPL-2.1](https://img.shields.io/badge/license-LGPL--2.1-blue.svg)](LICENSE)
 ![C++23](https://img.shields.io/badge/C%2B%2B-23-informational.svg)
 ![SDL3](https://img.shields.io/badge/SDL-3-1abc9c.svg)
