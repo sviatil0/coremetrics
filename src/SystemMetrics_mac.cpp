@@ -124,6 +124,70 @@ std::vector<float> SystemMetrics::readPerCoreCpu()
     return result;
 }
 
+MemBreakdown SystemMetrics::readMemBreakdown()
+{
+    MemBreakdown out{0, 0, 0, 0, 0};
+
+    int mib[2] = {CTL_HW, HW_MEMSIZE};
+    uint64_t memSize = 0;
+    size_t memSizeLen = sizeof(memSize);
+    if (sysctl(mib, 2, &memSize, &memSizeLen, nullptr, 0) != 0 || memSize == 0)
+    {
+        return out;
+    }
+
+    vm_statistics64_data_t vmStats;
+    mach_msg_type_number_t count = HOST_VM_INFO64_COUNT;
+    if (host_statistics64(mach_host_self(), HOST_VM_INFO64,
+                          reinterpret_cast<host_info64_t>(&vmStats), &count) != KERN_SUCCESS)
+    {
+        return out;
+    }
+
+    vm_size_t pageSize = 0;
+    host_page_size(mach_host_self(), &pageSize);
+    if (pageSize == 0)
+    {
+        return out;
+    }
+
+    auto pagesToKb = [pageSize](uint64_t pages) -> unsigned long long {
+        return (static_cast<unsigned long long>(pages) * pageSize) / 1024ULL;
+    };
+
+    out.totalKb = memSize / 1024ULL;
+    out.activeKb = pagesToKb(static_cast<uint64_t>(vmStats.active_count));
+    out.wiredKb = pagesToKb(static_cast<uint64_t>(vmStats.wire_count));
+    // External page count is Darwin's file-backed reclaimable bucket; fall
+    // back to inactive_count on older kernels that do not expose it.
+    uint64_t cachedPages = static_cast<uint64_t>(vmStats.external_page_count);
+    if (cachedPages == 0)
+    {
+        cachedPages = static_cast<uint64_t>(vmStats.inactive_count);
+    }
+    out.cachedKb = pagesToKb(cachedPages);
+    out.freeKb = pagesToKb(static_cast<uint64_t>(vmStats.free_count));
+
+    // Fold any rounding remainder into 'free' so segments sum to total.
+    unsigned long long sum = out.activeKb + out.wiredKb + out.cachedKb + out.freeKb;
+    if (sum < out.totalKb)
+    {
+        out.freeKb += (out.totalKb - sum);
+    }
+    else if (sum > out.totalKb)
+    {
+        unsigned long long over = sum - out.totalKb;
+        unsigned long long shave = (over <= out.cachedKb) ? over : out.cachedKb;
+        out.cachedKb -= shave;
+        over -= shave;
+        if (over > 0 && over <= out.freeKb)
+        {
+            out.freeKb -= over;
+        }
+    }
+    return out;
+}
+
 float SystemMetrics::readGpuPercent()
 {
     float result = 0.0f;

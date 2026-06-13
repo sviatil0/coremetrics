@@ -139,6 +139,20 @@ constexpr int PERCORE_Y1 = 236;
 constexpr int PERCORE_X0 = 24;
 constexpr int PERCORE_X1 = 936;
 constexpr int PERCORE_GAP = 4;
+
+// Memory breakdown segmented bar. Sits just below the aggregate RAM bar
+// (y=136..160 in base.xml). Shows active / wired / cached / free segments
+// at the same horizontal extent so they read as a continuation. htop
+// colors: active = red, wired = orange, cached = blue, free = dark.
+static MemBreakdown g_memBreakdown{0, 0, 0, 0, 0};
+constexpr int MEMSEG_X0 = 84;
+constexpr int MEMSEG_X1 = 864;
+// Sit between RAM bar bottom (y=160) and GPU bar top (y=184). 14px tall
+// is enough to read the segment colors clearly without crowding the
+// neighbors.
+constexpr int MEMSEG_Y0 = 164;
+constexpr int MEMSEG_Y1 = 178;
+
 static ivec2 g_headerColMin[4];
 static ivec2 g_headerColMax[4];
 static ivec2 g_muteBtnMin;
@@ -231,6 +245,47 @@ static void destroySparklines()
     g_gpuSparkline = nullptr;
 }
 
+static void renderMemBreakdownStrip(Screen &dest)
+{
+    if (g_memBreakdown.totalKb == 0)
+    {
+        return;
+    }
+    const int width = MEMSEG_X1 - MEMSEG_X0;
+    if (width <= 0)
+    {
+        return;
+    }
+
+    auto segPx = [&](unsigned long long kb) {
+        // Compute as 64-bit to avoid overflowing the multiplication on
+        // large-memory hosts (256GB+).
+        unsigned long long n = static_cast<unsigned long long>(width) * kb;
+        return static_cast<int>(n / g_memBreakdown.totalKb);
+    };
+
+    const vec3 colActive(0.95f, 0.35f, 0.35f); // red: in-use by processes
+    const vec3 colWired(0.95f, 0.66f, 0.30f);  // orange: kernel + pinned
+    const vec3 colCached(0.45f, 0.78f, 0.95f); // blue: reclaimable cache
+    const vec3 colFree(0.18f, 0.18f, 0.18f);   // dark: free
+
+    int x = MEMSEG_X0;
+    // Active
+    int aw = segPx(g_memBreakdown.activeKb);
+    if (aw > 0) { dest.drawBox(ivec2(x, MEMSEG_Y0), ivec2(x + aw, MEMSEG_Y1), colActive); x += aw; }
+    // Wired
+    int ww = segPx(g_memBreakdown.wiredKb);
+    if (ww > 0) { dest.drawBox(ivec2(x, MEMSEG_Y0), ivec2(x + ww, MEMSEG_Y1), colWired); x += ww; }
+    // Cached
+    int cw = segPx(g_memBreakdown.cachedKb);
+    if (cw > 0) { dest.drawBox(ivec2(x, MEMSEG_Y0), ivec2(x + cw, MEMSEG_Y1), colCached); x += cw; }
+    // Free fills whatever is left so rounding remainder gets absorbed visually.
+    if (x < MEMSEG_X1)
+    {
+        dest.drawBox(ivec2(x, MEMSEG_Y0), ivec2(MEMSEG_X1, MEMSEG_Y1), colFree);
+    }
+}
+
 static void renderPerCoreStrip(Screen &dest)
 {
     if (g_perCoreCpu.empty())
@@ -318,6 +373,7 @@ static void pollMetrics()
     }
 
     g_perCoreCpu = SystemMetrics::readPerCoreCpu();
+    g_memBreakdown = SystemMetrics::readMemBreakdown();
 
     bool cpuNowAlarm = cpuPct >= ALARM_THRESHOLD;
     bool ramNowAlarm = memPct >= ALARM_THRESHOLD;
@@ -490,6 +546,7 @@ int main(int argc, char **argv)
         LayoutManager::getInstance().render(shot, ivec2(0, 0), ivec2(RESX - 1, RESY - 1));
         if (tab != "processes")
         {
+            renderMemBreakdownStrip(shot);
             renderPerCoreStrip(shot);
             if (g_sparklinesEnabled)
             {
@@ -843,6 +900,7 @@ int main(int argc, char **argv)
                 LayoutManager::getInstance().getRoot(), "system");
             if (systemNode != nullptr && systemNode->getData().isActive())
             {
+                renderMemBreakdownStrip(screen);
                 renderPerCoreStrip(screen);
                 if (g_sparklinesEnabled)
                 {
