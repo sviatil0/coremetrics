@@ -11,18 +11,16 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Linux + macOS are the gated targets. Windows is now added so the
-        # Windows metrics layer (SystemMetrics_win.cpp) stays compile-clean,
-        # but the Windows leg is marked continue-on-error because the
-        # SDL3 + pkg-config toolchain on the runner is still flaky. The
-        # PR-gating signal stays driven by Linux + macOS.
+        # All three legs are gated now that the Windows SDL3 + MinGW
+        # toolchain is stable. The Windows step uses SDL3_ROOT / static
+        # libstdc++ / DLL copy to keep tests.exe self-contained.
         include:
           - os: ubuntu-latest
             allow-failure: false
           - os: macos-latest
             allow-failure: false
           - os: windows-latest
-            allow-failure: true
+            allow-failure: false
 
     runs-on: ${{ matrix.os }}
     continue-on-error: ${{ matrix.allow-failure }}
