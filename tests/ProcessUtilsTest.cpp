@@ -30,6 +30,18 @@ namespace
         p.memPct = mem;
         return p;
     }
+
+    ProcessInfo makeIo(int pid, unsigned long long readKb, unsigned long long writeKb)
+    {
+        ProcessInfo p;
+        p.pid = pid;
+        p.name = "x";
+        p.cpuPct = 0.0f;
+        p.memPct = 0.0f;
+        p.diskReadKbPerSec = readKb;
+        p.diskWriteKbPerSec = writeKb;
+        return p;
+    }
 }
 
 static void testFormatPctRoundsToOneDecimal()
@@ -117,6 +129,38 @@ static void testCompareByMem()
            compareProcessByColumn(heavy, light, SORT_MEM, false));
     report("compareProcessByColumn MEM asc puts lightest first",
            compareProcessByColumn(light, heavy, SORT_MEM, true));
+}
+
+static void testCompareByDisk()
+{
+    ProcessInfo busyDisk = makeIo(1, 8192, 4096);
+    ProcessInfo quietDisk = makeIo(2, 0, 0);
+    report("compareProcessByColumn DISK desc puts busiest disk first",
+           compareProcessByColumn(busyDisk, quietDisk, SORT_DISK, false));
+    report("compareProcessByColumn DISK asc puts quietest disk first",
+           compareProcessByColumn(quietDisk, busyDisk, SORT_DISK, true));
+}
+
+static void testFormatDiskIoIdle()
+{
+    report("formatDiskIo 0/0 yields empty string",
+           formatDiskIo(0, 0).empty());
+}
+
+static void testFormatDiskIoKilobytes()
+{
+    report("formatDiskIo 100KB read + 50KB write yields '150 KB/s'",
+           formatDiskIo(100, 50) == "150 KB/s");
+}
+
+static void testFormatDiskIoMegabytesThreshold()
+{
+    // 1024 KB/s is the MB/s threshold.
+    report("formatDiskIo at 1024KB/s yields '1.0 MB/s'",
+           formatDiskIo(1024, 0) == "1.0 MB/s");
+    // 13.3 MB/s composed of read 10MB + write 3.3MB.
+    report("formatDiskIo at 13312 + 3072 KB/s yields '16.0 MB/s'",
+           formatDiskIo(13312, 3072) == "16.0 MB/s");
 }
 
 static void testCompareUnknownColumnFallback()
@@ -264,6 +308,10 @@ void processUtilsTestSuite()
     testCompareByName();
     testCompareByCpu();
     testCompareByMem();
+    testCompareByDisk();
+    testFormatDiskIoIdle();
+    testFormatDiskIoKilobytes();
+    testFormatDiskIoMegabytesThreshold();
     testCompareUnknownColumnFallback();
 
     testComputeIoKbPerSecZeroElapsed();
