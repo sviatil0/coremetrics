@@ -101,7 +101,7 @@ jobs:
         # (-L only helps the linker; runtime uses PATH and the exe
         # directory). The setup-sdl layout has dlls in bin/ in some
         # versions and lib/ in others; search both.
-        mkdir -p bin
+        mkdir -p obj bin
         make CXX=g++ \
              CXXFLAGS="-std=c++23 -Wall -I ./include $SDL_CFLAGS" \
              LDFLAGS="$SDL_LIBS" \
