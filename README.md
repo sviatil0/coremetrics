@@ -304,8 +304,6 @@ The math core is the most reused surface; the full per-class reference is folded
 
 ## Team and my contribution
 
-A 4-person Notre Dame CSE 40232 software-engineering project (SP26 Team 04), three months, a PR-template + required-review workflow with per-developer branches. I was the lead and primary author: **~72% of the source by line, git-blame verified.**
-
 ```mermaid
 pie showData
     title Lines of code by author (git blame, all source files)
