@@ -36,6 +36,17 @@
   </screenshots>
   <content_rating type="oars-1.1" />
   <releases>
+    <release version="0.2.3" date="2026-06-13">
+      <description>
+        <p>
+          Per-process DISK I/O column on the Processes tab. Throughput
+          formatted as X.X MB/s or XXX KB/s; idle processes show nothing.
+          Column-header click sorts by read+write rate via the new
+          SORT_DISK enum. Layout weights rebalanced to fit 5 columns
+          (NAME loses 8% to make room).
+        </p>
+      </description>
+    </release>
     <release version="0.2.2" date="2026-06-13">
       <description>
         <p>
