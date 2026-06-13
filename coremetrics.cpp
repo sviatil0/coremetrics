@@ -237,13 +237,51 @@ static void pollMetrics()
 
 int main(int argc, char **argv)
 {
-    (void)argc;
-    (void)argv;
+    // Optional headless screenshot mode: `coremetrics --screenshot out.bmp`
+    // renders one frame to an offscreen surface and saves it, no window needed.
+    std::string screenshotPath;
+    for (int i = 1; i < argc; ++i)
+    {
+        if (std::string(argv[i]) == "--screenshot" && i + 1 < argc)
+        {
+            screenshotPath = argv[i + 1];
+        }
+    }
 
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO))
     {
         std::cerr << "Failed to init SDL: " << SDL_GetError() << '\n';
         return -1;
+    }
+
+    if (!screenshotPath.empty())
+    {
+        Screen shot(RESX, RESY);
+        buildScene();
+        cacheElementPointers();
+        pollMetrics();
+        shot.clear();
+        LayoutManager::getInstance().render(shot, ivec2(0, 0), ivec2(RESX - 1, RESY - 1));
+        SDL_Surface *out = SDL_CreateSurface(RESX, RESY, SDL_PIXELFORMAT_RGBA32);
+        if (out == nullptr)
+        {
+            std::cerr << "Failed to create screenshot surface: " << SDL_GetError() << '\n';
+            SDL_Quit();
+            return -3;
+        }
+        shot.blitTo(out);
+        if (!SDL_SaveBMP(out, screenshotPath.c_str()))
+        {
+            std::cerr << "Failed to save screenshot: " << SDL_GetError() << '\n';
+        }
+        else
+        {
+            std::cout << "Saved screenshot to " << screenshotPath << '\n';
+        }
+        SDL_DestroySurface(out);
+        Font::shutdown();
+        SDL_Quit();
+        return 0;
     }
 
     SDL_Window *window = SDL_CreateWindow("CoreMetrics", RESX, RESY, SDL_WINDOW_RESIZABLE);

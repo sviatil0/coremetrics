@@ -14,7 +14,9 @@
 
 </div>
 
-> **Visual:** a live application screenshot is not captured yet. The two-tab layout (System: CPU/RAM/GPU bars with load-colored thresholds; Processes: sortable PID / NAME / CPU% / MEM% table) is described under [The demo](#the-demo). Per-package UML renders are in [`assets/`](assets/). A captioned product screenshot will replace this note once a clean frame is grabbed.
+![CoreMetrics System tab](assets/screenshot-system.png)
+
+> The System tab: live CPU / RAM / GPU bars with load-colored thresholds (RAM is red past 80%, GPU green at 28%). The Processes tab adds a sortable PID / NAME / CPU% / MEM% table. This frame is rendered by the app itself via `coremetrics --screenshot out.bmp`, a headless one-frame render path.
 
 ---
 
@@ -47,6 +49,9 @@ make                 # builds bin/coremetrics and launches it
 
 # 4. (optional) watch the bars spike
 ./stress.sh          # 30s of CPU + RAM load; bars cross yellow/red thresholds
+
+# (optional) render a frame headlessly, no window needed
+./bin/coremetrics --screenshot shot.bmp
 ```
 
 <details>
