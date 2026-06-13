@@ -265,26 +265,7 @@ static void destroySparklines()
 
 static std::string formatUptime(unsigned long long secs)
 {
-    if (secs == 0)
-    {
-        return "Up --";
-    }
-    unsigned long long days = secs / 86400;
-    secs %= 86400;
-    unsigned long long hrs = secs / 3600;
-    secs %= 3600;
-    unsigned long long mins = secs / 60;
-    std::string out = "Up ";
-    if (days > 0)
-    {
-        out += std::to_string(days) + "d ";
-    }
-    if (days > 0 || hrs > 0)
-    {
-        out += std::to_string(hrs) + "h ";
-    }
-    out += std::to_string(mins) + "m";
-    return out;
+    return formatUptimeString(secs);
 }
 
 static std::string formatLoadAverages()
@@ -566,22 +547,16 @@ static void pollMetrics()
     }
     if (!g_filterText.empty())
     {
-        std::string needle;
-        needle.reserve(g_filterText.size());
-        for (char c : g_filterText)
+        std::vector<ProcessInfo> kept;
+        kept.reserve(procs.size());
+        for (const auto &p : procs)
         {
-            needle.push_back(static_cast<char>(std::tolower(static_cast<unsigned char>(c))));
+            if (processNameMatchesFilter(p.name, g_filterText))
+            {
+                kept.push_back(p);
+            }
         }
-        procs.erase(std::remove_if(procs.begin(), procs.end(),
-            [&needle](const ProcessInfo &p) {
-                std::string hay;
-                hay.reserve(p.name.size());
-                for (char c : p.name)
-                {
-                    hay.push_back(static_cast<char>(std::tolower(static_cast<unsigned char>(c))));
-                }
-                return hay.find(needle) == std::string::npos;
-            }), procs.end());
+        procs = std::move(kept);
     }
     if (procs.size() > dataRowCount)
     {

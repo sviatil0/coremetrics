@@ -1,4 +1,5 @@
 #include "ProcessUtils.hpp"
+#include <cctype>
 
 std::string formatPct(float value)
 {
@@ -50,4 +51,69 @@ bool compareProcessByColumn(const ProcessInfo &a,
         return ascending ? (a.memPct < b.memPct) : (a.memPct > b.memPct);
     }
     return false;
+}
+
+std::uint64_t computeIoKbPerSec(std::uint64_t prev,
+                                std::uint64_t curr,
+                                double elapsedSec)
+{
+    if (elapsedSec <= 0.0 || curr < prev)
+    {
+        return 0;
+    }
+    std::uint64_t delta = curr - prev;
+    return static_cast<std::uint64_t>(
+        (static_cast<double>(delta) / 1024.0) / elapsedSec);
+}
+
+bool processNameMatchesFilter(const std::string &name,
+                              const std::string &needle)
+{
+    if (needle.empty())
+    {
+        return true;
+    }
+    if (name.empty())
+    {
+        return false;
+    }
+    std::string lowerNeedle;
+    lowerNeedle.reserve(needle.size());
+    for (char c : needle)
+    {
+        lowerNeedle.push_back(static_cast<char>(
+            std::tolower(static_cast<unsigned char>(c))));
+    }
+    std::string lowerName;
+    lowerName.reserve(name.size());
+    for (char c : name)
+    {
+        lowerName.push_back(static_cast<char>(
+            std::tolower(static_cast<unsigned char>(c))));
+    }
+    return lowerName.find(lowerNeedle) != std::string::npos;
+}
+
+std::string formatUptimeString(unsigned long long seconds)
+{
+    if (seconds == 0)
+    {
+        return "Up --";
+    }
+    unsigned long long days = seconds / 86400;
+    seconds %= 86400;
+    unsigned long long hrs = seconds / 3600;
+    seconds %= 3600;
+    unsigned long long mins = seconds / 60;
+    std::string out = "Up ";
+    if (days > 0)
+    {
+        out += std::to_string(days) + "d ";
+    }
+    if (days > 0 || hrs > 0)
+    {
+        out += std::to_string(hrs) + "h ";
+    }
+    out += std::to_string(mins) + "m";
+    return out;
 }

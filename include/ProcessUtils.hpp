@@ -34,4 +34,24 @@ bool compareProcessByColumn(const ProcessInfo &a,
                             SortColumn column,
                             bool ascending);
 
+// Pure delta-based disk-I/O rate. prev/curr are cumulative byte counters
+// taken at two samples; elapsedSec is the wall-clock seconds between them.
+// Returns kilobytes/second. Returns 0 when elapsedSec is <= 0 or when curr
+// < prev (the only sane response to a counter that went backwards, which
+// happens on pid reuse and on some counter resets).
+std::uint64_t computeIoKbPerSec(std::uint64_t prev,
+                                std::uint64_t curr,
+                                double elapsedSec);
+
+// Case-insensitive substring match used by the Processes-tab filter.
+// An empty needle always matches (the filter is treated as disabled).
+// A non-empty needle and an empty name never matches.
+bool processNameMatchesFilter(const std::string &name,
+                              const std::string &needle);
+
+// Format an uptime in seconds as "Up <d>d <h>h <m>m" / "Up <h>h <m>m" /
+// "Up <m>m". Seconds == 0 yields "Up --" so a failed read renders the
+// known-unavailable state instead of "Up 0m".
+std::string formatUptimeString(unsigned long long seconds);
+
 #endif
