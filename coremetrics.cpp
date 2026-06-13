@@ -22,14 +22,7 @@
 
 constexpr int RESX = 960;
 constexpr int RESY = 540;
-constexpr int TAB_BAR_HEIGHT = 48;
-constexpr int TAB_BTN_PAD = 8;
-constexpr int BAR_HEIGHT = 24;
-constexpr int BAR_MARGIN = 24;
-constexpr int BAR_LABEL_WIDTH = 60;
 constexpr int PROCESS_ROW_HEIGHT = 20;
-constexpr int PROCESS_TOP_PADDING = 16;
-constexpr std::size_t PROCESS_ROW_COUNT = 15;
 constexpr Uint64 POLL_INTERVAL_MS = 500;
 
 constexpr float ALARM_THRESHOLD = 80.0f;

@@ -7,6 +7,12 @@
 #include <CoreFoundation/CoreFoundation.h>
 #include <IOKit/IOKitLib.h>
 #include <libproc.h>
+
+// The default IOKit port is kIOMainPortDefault (macOS 12+) or the deprecated
+// kIOMasterPortDefault on older SDKs; both are documented as MACH_PORT_NULL.
+// Passing the literal null port avoids depending on either name (and its
+// deprecation warning) while behaving identically on every macOS version.
+static const mach_port_t MS_IO_DEFAULT_PORT = MACH_PORT_NULL;
 #include <mach/mach.h>
 #include <mach/mach_host.h>
 #include <mach/host_info.h>
@@ -68,7 +74,7 @@ float SystemMetrics::readGpuPercent()
         return 0.0f;
     }
     io_iterator_t iter = 0;
-    if (IOServiceGetMatchingServices(kIOMasterPortDefault, match, &iter) != KERN_SUCCESS)
+    if (IOServiceGetMatchingServices(MS_IO_DEFAULT_PORT, match, &iter) != KERN_SUCCESS)
     {
         return 0.0f;
     }

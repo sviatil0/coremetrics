@@ -62,6 +62,7 @@ std::unique_ptr<GUIElement> GUIElementFactory::create(GUIElementType type, vec2 
     case GUIElementType::ROW:
     case GUIElementType::LABEL:
     case GUIElementType::BUTTON:
+    case GUIElementType::IMAGE:
         std::cerr << "GUIElementFactory: type requires specialized overload\n";
         return nullptr;
     }

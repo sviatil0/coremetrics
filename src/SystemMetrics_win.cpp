@@ -8,12 +8,18 @@
 #include <tlhelp32.h>
 #include <pdh.h>
 #include <pdhmsg.h>
+#include <map>
 #include <vector>
 
 extern bool systemMetricsCompareByMemDesc(const ProcessInfo &a, const ProcessInfo &b);
 
 static ULONGLONG g_lastTotal = 0;
 static ULONGLONG g_lastIdle = 0;
+
+// Per-process CPU% needs a delta: process ticks used between two samples over the
+// system ticks that elapsed in the same window.
+static std::map<DWORD, ULONGLONG> g_lastProcTicks;
+static ULONGLONG g_lastProcSampleSysTotal = 0;
 
 static ULONGLONG fileTimeToULL(const FILETIME &ft)
 {
@@ -145,6 +151,20 @@ std::vector<ProcessInfo> SystemMetrics::topProcesses(std::size_t n)
     GlobalMemoryStatusEx(&ms);
     DWORDLONG totalBytes = ms.ullTotalPhys;
 
+    // Sample system-wide busy ticks once, as the denominator for per-process CPU%.
+    FILETIME sysIdleFt;
+    FILETIME sysKernelFt;
+    FILETIME sysUserFt;
+    ULONGLONG sysTotal = 0;
+    if (GetSystemTimes(&sysIdleFt, &sysKernelFt, &sysUserFt))
+    {
+        sysTotal = fileTimeToULL(sysKernelFt) + fileTimeToULL(sysUserFt);
+    }
+    ULONGLONG sysTotalDiff = (g_lastProcSampleSysTotal == 0 || sysTotal < g_lastProcSampleSysTotal)
+                                 ? 0
+                                 : sysTotal - g_lastProcSampleSysTotal;
+    std::map<DWORD, ULONGLONG> currentProcTicks;
+
     HANDLE snap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
     if (snap == INVALID_HANDLE_VALUE)
     {
@@ -185,7 +205,17 @@ std::vector<ProcessInfo> SystemMetrics::topProcesses(std::size_t n)
             FILETIME userFt;
             if (GetProcessTimes(hProc, &createFt, &exitFt, &kernelFt, &userFt))
             {
-                info.cpuPct = static_cast<float>(fileTimeToULL(kernelFt) + fileTimeToULL(userFt));
+                ULONGLONG procTicks = fileTimeToULL(kernelFt) + fileTimeToULL(userFt);
+                currentProcTicks[entry.th32ProcessID] = procTicks;
+                if (sysTotalDiff > 0)
+                {
+                    auto prev = g_lastProcTicks.find(entry.th32ProcessID);
+                    if (prev != g_lastProcTicks.end() && procTicks >= prev->second)
+                    {
+                        ULONGLONG procDiff = procTicks - prev->second;
+                        info.cpuPct = (static_cast<float>(procDiff) / static_cast<float>(sysTotalDiff)) * 100.0f;
+                    }
+                }
             }
             CloseHandle(hProc);
         }
@@ -193,6 +223,9 @@ std::vector<ProcessInfo> SystemMetrics::topProcesses(std::size_t n)
     } while (Process32Next(snap, &entry));
 
     CloseHandle(snap);
+
+    g_lastProcTicks = std::move(currentProcTicks);
+    g_lastProcSampleSysTotal = sysTotal;
 
     std::sort(result.begin(), result.end(), systemMetricsCompareByMemDesc);
     if (result.size() > n)
