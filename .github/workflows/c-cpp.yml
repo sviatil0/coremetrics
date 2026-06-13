@@ -91,7 +91,10 @@ jobs:
         # the SDL3 include directory and the build failed at
         # screen.hpp's #include <SDL3/SDL.h>).
         SDL_CFLAGS="-I${SDL3_ROOT}/include -I${SDL3_ttf_ROOT}/include -I${SDL3_image_ROOT}/include"
-        SDL_LIBS="-L${SDL3_ROOT}/lib -L${SDL3_ttf_ROOT}/lib -L${SDL3_image_ROOT}/lib -lSDL3 -lSDL3_ttf -lSDL3_image"
+        # SystemMetrics_win.cpp links against PDH (GPU counters) and
+        # PSAPI (GetProcessMemoryInfo). These ship in the Windows SDK so
+        # no extra -L is needed; naming the libs by short name is enough.
+        SDL_LIBS="-L${SDL3_ROOT}/lib -L${SDL3_ttf_ROOT}/lib -L${SDL3_image_ROOT}/lib -lSDL3 -lSDL3_ttf -lSDL3_image -lpdh -lpsapi"
         echo "Resolved SDL_CFLAGS: $SDL_CFLAGS"
         make CXX=g++ \
              CXXFLAGS="-std=c++23 -Wall -I ./include $SDL_CFLAGS" \
