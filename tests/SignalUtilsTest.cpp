@@ -30,15 +30,30 @@ static void testNamesAreStable()
 
 static void testPosixNumbersAreCorrect()
 {
-    // These match the POSIX-defined values that ship on every supported
-    // target (macOS Darwin, Linux glibc / musl). Asserting them here pins
-    // the table so a future refactor cannot silently renumber the enum.
+    // SIGHUP=1, SIGINT=2, SIGKILL=9, SIGTERM=15 are stable across every
+    // supported target (Darwin, Linux glibc/musl, FreeBSD). SIGSTOP and
+    // SIGCONT intentionally are NOT asserted here: their numeric values
+    // differ between Darwin (17/19) and Linux (19/18). The map is
+    // generated from the platform <signal.h>, so the runtime value is
+    // already correct on each host; pinning the numbers would just be a
+    // cross-platform footgun.
     bool passed = SignalUtils::posixNumber(SignalUtils::Signal::Hup) == 1
                   && SignalUtils::posixNumber(SignalUtils::Signal::Int) == 2
                   && SignalUtils::posixNumber(SignalUtils::Signal::Kill) == 9
-                  && SignalUtils::posixNumber(SignalUtils::Signal::Term) == 15
-                  && SignalUtils::posixNumber(SignalUtils::Signal::Cont) == 19;
-    report("SignalUtils::posixNumber matches POSIX-defined values", passed);
+                  && SignalUtils::posixNumber(SignalUtils::Signal::Term) == 15;
+    report("SignalUtils::posixNumber matches stable POSIX values", passed);
+}
+
+static void testStopContAreNonzeroAndDistinct()
+{
+    // Looser assertion for the signals whose POSIX numbers vary between
+    // Darwin and Linux: just confirm they're both non-zero and distinct
+    // from each other. Anything else would re-introduce the cross-platform
+    // hazard testPosixNumbersAreCorrect is documented to avoid.
+    int s = SignalUtils::posixNumber(SignalUtils::Signal::Stop);
+    int c = SignalUtils::posixNumber(SignalUtils::Signal::Cont);
+    report("SignalUtils::posixNumber STOP and CONT are non-zero and distinct",
+           s != 0 && c != 0 && s != c);
 }
 
 static void testRejectsInvalidPids()
@@ -72,6 +87,7 @@ void signalUtilsTestSuite()
 
     testNamesAreStable();
     testPosixNumbersAreCorrect();
+    testStopContAreNonzeroAndDistinct();
     testRejectsInvalidPids();
     testSignalToNonexistentPidReportsNoSuchProcess();
 
