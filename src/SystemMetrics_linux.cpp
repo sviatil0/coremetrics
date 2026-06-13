@@ -10,6 +10,7 @@
 #include <fstream>
 #include <map>
 #include <sstream>
+#include <sys/statvfs.h>
 
 extern bool systemMetricsCompareByMemDesc(const ProcessInfo &a, const ProcessInfo &b);
 
@@ -165,6 +166,20 @@ unsigned long long SystemMetrics::readUptimeSeconds()
     double secs = 0.0;
     file >> secs;
     return secs > 0.0 ? static_cast<unsigned long long>(secs) : 0;
+}
+
+DiskUsage SystemMetrics::readDiskUsage()
+{
+    DiskUsage out{0, 0};
+    struct statvfs fs;
+    if (statvfs("/", &fs) != 0)
+    {
+        return out;
+    }
+    unsigned long long frsize = fs.f_frsize > 0 ? fs.f_frsize : fs.f_bsize;
+    out.totalKb = (static_cast<unsigned long long>(fs.f_blocks) * frsize) / 1024ULL;
+    out.freeKb = (static_cast<unsigned long long>(fs.f_bavail) * frsize) / 1024ULL;
+    return out;
 }
 
 std::vector<float> SystemMetrics::readLoadAverages()

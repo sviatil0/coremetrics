@@ -19,6 +19,7 @@ static const mach_port_t MS_IO_DEFAULT_PORT = MACH_PORT_NULL;
 #include <mach/host_info.h>
 #include <mach/processor_info.h>
 #include <sys/sysctl.h>
+#include <sys/statvfs.h>
 #include <sys/time.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -148,6 +149,23 @@ unsigned long long SystemMetrics::readUptimeSeconds()
     auto now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
     long long diff = static_cast<long long>(now) - static_cast<long long>(bootTime.tv_sec);
     return diff > 0 ? static_cast<unsigned long long>(diff) : 0;
+}
+
+DiskUsage SystemMetrics::readDiskUsage()
+{
+    DiskUsage out{0, 0};
+    struct statvfs fs;
+    if (statvfs("/", &fs) != 0)
+    {
+        return out;
+    }
+    // f_frsize is the fragment size in bytes. Multiplying by f_blocks /
+    // f_bavail and dividing by 1024 yields kilobytes without overflowing
+    // 64-bit for any volume of realistic capacity.
+    unsigned long long frsize = fs.f_frsize > 0 ? fs.f_frsize : fs.f_bsize;
+    out.totalKb = (static_cast<unsigned long long>(fs.f_blocks) * frsize) / 1024ULL;
+    out.freeKb = (static_cast<unsigned long long>(fs.f_bavail) * frsize) / 1024ULL;
+    return out;
 }
 
 std::vector<float> SystemMetrics::readLoadAverages()
