@@ -337,11 +337,11 @@ int main(int argc, char **argv)
         {
             buildSparklines();
             // Prime the sparklines so a single headless --screenshot frame has
-            // enough history to draw a visible polyline. Without this, getSize()
-            // is 1 and Sparkline::draw returns early. 30 samples at 50ms each
-            // makes the chart read as ~1.5s of recent activity in the shot, and
-            // also satisfies the per-process delta requirement below.
-            for (int i = 0; i < 30; ++i)
+            // enough history to draw a visible polyline. 64 samples at 50ms
+            // each (~3.2s) fills the rolling window exactly and also gives the
+            // per-process CPU% delta a wide enough sampling window that idle
+            // processes still register measurable ticks.
+            for (std::size_t i = 0; i < SPARKLINE_CAPACITY; ++i)
             {
                 pollMetrics();
                 SDL_Delay(50);
@@ -349,14 +349,13 @@ int main(int argc, char **argv)
         }
         else
         {
-            // Per-process CPU% is a delta between two samples: a single
-            // pollMetrics call always reports 0.0% because there is no previous
-            // sample to diff against. Take a priming sample, sleep ~1.1s
-            // (enough that a typical process accumulates measurable ticks),
-            // then sample again before rendering. The aggregate CPU bar
-            // benefits the same way.
+            // Per-process CPU% is a delta between two samples. 1.1s was too
+            // tight: many processes accumulate sub-tick activity in that
+            // window and round to 0.0% in the shot. 3s captures everything
+            // that is doing real work without making the screenshot path
+            // feel sluggish.
             pollMetrics();
-            SDL_Delay(1100);
+            SDL_Delay(3000);
         }
         pollMetrics();
 
