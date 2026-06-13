@@ -34,6 +34,16 @@ static uint64_t g_lastIdle = 0;
 static std::unordered_map<pid_t, uint64_t> g_lastProcCpuNs;
 static uint64_t g_lastSampleNs = 0;
 
+// Per-process disk I/O rate. proc_pid_rusage gives cumulative bytes; we
+// diff against the previous sample and divide by elapsed wall-clock
+// seconds to land at KB/sec.
+struct MacProcIoCounters
+{
+    uint64_t readBytes;
+    uint64_t writeBytes;
+};
+static std::unordered_map<pid_t, MacProcIoCounters> g_lastProcIo;
+
 // Per-core tick history. Vector size = logical CPU count. Two slots per
 // core: [previousTotalTicks, previousIdleTicks]. Resized lazily on the
 // first call to readPerCoreCpu().
@@ -308,6 +318,10 @@ std::vector<ProcessInfo> SystemMetrics::topProcesses(std::size_t n)
     }
 
     std::unordered_map<pid_t, uint64_t> currentProcCpuNs;
+    std::unordered_map<pid_t, MacProcIoCounters> currentProcIo;
+    double ioElapsedSec = (wallDiffNs > 0)
+                              ? static_cast<double>(wallDiffNs) / 1.0e9
+                              : 0.0;
 
     int pidCount = proc_listpids(PROC_ALL_PIDS, 0, nullptr, 0);
     if (pidCount <= 0)
@@ -367,6 +381,38 @@ std::vector<ProcessInfo> SystemMetrics::topProcesses(std::size_t n)
             parentPid = static_cast<int>(bsdInfo.pbi_ppid);
         }
 
+        // proc_pid_rusage v4 carries cumulative disk-IO byte counts; older
+        // SDKs only define v2 but the field offsets are stable. Failure
+        // is non-fatal: the rate stays at zero for this pid.
+        MacProcIoCounters io{0, 0};
+        rusage_info_current rusage;
+        if (proc_pid_rusage(pid, RUSAGE_INFO_CURRENT,
+                            reinterpret_cast<rusage_info_t *>(&rusage)) == 0)
+        {
+            io.readBytes = rusage.ri_diskio_bytesread;
+            io.writeBytes = rusage.ri_diskio_byteswritten;
+        }
+        currentProcIo[pid] = io;
+        unsigned long long readKbPerSec = 0;
+        unsigned long long writeKbPerSec = 0;
+        if (ioElapsedSec > 0.0)
+        {
+            auto prevIo = g_lastProcIo.find(pid);
+            if (prevIo != g_lastProcIo.end())
+            {
+                uint64_t readDelta = (io.readBytes >= prevIo->second.readBytes)
+                                         ? io.readBytes - prevIo->second.readBytes
+                                         : 0;
+                uint64_t writeDelta = (io.writeBytes >= prevIo->second.writeBytes)
+                                          ? io.writeBytes - prevIo->second.writeBytes
+                                          : 0;
+                readKbPerSec = static_cast<unsigned long long>(
+                    static_cast<double>(readDelta) / 1024.0 / ioElapsedSec);
+                writeKbPerSec = static_cast<unsigned long long>(
+                    static_cast<double>(writeDelta) / 1024.0 / ioElapsedSec);
+            }
+        }
+
         ProcessInfo info;
         info.pid = pid;
         info.parentPid = parentPid;
@@ -380,11 +426,14 @@ std::vector<ProcessInfo> SystemMetrics::topProcesses(std::size_t n)
         {
             info.memPct = 0.0f;
         }
+        info.diskReadKbPerSec = readKbPerSec;
+        info.diskWriteKbPerSec = writeKbPerSec;
         result.push_back(info);
     }
 
     g_lastProcCpuNs = std::move(currentProcCpuNs);
     g_lastSampleNs = nowNs;
+    g_lastProcIo = std::move(currentProcIo);
 
     std::sort(result.begin(), result.end(), systemMetricsCompareByMemDesc);
     if (result.size() > n)
