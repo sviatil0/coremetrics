@@ -1,14 +1,20 @@
 #!/usr/bin/env bash
-# Compute Stefan's line-count share across his source files using `git blame`.
+# Compute per-author line counts across the source tree using `git blame`.
 #
-# Walks src/ + include/ + bench/ + coremetrics.cpp, runs `git blame --line-porcelain`
-# on each file, sums lines grouped by `author-mail`, and writes a shields.io
-# `endpoint` JSON to .github/badges/contribution.json.
+# Outputs:
+#   .github/badges/contribution.json     shields.io endpoint JSON (Stefan's %)
+#   .github/badges/contributions.md      Markdown section: heading + Mermaid pie
+#                                        + per-author bar table
 #
-# The script is deterministic for a given commit (no clock-based randomness,
-# no network calls), so two runs against the same tree produce byte-identical
-# output. CI runs it on every push to main; the output JSON is committed back
-# so the README badge can fetch it from raw.githubusercontent.
+# The CI job that runs this script injects contributions.md into README.md
+# between the markers:
+#
+#   <!-- contribution:start -->
+#   ... (replaced verbatim every run) ...
+#   <!-- contribution:end -->
+#
+# Deterministic: no clock, no network, no random. Same tree -> same output.
+# Portable bash 3.2 so it runs on macOS locally.
 
 set -euo pipefail
 
@@ -17,15 +23,11 @@ cd "$ROOT"
 
 STEFAN_EMAIL="soleksiienko1@gmail.com"
 
-# Source files included in the contribution count. Tests and assets are
-# excluded so the percentage reflects the application code Stefan can be
-# asked to defend in a Deep-Dive, not test scaffolding.
-# Collect every source file via a NUL-delimited find pipeline. Portable to
-# bash 3.2 (macOS default) so the script works for local runs without
-# installing a newer shell. Tests and assets are excluded; the percentage
-# reflects application code Stefan can be asked to defend, not scaffolding.
+# Source files included in the count. Tests and assets are excluded so the
+# percentage reflects the application code Stefan can be asked to defend.
 FILE_LIST="$(mktemp)"
-trap 'rm -f "$FILE_LIST"' EXIT
+AUTHOR_DUMP="$(mktemp)"
+trap 'rm -f "$FILE_LIST" "$AUTHOR_DUMP"' EXIT
 find src include bench -type f \( -name '*.cpp' -o -name '*.hpp' -o -name '*.h' \) 2>/dev/null > "$FILE_LIST"
 [ -f coremetrics.cpp ] && echo coremetrics.cpp >> "$FILE_LIST"
 
@@ -34,33 +36,67 @@ if [ ! -s "$FILE_LIST" ]; then
   exit 1
 fi
 
-# The -w flag ignores whitespace-only churn so a reformat does not flip
-# authorship for an entire file; -C and -M follow moves and copies so a
-# function moved from one file to another keeps its original author.
-TOTAL=0
-STEFAN=0
-
+# For each source file, run git blame -w -C -M (ignore whitespace, follow
+# copies + moves so a relocated function keeps its original author) and
+# write one line per blamed line in the form "<name>\t<email>". The combined
+# dump feeds both the totals and the per-author breakdown.
 while IFS= read -r f; do
   [ -n "$f" ] || continue
-  if ! lines=$(git blame -w -C -M --line-porcelain -- "$f" 2>/dev/null); then
-    continue
-  fi
-  file_total=$(printf '%s\n' "$lines" | grep -c '^author ' || true)
-  file_stefan=$(printf '%s\n' "$lines" | grep -c "^author-mail <${STEFAN_EMAIL}>" || true)
-  TOTAL=$((TOTAL + file_total))
-  STEFAN=$((STEFAN + file_stefan))
-done < "$FILE_LIST"
+  git blame -w -C -M --line-porcelain -- "$f" 2>/dev/null \
+    | awk '
+        /^author / {
+          # Drop "author " prefix, keep raw name; do not print yet, wait
+          # for the matching author-mail line on the same blame record.
+          sub(/^author /, "");
+          name = $0;
+          next;
+        }
+        /^author-mail / {
+          # author-mail value is wrapped in <...>; strip the angle brackets
+          # so it matches the script-level email comparison.
+          mail = $0;
+          sub(/^author-mail </, "", mail);
+          sub(/>$/, "", mail);
+          printf("%s\t%s\n", name, mail);
+        }
+      '
+done < "$FILE_LIST" >> "$AUTHOR_DUMP"
+
+TOTAL=$(wc -l < "$AUTHOR_DUMP" | awk '{print $1}')
 
 if [ "$TOTAL" -eq 0 ]; then
   echo "git blame returned 0 lines across the source tree" >&2
   exit 1
 fi
 
+# Aggregate "<name>\t<email>" into "<count>\t<name>\t<email>" sorted desc by
+# count. Group by email (so "Sviatoslav" + "Sviatoslav Oleksiienko" with the
+# same address fold into one row); pick the longest seen name as canonical
+# so the README shows the full form.
+PER_AUTHOR="$(mktemp)"
+trap 'rm -f "$FILE_LIST" "$AUTHOR_DUMP" "$PER_AUTHOR"' EXIT
+awk -F'\t' '
+  {
+    mail = $2;
+    name = $1;
+    count[mail]++;
+    if (length(name) > length(canonical[mail])) {
+      canonical[mail] = name;
+    }
+  }
+  END {
+    for (m in count) {
+      printf("%d\t%s\t%s\n", count[m], canonical[m], m);
+    }
+  }
+' "$AUTHOR_DUMP" | sort -t $'\t' -k1,1 -nr > "$PER_AUTHOR"
+
+STEFAN=$(awk -F'\t' -v e="$STEFAN_EMAIL" '$3 == e { s += $1 } END { print s + 0 }' "$PER_AUTHOR")
+
 PCT=$(awk -v s="$STEFAN" -v t="$TOTAL" 'BEGIN { printf("%.1f", (s / t) * 100) }')
 
-# Color thresholds: red < 40, orange < 60, yellow < 75, green >= 75.
-# Matches the existing bar threshold language in the UI so the README colors
-# read consistently.
+# Color thresholds match the in-app bar coloring so the README badge reads
+# consistently with the UI: red < 40, orange < 60, yellow < 75, green >= 75.
 COLOR=$(awk -v p="$PCT" 'BEGIN {
   if (p < 40) print "red";
   else if (p < 60) print "orange";
@@ -68,10 +104,11 @@ COLOR=$(awk -v p="$PCT" 'BEGIN {
   else print "brightgreen";
 }')
 
-OUT=".github/badges/contribution.json"
-mkdir -p "$(dirname "$OUT")"
+# --- shields.io endpoint JSON ----------------------------------------------
 
-cat > "$OUT" <<JSON
+OUT_JSON=".github/badges/contribution.json"
+mkdir -p "$(dirname "$OUT_JSON")"
+cat > "$OUT_JSON" <<JSON
 {
   "schemaVersion": 1,
   "label": "Stefan's code",
@@ -80,5 +117,62 @@ cat > "$OUT" <<JSON
 }
 JSON
 
-echo "Wrote $OUT"
-cat "$OUT"
+# --- Markdown contribution section ----------------------------------------
+
+OUT_MD=".github/badges/contributions.md"
+{
+  echo '<!-- contribution:start -->'
+  echo
+  echo '## Team and my contribution'
+  echo
+  echo "A 4-person Notre Dame CSE 40232 software-engineering project (SP26 Team 04), three months, a PR-template + required-review workflow with per-developer branches. I was the lead and primary author: **${PCT}% of the source by line** (git-blame verified, recomputed on every push to \`main\`)."
+  echo
+  echo "_The block below is regenerated by [\`scripts/compute-contributions.sh\`](scripts/compute-contributions.sh) on every push to \`main\` via the \`Contribution badge\` workflow. Don't edit between the markers — your edit will be overwritten._"
+  echo
+  echo '### Lines of code by author'
+  echo
+  echo '```mermaid'
+  echo 'pie showData'
+  echo "    title Source line share across src/, include/, bench/, coremetrics.cpp"
+  while IFS=$'\t' read -r cnt name mail; do
+    [ -n "$cnt" ] || continue
+    # Escape any double-quotes inside the author name so the Mermaid label parses.
+    safe_name=$(printf '%s' "$name" | sed 's/"/\\"/g')
+    if [ "$mail" = "$STEFAN_EMAIL" ]; then
+      safe_name="$safe_name (me)"
+    fi
+    printf '    "%s" : %s\n' "$safe_name" "$cnt"
+  done < "$PER_AUTHOR"
+  echo '```'
+  echo
+  echo '| Author | Lines | Share |'
+  echo '| --- | ---: | ---: |'
+  while IFS=$'\t' read -r cnt name mail; do
+    [ -n "$cnt" ] || continue
+    share=$(awk -v c="$cnt" -v t="$TOTAL" 'BEGIN { printf("%.1f", (c / t) * 100) }')
+    label="$name"
+    if [ "$mail" = "$STEFAN_EMAIL" ]; then
+      label="**$name (me)**"
+    fi
+    # ASCII share bar: each block is ~5% of total.
+    bars=$(awk -v p="$share" 'BEGIN {
+      n = int((p / 5) + 0.5);
+      out = "";
+      for (i = 0; i < n; i++) out = out "█";
+      for (i = n; i < 20; i++) out = out "░";
+      printf("%s", out);
+    }')
+    printf '| %s | %s | `%s` %s%% |\n' "$label" "$cnt" "$bars" "$share"
+  done < "$PER_AUTHOR"
+  echo
+  echo '_Run \`scripts/compute-contributions.sh\` locally to reproduce these numbers from your checkout._'
+  echo
+  echo '<!-- contribution:end -->'
+} > "$OUT_MD"
+
+echo "Wrote $OUT_JSON"
+cat "$OUT_JSON"
+echo
+echo "Wrote $OUT_MD"
+echo "--- preview ---"
+head -25 "$OUT_MD"
