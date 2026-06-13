@@ -14,21 +14,25 @@ LDFLAGS = -L/opt/homebrew/lib -lSDL3 -lSDL3_ttf -lSDL3_image -Wl,-rpath,/opt/hom
 
 SRCDIR = src
 TESTDIR = tests
+BENCHDIR = bench
 INCDIR = include
 OBJDIR = obj
 BINDIR = bin
 
 DEMO_TARGET = $(BINDIR)/demo
 TEST_TARGET = $(BINDIR)/tests
+BENCH_TARGET = $(BINDIR)/bench
 COREMETRICS_TARGET = $(BINDIR)/coremetrics
 
 SOURCES = $(wildcard $(SRCDIR)/*.cpp)
 TEST_SOURCES = $(wildcard $(TESTDIR)/*.cpp)
+BENCH_SOURCES = $(wildcard $(BENCHDIR)/*.cpp)
 
 OBJECTS = $(SOURCES:$(SRCDIR)/%.cpp=$(OBJDIR)/%.o)
 TEST_OBJECTS = $(TEST_SOURCES:$(TESTDIR)/%.cpp=$(OBJDIR)/%.o)
+BENCH_OBJECTS = $(BENCH_SOURCES:$(BENCHDIR)/%.cpp=$(OBJDIR)/%.o)
 
-.PHONY: all demo test coremetrics directories clean
+.PHONY: all demo test bench coremetrics directories clean
 
 all: coremetrics
 
@@ -37,6 +41,9 @@ demo: directories $(DEMO_TARGET)
 
 test: directories $(TEST_TARGET)
 	./$(TEST_TARGET)
+
+bench: directories $(BENCH_TARGET)
+	./$(BENCH_TARGET)
 
 coremetrics: directories $(COREMETRICS_TARGET)
 	./$(COREMETRICS_TARGET)
@@ -50,6 +57,9 @@ $(DEMO_TARGET): $(OBJDIR)/main.o $(OBJECTS)
 $(TEST_TARGET): $(TEST_OBJECTS) $(OBJECTS)
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
 
+$(BENCH_TARGET): $(BENCH_OBJECTS) $(OBJECTS)
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
+
 $(COREMETRICS_TARGET): $(OBJDIR)/coremetrics.o $(OBJECTS)
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
 
@@ -57,6 +67,9 @@ $(OBJDIR)/%.o: $(SRCDIR)/%.cpp
 	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -c $< -o $@
 
 $(OBJDIR)/%.o: $(TESTDIR)/%.cpp
+	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -c $< -o $@
+
+$(OBJDIR)/%.o: $(BENCHDIR)/%.cpp
 	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -c $< -o $@
 
 $(OBJDIR)/main.o: main.cpp
@@ -68,4 +81,4 @@ $(OBJDIR)/coremetrics.o: coremetrics.cpp
 clean:
 	rm -rf $(OBJDIR) $(BINDIR)
 
--include $(OBJECTS:.o=.d) $(TEST_OBJECTS:.o=.d) $(OBJDIR)/main.d $(OBJDIR)/coremetrics.d
+-include $(OBJECTS:.o=.d) $(TEST_OBJECTS:.o=.d) $(BENCH_OBJECTS:.o=.d) $(OBJDIR)/main.d $(OBJDIR)/coremetrics.d
