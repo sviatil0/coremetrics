@@ -1,4 +1,15 @@
-# SP26_Team04
+# CoreMetrics
+
+A real-time system process monitor (CPU, RAM, GPU, process table) built in C++ on
+top of a from-scratch 2D graphics library over SDL3. Cross-platform (Linux, macOS,
+Windows) with templated vector math, a Bresenham rasterizer, an event-driven GUI
+layer, and a thread-pool that parallelizes wide fills.
+
+**Team project (Notre Dame CSE 40232, Software Engineering, Spring 2026).** Built by a
+four-person team; I was the lead and majority contributor (the git history shows my
+commits as the plurality of the ~200 total). Teammates: Alicia Melotik, mcastel5;
+instructor: Prof. Daniel Rehberg. Released publicly with the team's and instructor's
+consent under LGPL-2.1.
 
 ## Class Diagram
 
