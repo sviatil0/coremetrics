@@ -55,9 +55,12 @@ Alicia        ████████░░░░░░░░░░░░░░
 mcastel5      ██████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  12%   (  805 lines)
 ```
 
-The engine is mine: the graphics core (templated vector math, the `Screen` rasterizer,
-the `ThreadPool`), the event system, the GUI element hierarchy and factory, and all three
-`SystemMetrics` platform layers. Reproduce the numbers yourself:
+What is mine: the vector / matrix math, the `Screen` rasterizer (Bresenham lines,
+barycentric triangle fill) and its pixel tests, all three `SystemMetrics` platform
+backends (`/proc`, IOKit, PDH), the GUI element hierarchy and factory, and the parallel
+`drawBox` / `drawTriangle` call-sites. The `ThreadPool` itself and `Cloneable` were
+written by teammates; I wrote the rasterizer code that uses them. Reproduce the per-file
+split yourself:
 
 ```sh
 git ls-files '*.cpp' '*.hpp' '*.h' | while read f; do
@@ -139,8 +142,9 @@ architecture, the cross-platform proof, and a demo.
 - **From-scratch rasterizer.** `Screen` plots pixels, Bresenham lines, filled boxes and
   triangles directly onto an SDL surface it owns via RAII. No SDL draw calls above the raw
   surface.
-- **Parallel fills.** `ThreadPool` (one per `hardware_concurrency`) partitions wide
-  `drawBox` / `drawTriangle` pixel rows across workers and joins on `std::future`.
+- **Parallel fills.** `drawBox` / `drawTriangle` partition their pixel rows into disjoint
+  bands and dispatch them across a worker pool, joining on `std::future` (the pool itself
+  is a teammate's; the rasterizer call-sites are mine).
 - **Cross-platform metrics behind one header.** `SystemMetrics` is platform-agnostic at
   the interface; `_linux` (`/proc`), `_mac` (IOKit / `host_statistics`), and `_win` (PDH /
   toolhelp) implementations are selected by `#ifdef`, so only one contributes symbols.
