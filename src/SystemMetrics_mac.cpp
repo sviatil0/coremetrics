@@ -19,8 +19,10 @@ static const mach_port_t MS_IO_DEFAULT_PORT = MACH_PORT_NULL;
 #include <mach/host_info.h>
 #include <mach/processor_info.h>
 #include <sys/sysctl.h>
+#include <sys/time.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <stdlib.h>
 #include <unordered_map>
 #include <vector>
 
@@ -122,6 +124,34 @@ std::vector<float> SystemMetrics::readPerCoreCpu()
                   reinterpret_cast<vm_address_t>(infoArray),
                   static_cast<vm_size_t>(infoCount * sizeof(integer_t)));
     return result;
+}
+
+unsigned long long SystemMetrics::readUptimeSeconds()
+{
+    struct timeval bootTime;
+    size_t len = sizeof(bootTime);
+    int mib[2] = {CTL_KERN, KERN_BOOTTIME};
+    if (sysctl(mib, 2, &bootTime, &len, nullptr, 0) != 0 || bootTime.tv_sec == 0)
+    {
+        return 0;
+    }
+    auto now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+    long long diff = static_cast<long long>(now) - static_cast<long long>(bootTime.tv_sec);
+    return diff > 0 ? static_cast<unsigned long long>(diff) : 0;
+}
+
+std::vector<float> SystemMetrics::readLoadAverages()
+{
+    double loads[3] = {0.0, 0.0, 0.0};
+    if (getloadavg(loads, 3) != 3)
+    {
+        return std::vector<float>{0.0f, 0.0f, 0.0f};
+    }
+    return std::vector<float>{
+        static_cast<float>(loads[0]),
+        static_cast<float>(loads[1]),
+        static_cast<float>(loads[2])
+    };
 }
 
 MemBreakdown SystemMetrics::readMemBreakdown()

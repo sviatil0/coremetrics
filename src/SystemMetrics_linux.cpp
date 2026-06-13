@@ -119,6 +119,30 @@ float SystemMetrics::readCpuPercent()
     return usage * 100.0f;
 }
 
+unsigned long long SystemMetrics::readUptimeSeconds()
+{
+    std::ifstream file("/proc/uptime");
+    if (!file.is_open())
+    {
+        return 0;
+    }
+    double secs = 0.0;
+    file >> secs;
+    return secs > 0.0 ? static_cast<unsigned long long>(secs) : 0;
+}
+
+std::vector<float> SystemMetrics::readLoadAverages()
+{
+    std::ifstream file("/proc/loadavg");
+    if (!file.is_open())
+    {
+        return std::vector<float>{0.0f, 0.0f, 0.0f};
+    }
+    float l1 = 0.0f, l5 = 0.0f, l15 = 0.0f;
+    file >> l1 >> l5 >> l15;
+    return std::vector<float>{l1, l5, l15};
+}
+
 MemBreakdown SystemMetrics::readMemBreakdown()
 {
     MemBreakdown out{0, 0, 0, 0, 0};

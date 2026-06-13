@@ -64,6 +64,21 @@ float SystemMetrics::readCpuPercent()
     return usage * 100.0f;
 }
 
+unsigned long long SystemMetrics::readUptimeSeconds()
+{
+    ULONGLONG ticks = GetTickCount64();
+    return static_cast<unsigned long long>(ticks / 1000ULL);
+}
+
+std::vector<float> SystemMetrics::readLoadAverages()
+{
+    // No Windows analog for /proc/loadavg in the standard runtime. A real
+    // implementation would sample the system queue length over time via
+    // PDH and emulate the 1/5/15 EMA the way procps does. Out of scope
+    // for now; return zeros so the UI string just shows '--'.
+    return std::vector<float>{0.0f, 0.0f, 0.0f};
+}
+
 MemBreakdown SystemMetrics::readMemBreakdown()
 {
     MemBreakdown out{0, 0, 0, 0, 0};
