@@ -11,12 +11,21 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Linux + macOS are the verified targets. The Windows metrics layer
-        # (SystemMetrics_win.cpp) exists but the Windows SDL3 + pkg-config
-        # toolchain on the runner is flaky, so it is not gated in CI.
-        os: [ubuntu-latest, macos-latest]
+        # Linux + macOS are the gated targets. Windows is now added so the
+        # Windows metrics layer (SystemMetrics_win.cpp) stays compile-clean,
+        # but the Windows leg is marked continue-on-error because the
+        # SDL3 + pkg-config toolchain on the runner is still flaky. The
+        # PR-gating signal stays driven by Linux + macOS.
+        include:
+          - os: ubuntu-latest
+            allow-failure: false
+          - os: macos-latest
+            allow-failure: false
+          - os: windows-latest
+            allow-failure: true
 
     runs-on: ${{ matrix.os }}
+    continue-on-error: ${{ matrix.allow-failure }}
 
     steps:
     - uses: actions/checkout@v4
