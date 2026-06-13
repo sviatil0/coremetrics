@@ -62,6 +62,18 @@ make test       # 80+ unit tests across 11 suites
 Builds clean under C++23 (`g++ -std=c++23 -Wall`) on macOS and Linux; the CI matrix
 covers Ubuntu, macOS, and Windows.
 
+## Verifying it works
+
+```sh
+make test                        # 80+ unit tests across 11 suites
+./run-cross-platform-tests.sh    # runs the suite on macOS (native) + Linux (Docker)
+./stress.sh                      # spikes CPU/RAM/GPU so you can watch the bars react
+```
+
+`stress.sh` spawns real load (multi-worker CPU burn, a Python RAM allocation, and
+`glmark2`/`stress-ng` on the GPU) so the live bars actually move under pressure; it is
+how the monitor was demoed and sanity-checked, not just unit-tested in isolation.
+
 ## Slides
 
 A short [final presentation](docs/CoreMetrics-Final-Presentation.pdf) walks through the
