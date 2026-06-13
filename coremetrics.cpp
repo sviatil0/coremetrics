@@ -22,6 +22,7 @@
 #include "SystemMetrics.hpp"
 #include "LayoutUtils.hpp"
 #include "ProcessUtils.hpp"
+#include "Sparkline.hpp"
 
 constexpr int RESX = 960;
 constexpr int RESY = 540;
@@ -73,6 +74,16 @@ static void handleShutdownSignal(int)
 static SortColumn g_sortColumn = SORT_MEM;
 static bool g_sortAscending = false;
 static Row *g_headerRow = nullptr;
+
+// Sparklines are moonshot UI: a rolling time-series chart per metric drawn
+// over the System tab's lower half. Behind a flag (--sparklines) so the
+// default install matches the audit baseline; with the flag the System tab
+// gains 3 live polylines fed by RingBuffer<float> samples.
+static bool g_sparklinesEnabled = false;
+constexpr std::size_t SPARKLINE_CAPACITY = 64;
+static Sparkline *g_cpuSparkline = nullptr;
+static Sparkline *g_ramSparkline = nullptr;
+static Sparkline *g_gpuSparkline = nullptr;
 static ivec2 g_headerColMin[4];
 static ivec2 g_headerColMax[4];
 static ivec2 g_muteBtnMin;
@@ -140,6 +151,31 @@ static void cacheElementPointers()
     }
 }
 
+static void buildSparklines()
+{
+    // Stacked sparklines in the System tab's empty lower half. Each row spans
+    // the same horizontal range as the bars above (x in [24, 864]) and
+    // matches the same accent color, so the polyline reads as a continuation
+    // of its bar. Heights are 56px / row with 12px gaps.
+    const vec3 accent(0.871f, 1.0f, 0.608f);
+    g_cpuSparkline = new Sparkline(ivec2(24, 240), ivec2(864, 296), accent,
+                                   0.0f, 100.0f, SPARKLINE_CAPACITY);
+    g_ramSparkline = new Sparkline(ivec2(24, 308), ivec2(864, 364), accent,
+                                   0.0f, 100.0f, SPARKLINE_CAPACITY);
+    g_gpuSparkline = new Sparkline(ivec2(24, 376), ivec2(864, 432), accent,
+                                   0.0f, 100.0f, SPARKLINE_CAPACITY);
+}
+
+static void destroySparklines()
+{
+    delete g_cpuSparkline;
+    delete g_ramSparkline;
+    delete g_gpuSparkline;
+    g_cpuSparkline = nullptr;
+    g_ramSparkline = nullptr;
+    g_gpuSparkline = nullptr;
+}
+
 static void pollMetrics()
 {
     float cpuPct = SystemMetrics::readCpuPercent();
@@ -169,6 +205,19 @@ static void pollMetrics()
     if (g_gpuReadout != nullptr)
     {
         g_gpuReadout->setText(formatPct(gpuPct) + "%");
+    }
+
+    if (g_cpuSparkline != nullptr)
+    {
+        g_cpuSparkline->push(cpuPct);
+    }
+    if (g_ramSparkline != nullptr)
+    {
+        g_ramSparkline->push(memPct);
+    }
+    if (g_gpuSparkline != nullptr)
+    {
+        g_gpuSparkline->push(gpuPct);
     }
 
     bool cpuNowAlarm = cpuPct >= ALARM_THRESHOLD;
@@ -254,6 +303,10 @@ int main(int argc, char **argv)
                 durationSeconds = 0.0;
             }
         }
+        if (std::string(argv[i]) == "--sparklines")
+        {
+            g_sparklinesEnabled = true;
+        }
     }
 
     std::signal(SIGINT, handleShutdownSignal);
@@ -280,13 +333,31 @@ int main(int argc, char **argv)
         Screen shot(RESX, RESY);
         buildScene();
         cacheElementPointers();
-        // Per-process CPU% is a delta between two samples: a single pollMetrics
-        // call always reports 0.0% because there is no previous sample to
-        // diff against. Take a priming sample, sleep ~1.1s (enough that a
-        // typical process accumulates measurable ticks), then sample again
-        // before rendering. The aggregate CPU bar benefits the same way.
-        pollMetrics();
-        SDL_Delay(1100);
+        if (g_sparklinesEnabled)
+        {
+            buildSparklines();
+            // Prime the sparklines so a single headless --screenshot frame has
+            // enough history to draw a visible polyline. Without this, getSize()
+            // is 1 and Sparkline::draw returns early. 30 samples at 50ms each
+            // makes the chart read as ~1.5s of recent activity in the shot, and
+            // also satisfies the per-process delta requirement below.
+            for (int i = 0; i < 30; ++i)
+            {
+                pollMetrics();
+                SDL_Delay(50);
+            }
+        }
+        else
+        {
+            // Per-process CPU% is a delta between two samples: a single
+            // pollMetrics call always reports 0.0% because there is no previous
+            // sample to diff against. Take a priming sample, sleep ~1.1s
+            // (enough that a typical process accumulates measurable ticks),
+            // then sample again before rendering. The aggregate CPU bar
+            // benefits the same way.
+            pollMetrics();
+            SDL_Delay(1100);
+        }
         pollMetrics();
 
         if (tab == "processes")
@@ -298,6 +369,12 @@ int main(int argc, char **argv)
 
         shot.clear();
         LayoutManager::getInstance().render(shot, ivec2(0, 0), ivec2(RESX - 1, RESY - 1));
+        if (g_sparklinesEnabled && tab != "processes")
+        {
+            if (g_cpuSparkline != nullptr) g_cpuSparkline->draw(shot);
+            if (g_ramSparkline != nullptr) g_ramSparkline->draw(shot);
+            if (g_gpuSparkline != nullptr) g_gpuSparkline->draw(shot);
+        }
         SDL_Surface *out = SDL_CreateSurface(RESX, RESY, SDL_PIXELFORMAT_RGBA32);
         if (out == nullptr)
         {
@@ -359,6 +436,10 @@ int main(int argc, char **argv)
 
     buildScene();
     cacheElementPointers();
+    if (g_sparklinesEnabled)
+    {
+        buildSparklines();
+    }
     pollMetrics();
 
     Uint64 lastPoll = SDL_GetTicks();
@@ -500,10 +581,25 @@ int main(int argc, char **argv)
 
         screen.clear();
         LayoutManager::getInstance().render(screen, ivec2(0, 0), ivec2(RESX - 1, RESY - 1));
+        if (g_sparklinesEnabled)
+        {
+            // Only paint sparklines while the System tab is the active layout;
+            // when the user is on Processes the rows already occupy the same
+            // pixel range, so a sparkline would overdraw the table.
+            Tree<Layout> *systemNode = EventManager::findLayoutByName(
+                LayoutManager::getInstance().getRoot(), "system");
+            if (systemNode != nullptr && systemNode->getData().isActive())
+            {
+                if (g_cpuSparkline != nullptr) g_cpuSparkline->draw(screen);
+                if (g_ramSparkline != nullptr) g_ramSparkline->draw(screen);
+                if (g_gpuSparkline != nullptr) g_gpuSparkline->draw(screen);
+            }
+        }
         screen.blitTo(SDL_GetWindowSurface(window));
         SDL_UpdateWindowSurface(window);
     }
 
+    destroySparklines();
     SoundPlayer::getInstance().shutdown();
     Font::shutdown();
     SDL_DestroyWindow(window);

@@ -14,6 +14,7 @@
 #include "SystemMetricsTest.hpp"
 #include "SystemMetricsParseTest.hpp"
 #include "ProcessUtilsTest.hpp"
+#include "RingBufferTest.hpp"
 #include "CloneableTest.hpp"
 
 int main(int argc, char **argv)
@@ -38,6 +39,7 @@ int main(int argc, char **argv)
 	systemMetricsTestSuite();
 	systemMetricsParseTestSuite();
 	processUtilsTestSuite();
+	ringBufferTestSuite();
 	cloneableTestSuite();
 
 	SDL_Quit();
