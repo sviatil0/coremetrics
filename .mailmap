@@ -1,0 +1,19 @@
+# Canonical author identities for git log / git blame / git shortlog.
+# Format: canonical-name <canonical-email> [alias-name <alias-email>]
+# Docs: https://git-scm.com/docs/gitmailmap
+
+# Lead and primary author
+Sviatoslav Oleksiienko <soleksiienko1@gmail.com>
+Sviatoslav Oleksiienko <soleksiienko1@gmail.com> Sviatoslav <soleksiienko1@gmail.com>
+Sviatoslav Oleksiienko <soleksiienko1@gmail.com> Stefan (Sviatoslav) Oleksiienko <soleksiienko1@gmail.com>
+
+# Team
+Alicia Melotik <amelotik@nd.edu>
+Alicia Melotik <amelotik@nd.edu> amelotik <amelotik@nd.edu>
+Alicia Melotik <amelotik@nd.edu> Alicia Melotik <amelotik@student12.cse.nd.edu>
+
+Daniel Rehberg <drehberg@student10.cse.nd.edu>
+Daniel Rehberg <drehberg@student10.cse.nd.edu> Dan Rehberg <dbalthazzar@gmail.com>
+
+Martin Castelluccio <158235299+mcastel5@users.noreply.github.com>
+Martin Castelluccio <158235299+mcastel5@users.noreply.github.com> mcastel5 <158235299+mcastel5@users.noreply.github.com>

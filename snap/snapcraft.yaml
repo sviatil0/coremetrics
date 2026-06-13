@@ -1,0 +1,92 @@
+name: coremetrics
+version: "0.2.0"
+summary: Cross-platform desktop system monitor (CPU / RAM / GPU / processes)
+description: |
+  CoreMetrics is a small C++23 system monitor built directly on raw SDL3 pixel
+  surfaces. It shows live CPU, RAM, GPU, and per-process resource usage with
+  an optional rolling sparklines view and an htop-style kill flow on the
+  Processes tab.
+
+  No Qt, no Electron, no JavaScript runtime — every widget is hand-rasterized
+  by code in this repository. Three native metrics backends (Linux /proc,
+  macOS Mach + IOKit, Windows PDH) are selected at compile time so the same
+  source tree builds the same UI on each platform.
+
+grade: stable
+confinement: strict
+base: core22
+
+architectures:
+  - build-on: amd64
+  - build-on: arm64
+
+apps:
+  coremetrics:
+    command: bin/coremetrics
+    desktop: usr/share/applications/coremetrics.desktop
+    extensions:
+      - gnome
+    plugs:
+      - desktop
+      - desktop-legacy
+      - x11
+      - wayland
+      - opengl
+      - audio-playback
+      - system-observe
+      - process-control
+
+parts:
+  sdl3:
+    plugin: cmake
+    source: https://github.com/libsdl-org/SDL.git
+    source-tag: release-3.2.16
+    cmake-parameters:
+      - -DCMAKE_INSTALL_PREFIX=/usr
+      - -DCMAKE_BUILD_TYPE=Release
+      - -DSDL_TESTS=OFF
+    build-packages:
+      - libfreetype-dev
+      - libharfbuzz-dev
+      - libpng-dev
+      - libwayland-dev
+      - libxkbcommon-dev
+
+  sdl3-ttf:
+    plugin: cmake
+    source: https://github.com/libsdl-org/SDL_ttf.git
+    source-tag: release-3.2.2
+    after: [sdl3]
+    cmake-parameters:
+      - -DCMAKE_INSTALL_PREFIX=/usr
+      - -DCMAKE_BUILD_TYPE=Release
+      - -DSDLTTF_VENDORED=OFF
+
+  sdl3-image:
+    plugin: cmake
+    source: https://github.com/libsdl-org/SDL_image.git
+    source-tag: release-3.2.4
+    after: [sdl3]
+    cmake-parameters:
+      - -DCMAKE_INSTALL_PREFIX=/usr
+      - -DCMAKE_BUILD_TYPE=Release
+      - -DSDLIMAGE_VENDORED=OFF
+
+  coremetrics:
+    plugin: make
+    source: .
+    after: [sdl3, sdl3-ttf, sdl3-image]
+    build-packages:
+      - g++
+      - make
+      - pkg-config
+    override-build: |
+      mkdir -p obj bin
+      make CXXFLAGS="-std=c++23 -Wall -O2 -I ./include -I/usr/include" \
+           LDFLAGS="-L/usr/lib -lSDL3 -lSDL3_ttf -lSDL3_image -Wl,-rpath,/usr/lib" \
+           bin/coremetrics
+      install -D -m 0755 bin/coremetrics $SNAPCRAFT_PART_INSTALL/bin/coremetrics
+      install -D -m 0644 base.xml $SNAPCRAFT_PART_INSTALL/bin/base.xml
+      cp -r assets $SNAPCRAFT_PART_INSTALL/bin/assets
+      install -D -m 0644 snap/local/coremetrics.desktop \
+        $SNAPCRAFT_PART_INSTALL/usr/share/applications/coremetrics.desktop

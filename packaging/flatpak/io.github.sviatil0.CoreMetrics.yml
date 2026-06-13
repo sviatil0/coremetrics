@@ -1,0 +1,66 @@
+app-id: io.github.sviatil0.CoreMetrics
+runtime: org.freedesktop.Platform
+runtime-version: '23.08'
+sdk: org.freedesktop.Sdk
+command: coremetrics
+finish-args:
+  # Show windows via the host's Wayland or X11 display server.
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --share=ipc
+  # GPU acceleration for the SDL3 software surface blit (passthrough only).
+  - --device=dri
+  # Required so the Processes tab can enumerate /proc and read per-process stats.
+  - --filesystem=host-os:ro
+  # SDL3 audio for the alarm tick sound.
+  - --socket=pulseaudio
+modules:
+  - name: sdl3
+    buildsystem: cmake-ninja
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=Release
+      - -DSDL_TESTS=OFF
+    sources:
+      - type: archive
+        url: https://github.com/libsdl-org/SDL/releases/download/release-3.2.16/SDL3-3.2.16.tar.gz
+        # SHA256 placeholder; Flathub CI rejects modules without a verified
+        # sha256 and recomputes against the URL on submission. The CI will
+        # surface the correct value the first time it pulls the tag.
+        sha256: REPLACE_WITH_SDL3_TARBALL_SHA256
+
+  - name: sdl3-ttf
+    buildsystem: cmake-ninja
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=Release
+      - -DSDLTTF_VENDORED=OFF
+    sources:
+      - type: archive
+        url: https://github.com/libsdl-org/SDL_ttf/releases/download/release-3.2.2/SDL3_ttf-3.2.2.tar.gz
+        sha256: REPLACE_WITH_SDL3_TTF_TARBALL_SHA256
+
+  - name: sdl3-image
+    buildsystem: cmake-ninja
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=Release
+      - -DSDLIMAGE_VENDORED=OFF
+    sources:
+      - type: archive
+        url: https://github.com/libsdl-org/SDL_image/releases/download/release-3.2.4/SDL3_image-3.2.4.tar.gz
+        sha256: REPLACE_WITH_SDL3_IMAGE_TARBALL_SHA256
+
+  - name: coremetrics
+    buildsystem: simple
+    build-commands:
+      - mkdir -p obj bin
+      - make CXXFLAGS="-std=c++23 -Wall -O2 -I ./include -I/app/include"
+             LDFLAGS="-L/app/lib -lSDL3 -lSDL3_ttf -lSDL3_image -Wl,-rpath,/app/lib"
+             bin/coremetrics
+      - install -D -m 0755 bin/coremetrics /app/bin/coremetrics
+      - install -D -m 0644 base.xml /app/bin/base.xml
+      - cp -r assets /app/bin/assets
+      - install -D -m 0644 packaging/flatpak/io.github.sviatil0.CoreMetrics.desktop /app/share/applications/io.github.sviatil0.CoreMetrics.desktop
+      - install -D -m 0644 assets/logo.png /app/share/icons/hicolor/256x256/apps/io.github.sviatil0.CoreMetrics.png
+      - install -D -m 0644 packaging/flatpak/io.github.sviatil0.CoreMetrics.metainfo.xml /app/share/metainfo/io.github.sviatil0.CoreMetrics.metainfo.xml
+    sources:
+      - type: dir
+        path: ../..

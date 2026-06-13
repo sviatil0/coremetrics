@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=CoreMetrics
+Comment=Cross-platform desktop system monitor (CPU / RAM / GPU / processes)
+Exec=coremetrics
+Icon=${SNAP}/bin/assets/logo.png
+Type=Application
+Categories=System;Monitor;
+Keywords=system;monitor;cpu;ram;gpu;process;htop;
+Terminal=false

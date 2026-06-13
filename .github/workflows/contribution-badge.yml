@@ -1,10 +1,17 @@
 name: Contribution badge
 
-# Recomputes Stefan's git-blame line share whenever main moves and commits
-# the updated `.github/badges/contribution.json` back. The README's badge
-# points at the raw URL of that JSON via shields.io's endpoint mode, so the
-# percentage always reflects the current main, never a stale hand-typed
-# claim.
+# Recomputes per-author line counts whenever main moves. Writes two artifacts:
+#
+#   .github/badges/contribution.json   shields.io endpoint JSON (Stefan's %)
+#   .github/badges/contributions.md    Markdown section with Mermaid pie +
+#                                       per-author bar table
+#
+# Then injects contributions.md into README.md between the markers
+# <!-- contribution:start --> and <!-- contribution:end --> and commits both
+# the JSON and the rewritten README back to main. The README badge and the
+# contribution section therefore always reflect the current main, never a
+# stale hand-typed claim, and the recomputation is byte-deterministic for a
+# given tree.
 
 on:
   push:
@@ -15,6 +22,7 @@ on:
       - 'bench/**'
       - 'coremetrics.cpp'
       - 'scripts/compute-contributions.sh'
+      - '.mailmap'
       - '.github/workflows/contribution-badge.yml'
   workflow_dispatch:
 
@@ -30,20 +38,50 @@ jobs:
         with:
           fetch-depth: 0  # full history required for accurate `git blame`
 
-      - name: Recompute badge
+      - name: Recompute badge + contribution section
         run: bash scripts/compute-contributions.sh
 
-      - name: Commit if changed
+      - name: Inject contribution section into README
+        run: |
+          python3 - <<'PY'
+          import pathlib, re, sys
+
+          readme = pathlib.Path("README.md")
+          section = pathlib.Path(".github/badges/contributions.md").read_text()
+
+          original = readme.read_text()
+          # Markers are kept inside the section file so a single sed-style
+          # replace covers both the opening and closing tokens in one pass.
+          pattern = re.compile(
+              r"<!--\s*contribution:start\s*-->.*?<!--\s*contribution:end\s*-->",
+              re.DOTALL,
+          )
+          if not pattern.search(original):
+              sys.stderr.write(
+                  "README.md is missing the <!-- contribution:start --> / end markers; "
+                  "no injection performed.\n"
+              )
+              sys.exit(0)
+
+          updated = pattern.sub(section.strip(), original)
+          if updated != original:
+              readme.write_text(updated)
+              print("README contribution section refreshed.")
+          else:
+              print("README contribution section unchanged.")
+          PY
+
+      - name: Commit if anything changed
         env:
           GIT_AUTHOR_NAME: Sviatoslav Oleksiienko
           GIT_AUTHOR_EMAIL: soleksiienko1@gmail.com
           GIT_COMMITTER_NAME: Sviatoslav Oleksiienko
           GIT_COMMITTER_EMAIL: soleksiienko1@gmail.com
         run: |
-          if git diff --quiet -- .github/badges/contribution.json; then
-            echo "Badge unchanged, nothing to commit."
+          git add .github/badges/contribution.json .github/badges/contributions.md README.md
+          if git diff --cached --quiet; then
+            echo "Nothing to commit."
             exit 0
           fi
-          git add .github/badges/contribution.json
-          git commit -m "chore(badge): refresh contribution share from git blame"
+          git commit -m "chore(contribution): refresh badge and per-author breakdown from git blame"
           git push origin HEAD:main

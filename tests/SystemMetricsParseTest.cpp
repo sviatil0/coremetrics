@@ -140,6 +140,55 @@ static void testProcStatusEmpty()
     report("parseProcStatusVmRssKb rejects empty", !ok && kb == 0);
 }
 
+static void testProcStatPerCoreThreeCores()
+{
+    const std::string content =
+        "cpu  100 50 30 800 20 10 5 0\n"
+        "cpu0 40 20 10 300 5 3 1 0\n"
+        "cpu1 30 15 10 250 8 4 2 0\n"
+        "cpu2 30 15 10 250 7 3 2 0\n"
+        "intr 12345\n";
+
+    std::vector<ProcParsers::CpuTicks> ticks;
+    bool ok = ProcParsers::parseProcStatPerCore(content, ticks);
+    bool passed = ok
+                  && ticks.size() == 3
+                  && ticks[0].idle == 305
+                  && ticks[0].total == (40ULL + 20 + 10 + 305 + 3 + 1)
+                  && ticks[2].idle == 257;
+    report("parseProcStatPerCore three cores", passed);
+}
+
+static void testProcStatPerCoreSkipsAggregate()
+{
+    const std::string content =
+        "cpu  100 50 30 800 0 0 0 0\n"
+        "cpu0 50 25 15 400 0 0 0 0\n";
+    std::vector<ProcParsers::CpuTicks> ticks;
+    bool ok = ProcParsers::parseProcStatPerCore(content, ticks);
+    report("parseProcStatPerCore skips aggregate cpu line",
+           ok && ticks.size() == 1);
+}
+
+static void testProcStatPerCoreEmptyInput()
+{
+    std::vector<ProcParsers::CpuTicks> ticks;
+    ProcParsers::CpuTicks pre{99ULL, 99ULL};
+    ticks.push_back(pre);
+    bool ok = ProcParsers::parseProcStatPerCore("", ticks);
+    report("parseProcStatPerCore rejects empty + clears vector",
+           !ok && ticks.empty());
+}
+
+static void testProcStatPerCoreNoPerCoreLines()
+{
+    const std::string content = "cpu  1 2 3 4 0 0 0 0\nintr 0\n";
+    std::vector<ProcParsers::CpuTicks> ticks;
+    bool ok = ProcParsers::parseProcStatPerCore(content, ticks);
+    report("parseProcStatPerCore returns false when only aggregate present",
+           !ok && ticks.empty());
+}
+
 void systemMetricsParseTestSuite()
 {
     std::cout << "=============================================" << '\n';
@@ -164,6 +213,11 @@ void systemMetricsParseTestSuite()
     testProcStatusVmRssPresent();
     testProcStatusVmRssAbsent();
     testProcStatusEmpty();
+
+    testProcStatPerCoreThreeCores();
+    testProcStatPerCoreSkipsAggregate();
+    testProcStatPerCoreEmptyInput();
+    testProcStatPerCoreNoPerCoreLines();
 
     std::cout << '\n';
     std::cout << "  Failures: " << g_failures << '\n';

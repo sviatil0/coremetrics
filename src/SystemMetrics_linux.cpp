@@ -4,6 +4,7 @@
 #include "ProcParsers.hpp"
 #include "ProcessUtils.hpp"
 #include <algorithm>
+#include <chrono>
 #include <cstdlib>
 #include <dirent.h>
 #include <fstream>
@@ -12,6 +13,9 @@
 
 extern bool systemMetricsCompareByMemDesc(const ProcessInfo &a, const ProcessInfo &b);
 
+static std::vector<unsigned long long> g_lastPerCoreTotal;
+static std::vector<unsigned long long> g_lastPerCoreIdle;
+
 static unsigned long long g_lastTotal = 0;
 static unsigned long long g_lastIdle = 0;
 
@@ -19,6 +23,41 @@ static unsigned long long g_lastIdle = 0;
 // over the system-wide jiffies that elapsed in the same window.
 static std::map<int, unsigned long long> g_lastProcTicks;
 static unsigned long long g_lastProcSampleTotal = 0;
+
+// Per-process disk I/O rate needs a delta: bytes read/written between two
+// samples, over wall-clock seconds. Tracked separately because /proc/[pid]/io
+// counters are cumulative and need real time (not jiffies) to convert into
+// KB/sec.
+struct ProcIoCounters
+{
+    unsigned long long readBytes;
+    unsigned long long writeBytes;
+};
+static std::map<int, ProcIoCounters> g_lastProcIo;
+static std::chrono::steady_clock::time_point g_lastProcIoSampleTime;
+
+static ProcIoCounters readProcIoBytes(int pid)
+{
+    ProcIoCounters out{0, 0};
+    std::ostringstream path;
+    path << "/proc/" << pid << "/io";
+    std::ifstream file(path.str());
+    if (!file.is_open())
+    {
+        return out;
+    }
+    std::string line;
+    while (std::getline(file, line))
+    {
+        std::istringstream iss(line);
+        std::string key;
+        unsigned long long value = 0;
+        iss >> key >> value;
+        if (key == "read_bytes:") out.readBytes = value;
+        else if (key == "write_bytes:") out.writeBytes = value;
+    }
+    return out;
+}
 
 static std::string slurpFile(const std::string &path)
 {
@@ -116,6 +155,123 @@ float SystemMetrics::readCpuPercent()
     return usage * 100.0f;
 }
 
+unsigned long long SystemMetrics::readUptimeSeconds()
+{
+    std::ifstream file("/proc/uptime");
+    if (!file.is_open())
+    {
+        return 0;
+    }
+    double secs = 0.0;
+    file >> secs;
+    return secs > 0.0 ? static_cast<unsigned long long>(secs) : 0;
+}
+
+std::vector<float> SystemMetrics::readLoadAverages()
+{
+    std::ifstream file("/proc/loadavg");
+    if (!file.is_open())
+    {
+        return std::vector<float>{0.0f, 0.0f, 0.0f};
+    }
+    float l1 = 0.0f, l5 = 0.0f, l15 = 0.0f;
+    file >> l1 >> l5 >> l15;
+    return std::vector<float>{l1, l5, l15};
+}
+
+MemBreakdown SystemMetrics::readMemBreakdown()
+{
+    MemBreakdown out{0, 0, 0, 0, 0};
+    std::ifstream file("/proc/meminfo");
+    if (!file.is_open())
+    {
+        return out;
+    }
+
+    unsigned long long memTotal = 0;
+    unsigned long long memFree = 0;
+    unsigned long long buffers = 0;
+    unsigned long long cached = 0;
+    unsigned long long sReclaimable = 0;
+    unsigned long long shmem = 0;
+    unsigned long long active = 0;
+
+    std::string line;
+    while (std::getline(file, line))
+    {
+        std::istringstream iss(line);
+        std::string key;
+        unsigned long long value = 0;
+        iss >> key >> value;
+        if (key == "MemTotal:") memTotal = value;
+        else if (key == "MemFree:") memFree = value;
+        else if (key == "Buffers:") buffers = value;
+        else if (key == "Cached:") cached = value;
+        else if (key == "SReclaimable:") sReclaimable = value;
+        else if (key == "Shmem:") shmem = value;
+        else if (key == "Active:") active = value;
+    }
+    if (memTotal == 0)
+    {
+        return out;
+    }
+
+    out.totalKb = memTotal;
+    out.freeKb = memFree;
+    // htop's cached bucket: page cache + reclaimable slab + buffers,
+    // minus shmem which is double-counted between Cached and Shmem on
+    // Linux. Guarded against underflow.
+    unsigned long long cachedAll = cached + sReclaimable + buffers;
+    if (shmem <= cachedAll) cachedAll -= shmem;
+    out.cachedKb = cachedAll;
+    out.activeKb = active;
+    // Wired ~= total - (active + cached + free). Bounded at zero so the
+    // math cannot go negative on an unusual layout.
+    unsigned long long accounted = out.cachedKb + out.activeKb + out.freeKb;
+    out.wiredKb = (memTotal > accounted) ? (memTotal - accounted) : 0;
+    return out;
+}
+
+std::vector<float> SystemMetrics::readPerCoreCpu()
+{
+    std::vector<ProcParsers::CpuTicks> ticks;
+    if (!ProcParsers::parseProcStatPerCore(slurpFile("/proc/stat"), ticks))
+    {
+        return std::vector<float>();
+    }
+
+    std::vector<float> result(ticks.size(), 0.0f);
+    bool firstSample = (g_lastPerCoreTotal.size() != ticks.size());
+    if (firstSample)
+    {
+        g_lastPerCoreTotal.assign(ticks.size(), 0);
+        g_lastPerCoreIdle.assign(ticks.size(), 0);
+    }
+
+    for (std::size_t i = 0; i < ticks.size(); ++i)
+    {
+        if (!firstSample)
+        {
+            unsigned long long totalDiff = (ticks[i].total >= g_lastPerCoreTotal[i])
+                                               ? ticks[i].total - g_lastPerCoreTotal[i]
+                                               : 0;
+            unsigned long long idleDiff = (ticks[i].idle >= g_lastPerCoreIdle[i])
+                                              ? ticks[i].idle - g_lastPerCoreIdle[i]
+                                              : 0;
+            if (totalDiff > 0)
+            {
+                float usage = 1.0f - (static_cast<float>(idleDiff) / static_cast<float>(totalDiff));
+                if (usage < 0.0f) usage = 0.0f;
+                if (usage > 1.0f) usage = 1.0f;
+                result[i] = usage * 100.0f;
+            }
+        }
+        g_lastPerCoreTotal[i] = ticks[i].total;
+        g_lastPerCoreIdle[i] = ticks[i].idle;
+    }
+    return result;
+}
+
 float SystemMetrics::readGpuPercent()
 {
     std::ifstream file("/sys/class/drm/card0/device/gpu_busy_percent");
@@ -206,6 +362,16 @@ std::vector<ProcessInfo> SystemMetrics::topProcesses(std::size_t n)
                                           : sysTotal - g_lastProcSampleTotal;
 
     std::map<int, unsigned long long> currentProcTicks;
+    std::map<int, ProcIoCounters> currentProcIo;
+
+    // Wall-clock seconds since the previous I/O sample. Used to convert
+    // cumulative byte counters from /proc/[pid]/io into a KB/sec rate.
+    auto nowTp = std::chrono::steady_clock::now();
+    double ioElapsedSec = 0.0;
+    if (g_lastProcIoSampleTime.time_since_epoch().count() != 0)
+    {
+        ioElapsedSec = std::chrono::duration<double>(nowTp - g_lastProcIoSampleTime).count();
+    }
 
     struct dirent *entry = nullptr;
     while ((entry = readdir(dir)) != nullptr)
@@ -237,17 +403,71 @@ std::vector<ProcessInfo> SystemMetrics::topProcesses(std::size_t n)
         {
             memPct = (static_cast<float>(memKb) / static_cast<float>(memTotalKb)) * 100.0f;
         }
+        // /proc/[pid]/stat field 4 is the parent pid (1-based after the
+        // ppid_position offset that ProcParsers uses for the ticks). The
+        // parser already grabs utime+stime; we read ppid here without
+        // adding a second pure helper since it's a one-off field.
+        int parentPid = 0;
+        {
+            std::ostringstream statPath;
+            statPath << "/proc/" << pid << "/stat";
+            std::ifstream statFile(statPath.str());
+            if (statFile.is_open())
+            {
+                std::string content;
+                std::getline(statFile, content);
+                std::size_t rparen = content.rfind(')');
+                if (rparen != std::string::npos && rparen + 1 < content.size())
+                {
+                    std::istringstream iss(content.substr(rparen + 1));
+                    std::string state;
+                    int ppid = 0;
+                    if (iss >> state >> ppid)
+                    {
+                        parentPid = ppid;
+                    }
+                }
+            }
+        }
+
+        ProcIoCounters io = readProcIoBytes(pid);
+        currentProcIo[pid] = io;
+        unsigned long long readKbPerSec = 0;
+        unsigned long long writeKbPerSec = 0;
+        if (ioElapsedSec > 0.0)
+        {
+            auto prevIo = g_lastProcIo.find(pid);
+            if (prevIo != g_lastProcIo.end())
+            {
+                unsigned long long readDelta = (io.readBytes >= prevIo->second.readBytes)
+                                                   ? io.readBytes - prevIo->second.readBytes
+                                                   : 0;
+                unsigned long long writeDelta = (io.writeBytes >= prevIo->second.writeBytes)
+                                                    ? io.writeBytes - prevIo->second.writeBytes
+                                                    : 0;
+                readKbPerSec = static_cast<unsigned long long>(
+                    static_cast<double>(readDelta) / 1024.0 / ioElapsedSec);
+                writeKbPerSec = static_cast<unsigned long long>(
+                    static_cast<double>(writeDelta) / 1024.0 / ioElapsedSec);
+            }
+        }
+
         ProcessInfo info;
         info.pid = pid;
+        info.parentPid = parentPid;
         info.name = procName;
         info.cpuPct = cpuPct;
         info.memPct = memPct;
+        info.diskReadKbPerSec = readKbPerSec;
+        info.diskWriteKbPerSec = writeKbPerSec;
         result.push_back(info);
     }
     closedir(dir);
 
     g_lastProcTicks = std::move(currentProcTicks);
     g_lastProcSampleTotal = sysTotal;
+    g_lastProcIo = std::move(currentProcIo);
+    g_lastProcIoSampleTime = nowTp;
 
     std::sort(result.begin(), result.end(), systemMetricsCompareByMemDesc);
     if (result.size() > n)
