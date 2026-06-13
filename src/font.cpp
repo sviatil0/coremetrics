@@ -3,7 +3,12 @@
 #include <iostream>
 
 constexpr const char *DEFAULT_FONT_PATH = "assets/font.ttf";
-constexpr float DEFAULT_FONT_SIZE = 18.0f;
+// Roboto Regular at 18pt was perceptibly dim against the near-black UI
+// background once anti-aliasing thinned each stroke. Going up to 20pt and
+// switching the runtime style to BOLD keeps glyphs inside the 20px row
+// height while giving each character enough opaque pixels to actually
+// read at screenshot resolution.
+constexpr float DEFAULT_FONT_SIZE = 20.0f;
 
 static TTF_Font *g_font = nullptr;
 static bool g_fontInitTried = false;
@@ -25,7 +30,12 @@ static TTF_Font *ensureFont()
     if (g_font == nullptr)
     {
         std::cerr << "TTF_OpenFont failed for " << DEFAULT_FONT_PATH << ": " << SDL_GetError() << '\n';
+        return nullptr;
     }
+    // Hinting LIGHT keeps Roboto's stems straight on a dark background without
+    // forcing sub-pixel positioning that the destination surface (BLENDMODE_NONE)
+    // can't blend nicely. NONE would be even crisper but also a touch chunkier.
+    TTF_SetFontHinting(g_font, TTF_HINTING_LIGHT);
     return g_font;
 }
 
