@@ -148,13 +148,23 @@ float SystemMetrics::readGpuPercent()
     DWORD bufferSize = 0;
     DWORD itemCount = 0;
 
-    PdhGetFormattedCounterArray(
+    // PDH expects a two-pass call: first probe asks for sizes, second
+    // call fills the buffer. PDH_MORE_DATA is the expected return for
+    // the probe; ERROR_SUCCESS on the probe means there is nothing to
+    // read (no counters yet). Treat bufferSize == 0 as "no data this
+    // round" instead of allocating a zero-length vector and writing
+    // through its data() pointer (UB; MSVC iterator-debug crashes).
+    PDH_STATUS probeStatus = PdhGetFormattedCounterArray(
         counter,
         PDH_FMT_DOUBLE,
         &bufferSize,
         &itemCount,
         nullptr
     );
+    if (probeStatus != PDH_MORE_DATA || bufferSize == 0 || itemCount == 0)
+    {
+        return 0.0f;
+    }
 
     std::vector<BYTE> buffer(bufferSize);
 
