@@ -21,7 +21,7 @@
 
 > Both frames are rendered by the app itself, headlessly: `coremetrics --screenshot out.bmp [system|processes]` runs one render pass to an offscreen surface and saves it, no window required.
 
-New here? [**DOCS.md**](DOCS.md) is a guided map of the whole repo: what to read, in what order, down to each subsystem.
+New here? [**DOCS.md**](DOCS.md) maps the whole repo; [**API.md**](API.md) is the full public library reference (every class and method).
 
 ---
 

@@ -9,6 +9,7 @@ go as deep as you need.
 |---|---|---|
 | [README.md](README.md) | What CoreMetrics is, a screenshot, why it is interesting, quickstart, architecture, and the contribution breakdown. | 5 min |
 | [Final presentation (PDF)](docs/CoreMetrics-Final-Presentation.pdf) | The architecture, the cross-platform proof, and a demo, in slide form. | 5 min |
+| [API.md](API.md) | The full public API of the GUI library: every class and method, by category, with a table of contents. | reference |
 
 ## 2. Understand the architecture
 
