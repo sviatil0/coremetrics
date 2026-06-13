@@ -64,6 +64,25 @@ float SystemMetrics::readCpuPercent()
     return usage * 100.0f;
 }
 
+MemBreakdown SystemMetrics::readMemBreakdown()
+{
+    MemBreakdown out{0, 0, 0, 0, 0};
+    MEMORYSTATUSEX ms;
+    ms.dwLength = sizeof(ms);
+    if (!GlobalMemoryStatusEx(&ms))
+    {
+        return out;
+    }
+    out.totalKb = ms.ullTotalPhys / 1024ULL;
+    out.freeKb = ms.ullAvailPhys / 1024ULL;
+    // GlobalMemoryStatusEx does not give an active / wired / cached split.
+    // GetPerformanceInfo() does (Cached + Kernel*) but pulls in PsApi.h and
+    // additional ntdll wiring; for now fold the whole 'used' bucket into
+    // activeKb so the segmented bar still renders something meaningful.
+    out.activeKb = (out.totalKb > out.freeKb) ? (out.totalKb - out.freeKb) : 0;
+    return out;
+}
+
 std::vector<float> SystemMetrics::readPerCoreCpu()
 {
     // Windows per-core CPU is available via NtQuerySystemInformation +

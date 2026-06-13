@@ -119,6 +119,59 @@ float SystemMetrics::readCpuPercent()
     return usage * 100.0f;
 }
 
+MemBreakdown SystemMetrics::readMemBreakdown()
+{
+    MemBreakdown out{0, 0, 0, 0, 0};
+    std::ifstream file("/proc/meminfo");
+    if (!file.is_open())
+    {
+        return out;
+    }
+
+    unsigned long long memTotal = 0;
+    unsigned long long memFree = 0;
+    unsigned long long buffers = 0;
+    unsigned long long cached = 0;
+    unsigned long long sReclaimable = 0;
+    unsigned long long shmem = 0;
+    unsigned long long active = 0;
+
+    std::string line;
+    while (std::getline(file, line))
+    {
+        std::istringstream iss(line);
+        std::string key;
+        unsigned long long value = 0;
+        iss >> key >> value;
+        if (key == "MemTotal:") memTotal = value;
+        else if (key == "MemFree:") memFree = value;
+        else if (key == "Buffers:") buffers = value;
+        else if (key == "Cached:") cached = value;
+        else if (key == "SReclaimable:") sReclaimable = value;
+        else if (key == "Shmem:") shmem = value;
+        else if (key == "Active:") active = value;
+    }
+    if (memTotal == 0)
+    {
+        return out;
+    }
+
+    out.totalKb = memTotal;
+    out.freeKb = memFree;
+    // htop's cached bucket: page cache + reclaimable slab + buffers,
+    // minus shmem which is double-counted between Cached and Shmem on
+    // Linux. Guarded against underflow.
+    unsigned long long cachedAll = cached + sReclaimable + buffers;
+    if (shmem <= cachedAll) cachedAll -= shmem;
+    out.cachedKb = cachedAll;
+    out.activeKb = active;
+    // Wired ~= total - (active + cached + free). Bounded at zero so the
+    // math cannot go negative on an unusual layout.
+    unsigned long long accounted = out.cachedKb + out.activeKb + out.freeKb;
+    out.wiredKb = (memTotal > accounted) ? (memTotal - accounted) : 0;
+    return out;
+}
+
 std::vector<float> SystemMetrics::readPerCoreCpu()
 {
     std::vector<ProcParsers::CpuTicks> ticks;
