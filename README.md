@@ -89,23 +89,77 @@ The system is four layers. SDL3 hands us a window and a raw pixel surface; `Scre
 
 ```mermaid
 flowchart TD
-    SDL["SDL3 window + SDL_Surface"]
-    Screen["Screen<br/>drawPixel · drawLine · drawBox · drawTriangle · drawText"]
-    Pool["ThreadPool<br/>parallel row fills"]
-    Elements["GUIElement tree<br/>Bar · Row · Label · Button · Image · Selection"]
-    Layout["Layout / LayoutManager<br/>Tree&lt;Layout&gt;, painter's algorithm"]
-    Events["EventManager<br/>Click / Show / Sound, trickle propagation"]
-    Metrics["SystemMetrics<br/>Linux /proc · macOS IOKit · Windows PDH"]
-    App["CoreMetrics demo<br/>System + Processes tabs"]
+    classDef mine fill:#1b5e20,stroke:#a5d6a7,color:#ffffff
+    classDef ext fill:#0d47a1,stroke:#90caf9,color:#ffffff
+    classDef note fill:#37474f,stroke:#b0bec5,color:#ffffff
 
-    SDL --> Screen
+    subgraph APP["APP"]
+        Main["coremetrics.cpp<br/>build scene, 500ms poll loop, render+blit each frame"]
+    end
+
+    subgraph L3["LAYER 3 - composition"]
+        LM["LayoutManager (singleton)<br/>owns Tree of Layout, painter's algorithm"]
+        Layout["Layout regions"]
+        GUIFile["GUIFile<br/>XML load / save"]
+    end
+
+    subgraph L2["LAYER 2 - widgets"]
+        GE["GUIElement hierarchy<br/>Bar Row Label Button Image Selection<br/>each draw(Screen&)"]
+        Factory["GUIElementFactory + Cloneable CRTP"]
+    end
+
+    subgraph L1["LAYER 1 - graphics core"]
+        Screen["Screen rasterizer<br/>drawPixel line box triangle text blit"]
+        Pool["ThreadPool<br/>parallel pixel rows"]
+        Math["Math: Tvec2 Tvec3 Matrix"]
+    end
+
+    subgraph L0["LAYER 0 - platform (external)"]
+        SDL["SDL3 + SDL3_ttf + SDL3_image<br/>window + SDL_Surface + audio"]
+    end
+
+    subgraph EVENTS["EVENTS (cross-cutting)"]
+        EM["EventManager (singleton)<br/>Click Show Sound queue"]
+        Sound["SoundPlayer"]
+    end
+
+    subgraph METRICS["METRICS (cross-cutting data source)"]
+        Metrics["SystemMetrics<br/>CPU RAM GPU per OS ifdef"]
+    end
+
+    subgraph LEGEND["LEGEND"]
+        LK["green = my code"]
+        LX["blue = external (SDL3)"]
+    end
+
+    %% main render spine
+    Main -->|render| LM
+    LM --> Layout
+    Layout --> GE
+    LM -->|painter parent before child, calls draw| GE
+    GE -->|draw| Screen
     Screen --> Pool
-    Screen --> Elements
-    Elements --> Layout
-    Layout --> App
-    Events --> Elements
-    Metrics --> App
-    App --> Events
+    Screen -->|owns| SDL
+    Main -->|owns + blitTo window| Screen
+
+    %% persistence
+    GUIFile -.->|load / save| Layout
+    Factory -.->|builds| GE
+    Math -.->|underpins| Screen
+
+    %% events cross-cutting
+    Main -->|process| EM
+    EM -.->|trickle top down| GE
+    EM -.->|SoundEvent| Sound
+    Sound -->|audio| SDL
+
+    %% metrics cross-cutting
+    Main -->|poll 500ms| Metrics
+    Metrics -.->|mutates Bars Rows Labels| GE
+
+    class Main,LM,Layout,GUIFile,GE,Factory,Screen,Pool,Math,EM,Sound,Metrics,LK mine
+    class SDL,LX ext
+    class LEGEND note
 ```
 
 | Layer | Files | Responsibility |
