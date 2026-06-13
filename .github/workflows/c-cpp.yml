@@ -94,7 +94,11 @@ jobs:
         # SystemMetrics_win.cpp links against PDH (GPU counters) and
         # PSAPI (GetProcessMemoryInfo). These ship in the Windows SDK so
         # no extra -L is needed; naming the libs by short name is enough.
-        SDL_LIBS="-L${SDL3_ROOT}/lib -L${SDL3_ttf_ROOT}/lib -L${SDL3_image_ROOT}/lib -lSDL3 -lSDL3_ttf -lSDL3_image -lpdh -lpsapi"
+        # Static C++ runtime so bin/tests.exe does not depend on
+        # libstdc++-6.dll / libgcc_s_seh-1.dll / libwinpthread-1.dll
+        # from the MinGW install (which aren't on the runner's PATH
+        # and were silently causing tests.exe to exit 127).
+        SDL_LIBS="-L${SDL3_ROOT}/lib -L${SDL3_ttf_ROOT}/lib -L${SDL3_image_ROOT}/lib -lSDL3 -lSDL3_ttf -lSDL3_image -lpdh -lpsapi -static-libgcc -static-libstdc++"
         echo "Resolved SDL_CFLAGS: $SDL_CFLAGS"
         # Build first (without running tests), then copy the SDL3 DLLs
         # next to bin/tests so the Windows dynamic loader can find them
