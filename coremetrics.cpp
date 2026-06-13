@@ -1,4 +1,7 @@
 #include <algorithm>
+#include <atomic>
+#include <csignal>
+#include <cstdlib>
 #include <fstream>
 #include <iostream>
 #include <memory>
@@ -56,6 +59,16 @@ static bool g_alarmEnabled = true;
 static bool g_cpuAlarmActive = false;
 static bool g_ramAlarmActive = false;
 static bool g_gpuAlarmActive = false;
+
+// Set by SIGINT/SIGTERM and checked by the main loop. The main loop also
+// exits on its own once an optional --duration is exceeded; this flag covers
+// Ctrl-C from a terminal and `kill` from a parent process or CI.
+static std::atomic<bool> g_shutdownRequested{false};
+
+static void handleShutdownSignal(int)
+{
+    g_shutdownRequested.store(true);
+}
 
 static SortColumn g_sortColumn = SORT_MEM;
 static bool g_sortAscending = false;
@@ -223,13 +236,28 @@ int main(int argc, char **argv)
     // Optional headless screenshot mode: `coremetrics --screenshot out.bmp`
     // renders one frame to an offscreen surface and saves it, no window needed.
     std::string screenshotPath;
+    // Optional `--duration <seconds>` cleanly exits the live UI after N
+    // seconds. Useful for backgrounded smoke tests and screenshot capture
+    // pipelines that need a guaranteed-finite run. 0 means "run forever".
+    double durationSeconds = 0.0;
     for (int i = 1; i < argc; ++i)
     {
         if (std::string(argv[i]) == "--screenshot" && i + 1 < argc)
         {
             screenshotPath = argv[i + 1];
         }
+        if (std::string(argv[i]) == "--duration" && i + 1 < argc)
+        {
+            durationSeconds = std::atof(argv[i + 1]);
+            if (durationSeconds < 0.0)
+            {
+                durationSeconds = 0.0;
+            }
+        }
     }
+
+    std::signal(SIGINT, handleShutdownSignal);
+    std::signal(SIGTERM, handleShutdownSignal);
 
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO))
     {
@@ -309,11 +337,25 @@ int main(int argc, char **argv)
     pollMetrics();
 
     Uint64 lastPoll = SDL_GetTicks();
+    Uint64 startTicks = SDL_GetTicks();
+    Uint64 durationMs = (durationSeconds > 0.0)
+                            ? static_cast<Uint64>(durationSeconds * 1000.0)
+                            : 0;
     SDL_Event event;
     bool end = false;
 
     while (!end)
     {
+        if (g_shutdownRequested.load())
+        {
+            end = true;
+            break;
+        }
+        if (durationMs != 0 && SDL_GetTicks() - startTicks >= durationMs)
+        {
+            end = true;
+            break;
+        }
         while (SDL_PollEvent(&event))
         {
             switch (event.type)
