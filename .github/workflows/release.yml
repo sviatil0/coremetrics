@@ -1,0 +1,171 @@
+name: Release
+
+# Fires on any tag matching `v*` (e.g. `v0.1.0`). Builds the production
+# binary on Linux and macOS, packages it with required runtime assets,
+# also produces a Debian .deb, and attaches everything to a GitHub Release
+# for the same tag. Users on either platform can `curl` the asset and run
+# the binary without a local toolchain.
+#
+# Triggered manually with `git tag v0.1.0 && git push origin v0.1.0`.
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract tag
+        id: tag
+        run: echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+
+      - name: Install dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential pkg-config libfreetype-dev libharfbuzz-dev
+
+      - name: Install dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew update
+          brew install sdl3 sdl3_ttf sdl3_image
+
+      - name: Setup SDL3 (Linux)
+        if: runner.os == 'Linux'
+        uses: libsdl-org/setup-sdl@main
+        with:
+          install-linux-dependencies: true
+          version: 3-latest
+          version-sdl-ttf: 3-latest
+          version-sdl-image: 3-latest
+
+      - name: Build (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          LIB_PATHS=$(pkg-config --libs-only-L sdl3 sdl3-ttf sdl3-image | sed 's|-L||g')
+          RPATHS=""
+          for P in $LIB_PATHS; do RPATHS="$RPATHS -Wl,-rpath,$P"; done
+          make bin/coremetrics CXXFLAGS="-std=c++23 -Wall -O2 -I ./include $(pkg-config --cflags sdl3 sdl3-ttf sdl3-image)" \
+                               LDFLAGS="$(pkg-config --libs sdl3 sdl3-ttf sdl3-image) $RPATHS"
+
+      - name: Build (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          mkdir -p obj bin
+          make bin/coremetrics CXXFLAGS="-std=c++23 -Wall -O2 -I ./include -I/opt/homebrew/include"
+
+      - name: Detect platform suffix
+        id: plat
+        run: |
+          if [ "${{ runner.os }}" = "Linux" ]; then
+            echo "suffix=linux-x86_64" >> "$GITHUB_OUTPUT"
+          else
+            ARCH=$(uname -m)
+            if [ "$ARCH" = "arm64" ]; then ARCH="arm64"; else ARCH="x86_64"; fi
+            echo "suffix=macos-$ARCH" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Package tarball
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+          SUFFIX: ${{ steps.plat.outputs.suffix }}
+        run: |
+          PKG="coremetrics-${TAG}-${SUFFIX}"
+          mkdir -p "dist/$PKG"
+          cp bin/coremetrics "dist/$PKG/coremetrics"
+          cp -r assets "dist/$PKG/assets"
+          cp README.md LICENSE CONTRIBUTING.md base.xml "dist/$PKG/" 2>/dev/null || true
+          # If LICENSE does not exist at repo root, fall back to the font license note.
+          if [ ! -f "dist/$PKG/LICENSE" ]; then cp assets/font.LICENSE.txt "dist/$PKG/LICENSE-notes.txt"; fi
+          cat > "dist/$PKG/INSTALL.txt" <<EOF
+          coremetrics ${TAG} (${SUFFIX})
+
+          1. Install SDL3 runtime dependencies for your platform:
+             macOS:        brew install sdl3 sdl3_ttf sdl3_image
+             Debian/Ubuntu: sudo apt-get install libsdl3-0 libsdl3-ttf-0 libsdl3-image-0
+                            (or build from libsdl-org/SDL if your distro is older)
+          2. From inside this directory, run:
+                ./coremetrics
+          EOF
+          tar -C dist -czf "dist/${PKG}.tar.gz" "$PKG"
+          ls -la "dist/${PKG}.tar.gz"
+
+      - name: Build .deb (Linux only)
+        if: runner.os == 'Linux'
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          # Strip leading 'v' from tag for Debian version field.
+          VERSION="${TAG#v}"
+          PKG_ROOT="dist/deb-root"
+          mkdir -p "$PKG_ROOT/DEBIAN" "$PKG_ROOT/usr/bin" "$PKG_ROOT/usr/share/coremetrics/assets" "$PKG_ROOT/usr/share/doc/coremetrics"
+          cp bin/coremetrics "$PKG_ROOT/usr/bin/coremetrics"
+          cp -r assets/* "$PKG_ROOT/usr/share/coremetrics/assets/"
+          cp base.xml "$PKG_ROOT/usr/share/coremetrics/"
+          cp README.md CONTRIBUTING.md "$PKG_ROOT/usr/share/doc/coremetrics/" 2>/dev/null || true
+          cat > "$PKG_ROOT/DEBIAN/control" <<EOF
+          Package: coremetrics
+          Version: ${VERSION}
+          Section: utils
+          Priority: optional
+          Architecture: amd64
+          Depends: libsdl3-0 | libsdl3, libsdl3-ttf-0 | libsdl3-ttf, libsdl3-image-0 | libsdl3-image
+          Maintainer: Sviatoslav Oleksiienko <soleksiienko1@gmail.com>
+          Description: Cross-platform desktop system metrics monitor
+           CoreMetrics is a small SDL3 GUI that shows live CPU, RAM, GPU,
+           and per-process resource usage. The metrics backends are
+           per-platform (Linux /proc, macOS Mach + libproc, Windows PDH).
+          EOF
+          dpkg-deb --build "$PKG_ROOT" "dist/coremetrics_${VERSION}_amd64.deb"
+          ls -la dist/coremetrics_*.deb
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: coremetrics-${{ steps.plat.outputs.suffix }}
+          path: |
+            dist/coremetrics-*.tar.gz
+            dist/coremetrics_*.deb
+          if-no-files-found: warn
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - name: Flatten artifact tree
+        run: |
+          mkdir -p release-assets
+          find dist -type f \( -name 'coremetrics-*.tar.gz' -o -name 'coremetrics_*.deb' \) -print -exec cp {} release-assets/ \;
+          ls -la release-assets
+
+      - name: Create or update GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          files: release-assets/*

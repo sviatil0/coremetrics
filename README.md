@@ -38,7 +38,29 @@ CoreMetrics is two things in one repo: a small **GUI toolkit written directly on
 
 > This is a 4-person team project, and I was the lead and primary author: **~72% of the source by line** (git-blame verified, 5,034 of 7,001). See [Team and my contribution](#team-and-my-contribution) for the per-file breakdown.
 
-## Quickstart
+## Install (prebuilt)
+
+No build toolchain required.
+
+```bash
+# macOS (Homebrew)
+brew tap sviatil0/coremetrics
+brew install coremetrics
+
+# Debian / Ubuntu
+curl -L https://github.com/sviatil0/coremetrics/releases/latest/download/coremetrics_amd64.deb -o /tmp/coremetrics.deb
+sudo apt install /tmp/coremetrics.deb
+
+# Any platform (tarball)
+curl -LO https://github.com/sviatil0/coremetrics/releases/latest/download/coremetrics-<version>-<platform>.tar.gz
+tar xf coremetrics-<version>-<platform>.tar.gz
+cd coremetrics-<version>-<platform>
+./coremetrics
+```
+
+The Homebrew formula pulls SDL3 + SDL3_ttf + SDL3_image as dependencies. The `.deb` declares the equivalent apt dependencies. The tarball assumes SDL3 is already installed.
+
+## Quickstart (from source)
 
 Requires a **C++23 compiler** (g++ 13+ or clang 16+), GNU Make, and **SDL3 + SDL3_ttf + SDL3_image**.
 
