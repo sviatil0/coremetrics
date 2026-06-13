@@ -42,8 +42,8 @@ Requires a **C++23 compiler** (g++ 13+ or clang 16+), GNU Make, and **SDL3 + SDL
 
 ```bash
 # 1. clone
-git clone https://github.com/ND-CSE40232-SE/SP26_Team04.git
-cd SP26_Team04
+git clone https://github.com/sviatil0/coremetrics.git
+cd coremetrics
 
 # 2. install the SDL3 dependencies
 brew install sdl3 sdl3_ttf sdl3_image          # macOS
