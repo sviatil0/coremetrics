@@ -116,6 +116,14 @@ static std::string g_statusFlash;
 static Uint64 g_statusFlashExpiryMs = 0;
 constexpr Uint64 STATUS_FLASH_DURATION_MS = 2500;
 
+// Process search/filter. '/' on the Processes tab enters input mode.
+// g_filterText is the case-insensitive substring matched against process
+// names; an empty string disables filtering. g_filterInputActive tracks
+// whether keystrokes append to the filter (input mode) or trigger the
+// usual row navigation (filter applied but no longer being edited).
+static std::string g_filterText;
+static bool g_filterInputActive = false;
+
 static void flashStatus(const std::string &text)
 {
     g_statusFlash = text;
@@ -451,8 +459,30 @@ static void pollMetrics()
     }
 
     std::size_t dataRowCount = g_processRows.size() - 1;
+    // Over-fetch by 3x dataRowCount so the case-insensitive substring filter
+    // has enough candidates to surface meaningful matches even when the
+    // user filters to a tail of the list.
     std::vector<ProcessInfo> procs = SystemMetrics::topProcesses(dataRowCount * 3);
     std::sort(procs.begin(), procs.end(), compareProcesses);
+    if (!g_filterText.empty())
+    {
+        std::string needle;
+        needle.reserve(g_filterText.size());
+        for (char c : g_filterText)
+        {
+            needle.push_back(static_cast<char>(std::tolower(static_cast<unsigned char>(c))));
+        }
+        procs.erase(std::remove_if(procs.begin(), procs.end(),
+            [&needle](const ProcessInfo &p) {
+                std::string hay;
+                hay.reserve(p.name.size());
+                for (char c : p.name)
+                {
+                    hay.push_back(static_cast<char>(std::tolower(static_cast<unsigned char>(c))));
+                }
+                return hay.find(needle) == std::string::npos;
+            }), procs.end());
+    }
     if (procs.size() > dataRowCount)
     {
         procs.resize(dataRowCount);
@@ -818,6 +848,18 @@ int main(int argc, char **argv)
                 }
                 break;
             }
+            case SDL_EVENT_TEXT_INPUT:
+            {
+                if (g_filterInputActive && processesTabActive())
+                {
+                    // SDL hands us UTF-8 fragments; append straight through.
+                    // The downstream filter does case-insensitive ASCII
+                    // matching so non-ASCII bytes just pass through and
+                    // narrow the match the same as any other typed char.
+                    g_filterText += event.text.text;
+                }
+                break;
+            }
             case SDL_EVENT_KEY_DOWN:
             {
                 SDL_Keycode key = event.key.key;
@@ -830,11 +872,54 @@ int main(int argc, char **argv)
                     {
                         closeSignalMenu();
                     }
+                    else if (g_filterInputActive)
+                    {
+                        // Esc while editing: drop the filter entirely so
+                        // a typo or accidental '/' isn't sticky.
+                        g_filterInputActive = false;
+                        g_filterText.clear();
+                        SDL_StopTextInput(window);
+                    }
+                    else if (!g_filterText.empty())
+                    {
+                        // Esc with filter applied but not editing: clear
+                        // the filter, mirrors htop F3.
+                        g_filterText.clear();
+                    }
                     else
                     {
                         g_selectedPid = -1;
                         g_selectedRowIndex = -1;
                     }
+                    break;
+                }
+
+                // Backspace in filter input mode edits the filter; outside
+                // input mode it does nothing (no other use).
+                if (g_filterInputActive && key == SDLK_BACKSPACE)
+                {
+                    if (!g_filterText.empty())
+                    {
+                        g_filterText.pop_back();
+                    }
+                    break;
+                }
+
+                // Enter commits the filter and exits input mode; the
+                // filter stays applied and Up/Down + 'k' resume working.
+                if (g_filterInputActive && (key == SDLK_RETURN || key == SDLK_KP_ENTER))
+                {
+                    g_filterInputActive = false;
+                    SDL_StopTextInput(window);
+                    break;
+                }
+
+                // While the user is editing the filter, do NOT let other
+                // bindings (Up/Down/k/1-6) fire underneath; that would be
+                // surprising and the SDL_StartTextInput path may have
+                // already enqueued the keystroke as text.
+                if (g_filterInputActive)
+                {
                     break;
                 }
 
@@ -925,6 +1010,14 @@ int main(int argc, char **argv)
                     g_signalMenuVisible = true;
                     g_signalMenuPickedIndex = -1;
                 }
+                else if (key == SDLK_SLASH)
+                {
+                    // '/' on Processes tab enters filter input mode. If
+                    // a filter is already applied, re-enter with the
+                    // existing text so the user can keep typing.
+                    g_filterInputActive = true;
+                    SDL_StartTextInput(window);
+                }
                 break;
             }
             }
@@ -965,6 +1058,28 @@ int main(int argc, char **argv)
         // brief status flash after a send. Painted over the layout tree so
         // they sit on top of the Processes table without modifying the Row
         // widget itself.
+        if (processesTabActive() && (g_filterInputActive || !g_filterText.empty()))
+        {
+            // Filter input strip at the top of the Processes tab, above
+            // the header row. Two-tone: accent label, white query text,
+            // a blinking cursor when input is active.
+            const vec3 labelColor(0.871f, 1.0f, 0.608f);
+            const vec3 textColor(1.0f, 1.0f, 1.0f);
+            const vec3 hintColor(0.55f, 0.55f, 0.55f);
+            std::string prefix = g_filterInputActive ? "filter> " : "filter: ";
+            std::string body = g_filterText;
+            if (g_filterInputActive && ((SDL_GetTicks() / 400) % 2) == 0)
+            {
+                body += "_";
+            }
+            Font::drawText(screen, prefix, ivec2(24, 56), labelColor);
+            Font::drawText(screen, body, ivec2(120, 56), textColor);
+            if (!g_filterInputActive && !g_filterText.empty())
+            {
+                Font::drawText(screen, "Esc clears", ivec2(800, 56), hintColor);
+            }
+        }
+
         if (processesTabActive() && g_selectedRowIndex >= 0
             && g_selectedRowIndex < PROCESSES_VISIBLE_ROWS)
         {
