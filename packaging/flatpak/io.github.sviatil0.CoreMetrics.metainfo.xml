@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.sviatil0.CoreMetrics</id>
+  <name>CoreMetrics</name>
+  <summary>Cross-platform desktop system monitor (CPU / RAM / GPU / processes)</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>LGPL-2.1-only</project_license>
+  <developer_name>Sviatoslav Oleksiienko</developer_name>
+  <description>
+    <p>
+      CoreMetrics is a small C++23 system monitor built directly on raw SDL3
+      pixel surfaces. It shows live CPU, RAM, GPU, and per-process resource
+      usage with an optional rolling sparklines view and an htop-style kill
+      flow on the Processes tab.
+    </p>
+    <p>
+      No Qt, no Electron, no JavaScript runtime. Every widget is
+      hand-rasterized by code in this repository. Three native metrics
+      backends (Linux /proc, macOS Mach + IOKit, Windows PDH) are selected
+      at compile time so the same source tree builds the same UI on each
+      platform.
+    </p>
+  </description>
+  <launchable type="desktop-id">io.github.sviatil0.CoreMetrics.desktop</launchable>
+  <url type="homepage">https://github.com/sviatil0/coremetrics</url>
+  <url type="bugtracker">https://github.com/sviatil0/coremetrics/issues</url>
+  <screenshots>
+    <screenshot type="default">
+      <image>https://raw.githubusercontent.com/sviatil0/coremetrics/main/assets/screenshot-system.png</image>
+      <caption>System tab with CPU / RAM / GPU bars and per-logical-CPU strip</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/sviatil0/coremetrics/main/assets/screenshot-processes.png</image>
+      <caption>Sortable Processes table with real per-process CPU%</caption>
+    </screenshot>
+  </screenshots>
+  <content_rating type="oars-1.1" />
+  <releases>
+    <release version="0.1.1" date="2026-06-13">
+      <description>
+        <p>
+          AssetPath resolver, htop-style row selection and kill, per-logical-CPU
+          bar strip, dynamic README contribution badge, install-path badges.
+        </p>
+      </description>
+    </release>
+    <release version="0.1.0" date="2026-06-13">
+      <description>
+        <p>
+          First tagged release: overnight wave + tag-driven release pipeline +
+          Homebrew tap.
+        </p>
+      </description>
+    </release>
+  </releases>
+</component>
