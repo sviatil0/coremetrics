@@ -16,7 +16,8 @@ For a guided tour of the repo see [DOCS.md](DOCS.md); for the project overview s
 - [GUI elements](#gui-elements): `GUIElement`, `Cloneable<Derived>`, `GUIElementFactory`, `GUIElementType`, `Point`, `Line`, `Box`, `Label`, `Selection`, `Image`, `Button`, `Bar`, `Row`
 - [Layout](#layout): `Tree<T>`, `Layout`, `LayoutManager`, `LayoutUtils`, `GUIFile`
 - [Events](#events): `Event`, `ClickEvent`, `ShowEvent`, `SoundEvent`, `EventManager`, `SoundPlayer`, `Font`
-- [System](#system): `ProcessInfo`, `SystemMetrics`, `ProcessUtils`
+- [System](#system): `ProcessInfo`, `SystemMetrics`, `ProcessUtils`, `ProcParsers`
+- [Charting](#charting): `RingBuffer<T>`, `Sparkline`
 
 ---
 
@@ -352,7 +353,39 @@ Static facade exposing cross-platform system metrics (CPU / memory / GPU / proce
 - `static std::vector<ProcessInfo> topProcesses(std::size_t n = 20)`: returns up to `n` top processes by usage.
 
 ### ProcessUtils
-`ProcessUtils.hpp` exposes a sort-column enum and one formatting helper.
+`ProcessUtils.hpp` exposes a sort-column enum and pure helpers used by every platform backend and by the in-app sort handler. Extracting the math out of the platform `topProcesses` bodies and the in-app `compareProcesses` wrapper makes them testable on any platform without `/proc` or a running window.
 
 - `enum SortColumn { SORT_PID = 0, SORT_NAME = 1, SORT_CPU = 2, SORT_MEM = 3 }`: column selector for sorting the process table.
-- `std::string formatPct(float value)`: formats a percentage float as a display string.
+- `std::string formatPct(float value)`: formats a percentage float as a display string with one decimal place.
+- `float computeCpuPercentDelta(std::uint64_t procCurrent, std::uint64_t procPrevious, std::uint64_t denom)`: returns the per-process CPU% as `((procCurrent - procPrevious) / denom) * 100`, clamped to `[0, 100]`. Returns `0.0f` when `denom == 0` or when `procCurrent < procPrevious` (counter reset, pid reuse). Used by the macOS, Linux, and Windows backends.
+- `bool compareProcessByColumn(const ProcessInfo &a, const ProcessInfo &b, SortColumn column, bool ascending)`: pure comparator for the Processes table. Numerical compare on PID / CPU% / MEM%, lexicographic on NAME. `ascending = true` puts smaller values first.
+
+### ProcParsers
+`ProcParsers.hpp` exposes platform-neutral string parsers for the three `/proc` files the Linux backend reads. Each takes file contents as a `std::string` and writes the result through an out-parameter so the same parser can be exercised with synthetic fixtures on any OS.
+
+- `bool ProcParsers::parseProcStat(const std::string &content, unsigned long long &totalOut, unsigned long long &idleOut)`: parses the first `cpu` line of `/proc/stat`. Returns `false` on empty input, non-`cpu` label, or a truncated line.
+- `bool ProcParsers::parseProcPidStatCpuTicks(const std::string &content, unsigned long long &ticksOut)`: parses `/proc/[pid]/stat` and returns `utime + stime` in jiffies. Uses `rfind(')')` so process names containing spaces or nested parens are handled correctly.
+- `bool ProcParsers::parseProcStatusVmRssKb(const std::string &content, unsigned long long &kbOut)`: scans `/proc/[pid]/status` for `VmRSS:` and returns the value in kB.
+
+## Charting
+
+### RingBuffer\<T\>
+Header-only fixed-capacity circular buffer (`include/RingBuffer.hpp`), mirroring the style of `Tree<T>`. Newest sample at the back, oldest at the front. When full, `push()` drops the oldest entry. Intended for rolling time-series windows (e.g. the 64-sample backing store of each `Sparkline`).
+
+- `explicit RingBuffer(std::size_t cap)`: constructs with the given capacity (clamped to at least 1).
+- `std::size_t getCapacity() const` / `std::size_t getSize() const`: capacity and current population.
+- `bool isEmpty() const` / `bool isFull() const`.
+- `void clear()`: drops every sample.
+- `void push(const T &value)`: appends a sample; drops the oldest one if already full.
+- `T at(std::size_t index) const`: index 0 is the oldest sample, `getSize() - 1` is the newest. Returns a default-constructed `T` if `index >= getSize()`.
+- `T newest() const` / `T oldest() const`: convenience accessors. Return `T()` when the buffer is empty.
+
+### Sparkline
+Inline time-series chart widget (`include/Sparkline.hpp`). Stores its samples in a `RingBuffer<float>` and plots N-1 line segments through `Screen::drawLine` (the Bresenham path). Right-justified so the newest sample sits at the right edge of the bounding box, matching every other live monitor.
+
+- `Sparkline(ivec2 minPos, ivec2 maxPos, vec3 color, float minValue, float maxValue, std::size_t capacity)`: constructs a chart inside the given pixel rectangle. `[minValue, maxValue]` defines the vertical scale; values outside are clamped, not stretched.
+- `void push(float value)`: clamps `value` into the configured range and appends it to the rolling window.
+- `void clear()`: drops every sample.
+- `std::size_t getCapacity() const` / `std::size_t getSize() const`: capacity and current population.
+- `ivec2 getMinPos() const` / `ivec2 getMaxPos() const`: the chart's bounding box.
+- `void draw(Screen &screen) const`: paints the polyline. Does nothing while `getSize() < 2`.
