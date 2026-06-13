@@ -22,7 +22,7 @@
 | System tab | Processes tab |
 |:---:|:---:|
 | ![System tab](assets/screenshot-system.png) | ![Processes tab](assets/screenshot-processes.png) |
-| CPU / RAM / GPU bars, load-colored (RAM red past 80%), plus rolling sparklines under `--sparklines` | Sortable PID / NAME / CPU% / MEM% table |
+| CPU / RAM / GPU bars, load-colored (RAM red past 80%), per-core strip, memory breakdown segments, uptime + load average, optional sparklines | Sortable, filterable process table with parent-child tree view, row selection, and signal menu (TERM / KILL / INT / HUP / STOP / CONT) |
 
 > Both frames are rendered by the app itself, headlessly: `coremetrics --screenshot out.png [system|processes]` runs one render pass to an offscreen surface and saves it, no window required. The extension picks the writer (`.png` via `IMG_SavePNG`, anything else via `SDL_SaveBMP`).
 
@@ -34,12 +34,13 @@ New here? [**DOCS.md**](DOCS.md) maps the whole repo; [**API.md**](API.md) is th
 
 CoreMetrics is two things in one repo: a small **GUI toolkit written directly on SDL3 pixel surfaces** (no Dear ImGui, no Qt, no game framework) and a **real system monitor built on top of it**. A few things worth a look:
 
+- **htop-comparable Processes tab.** Search and filter by name (`/`), parent-child tree view (`t`), row selection + signal menu (`k`) covering TERM / KILL / INT / HUP / STOP / CONT, all backed by per-process disk I/O, memory breakdown, uptime, and 1/5/15-minute load averages on the System tab.
 - **Three native metrics backends, one header.** `SystemMetrics` reads live data from `/proc` + `/sys` on Linux, mach + IOKit on macOS, and PDH + Toolhelp on Windows, selected at compile time via `#ifdef`.
 - **From-scratch UI stack.** Every widget rasterizes itself onto a raw `SDL_Surface` through one `Screen` primitive layer (`drawPixel`, Bresenham `drawLine`, `drawBox`, `drawTriangle`, `blitTo`). No retained-mode GUI library underneath; geometry is hand-rasterized, text and image decode go through SDL's debug renderer and SDL_image/SDL_ttf.
 - **Event-driven, no scene rebuilds.** Clicks trickle top-down through the layout tree; tab switches drain as paired show/hide events in a single pass; metrics mutate widgets in place every 500 ms.
 - **Modern C++ on purpose.** A `Cloneable<Derived>` CRTP mixin gives every widget a covariant `clone()` for free; ownership flows through `unique_ptr`; the layout tree is a generic `Tree<T>`.
 - **Parallel fills.** Wide `drawBox` / `drawTriangle` operations partition pixel rows across a `ThreadPool` and join on `std::future`s per frame (a teammate's work; see the contribution table).
-- **214 unit tests across 16 suites** and a Linux + macOS GitHub Actions matrix, plus a non-blocking AddressSanitizer + UndefinedBehaviorSanitizer leg (`make asan`, `make ubsan`).
+- **17 test suites** and a Linux + macOS GitHub Actions matrix, plus a non-blocking AddressSanitizer + UndefinedBehaviorSanitizer leg (`make asan`, `make ubsan`).
 
 > This is a 4-person team project, and I was the lead and primary author. The "Stefan's code" badge at the top is computed by a CI job that runs `git blame -w -C -M` across `src/`, `include/`, `bench/`, and `coremetrics.cpp` on every push to `main`, so the percentage is always current and never hand-typed. See [Team and my contribution](#team-and-my-contribution) for the per-file breakdown, and `scripts/compute-contributions.sh` for the exact logic.
 
@@ -53,7 +54,7 @@ brew tap sviatil0/coremetrics
 brew trust sviatil0/coremetrics   # one-time: Homebrew requires explicit trust for third-party taps
 brew install coremetrics
 
-# Debian / Ubuntu
+# Debian / Ubuntu (installs from the local .deb; no apt repository is configured yet)
 curl -L https://github.com/sviatil0/coremetrics/releases/latest/download/coremetrics_amd64.deb -o /tmp/coremetrics.deb
 sudo apt install /tmp/coremetrics.deb
 
@@ -226,7 +227,7 @@ Tab switching is event-driven: each tab button emits a hide event for the other 
 - GUI library, rasterizer, event system, layout tree, and the CoreMetrics demo build and run.
 - Live CPU / RAM and per-process stats on macOS, Linux, and Windows.
 - Total GPU usage on Linux (`gpu_busy_percent`), macOS (`IOAccelerator`), and Windows (PDH).
-- 175 unit tests across 13 suites; Linux + macOS compile + test matrix in CI (Windows builds locally only).
+- 17 test suites; Linux + macOS compile + test matrix in CI (Windows build leg is non-blocking).
 
 **Known limitations**
 
