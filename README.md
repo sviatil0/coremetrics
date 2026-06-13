@@ -36,6 +36,8 @@ CoreMetrics is two things in one repo: a small **GUI toolkit written directly on
 - **Event-driven, no scene rebuilds.** Clicks trickle top-down through the layout tree; tab switches drain as paired show/hide events in a single pass; metrics mutate widgets in place every 500 ms.
 - **175 unit tests across 13 suites** and a 3-OS GitHub Actions matrix.
 
+> This is a 4-person team project, and I was the lead and primary author: **~72% of the source by line** (git-blame verified, 5,034 of 7,001). See [Team and my contribution](#team-and-my-contribution) for the per-file breakdown.
+
 ## Quickstart
 
 Requires a **C++23 compiler** (g++ 13+ or clang 16+), GNU Make, and **SDL3 + SDL3_ttf + SDL3_image**.
@@ -300,18 +302,40 @@ The math core is the most reused surface; the full per-class reference is folded
 
 </details>
 
-## Team
+## Team and my contribution
 
-A 4-person Notre Dame CSE 40232 software-engineering project (SP26 Team 04). Contributions are git-verifiable via `git shortlog -sne` and `git blame`.
+A 4-person Notre Dame CSE 40232 software-engineering project (SP26 Team 04), three months, a PR-template + required-review workflow with per-developer branches. I was the lead and primary author: **~72% of the source by line, git-blame verified.**
 
-| Contributor | Owned |
+```mermaid
+pie showData
+    title Lines of code by author (git blame, all source files)
+    "Sviatoslav (me)" : 5034
+    "Alicia Melotik" : 1137
+    "mcastel5" : 805
+    "Daniel Rehberg" : 25
+```
+
+```
+me            ████████████████████████████████████░░░░░░░░░░░░  72%   (5,034 lines)
+Alicia        ████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  16%   (1,137 lines)
+mcastel5      ██████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  12%   (  805 lines)
+```
+
+| Contributor | What they owned |
 |---|---|
-| **Stefan (Sviatoslav) Oleksiienko** | Event system, layout engine, cross-platform `SystemMetrics`, the CoreMetrics demo app, CI, and tooling. **~71% of tracked C++/header lines** (`git blame`: 4,943 / 6,911). |
-| **Alicia Melotik** | XML parser and `GUIFile`, `Cloneable`/CRTP clone path, Windows GPU, layout helpers, refactors. |
-| **Martin Castellanos** | `Layout` core methods, `Button` event functor, `ThreadPool`, drawing parallelism. |
-| **Daniel Rehberg** | Early scaffolding and review. |
+| **Sviatoslav (me)** | The graphics core (vector/matrix math, the `Screen` rasterizer and its pixel tests), the event system, the GUI element hierarchy and factory, all three `SystemMetrics` platform backends, the demo app, CI, and tooling. The `ThreadPool` and `Cloneable` are teammates'; I wrote the rasterizer code that uses them. |
+| **Alicia Melotik** | The XML parser and `GUIFile`, the `Cloneable` / CRTP clone path, Windows GPU, layout helpers. |
+| **Martin Castellanos** | `Layout` core methods, the `Button` event functor, the `ThreadPool`, drawing parallelism. |
+| **Daniel Rehberg** (instructor) | Early scaffolding and review. |
 
-The team ran a PR-template + required-review workflow with a Trello board and per-developer branches; code review caught real bugs before merge (for example a strict-weak-ordering crash in the process sort).
+Reproduce the split yourself:
+
+```sh
+git ls-files '*.cpp' '*.hpp' '*.h' | while read f; do
+  git blame --line-porcelain "$f"; done | grep '^author ' | sort | uniq -c | sort -rn
+```
+
+Code review caught real bugs before merge (for example a strict-weak-ordering crash in the process sort). Released publicly with the team's and instructor's consent under LGPL-2.1.
 
 ## Contributing
 
