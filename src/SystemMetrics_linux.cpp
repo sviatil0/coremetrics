@@ -1,6 +1,7 @@
 #ifdef __linux__
 
 #include "SystemMetrics.hpp"
+#include "ProcessUtils.hpp"
 #include <algorithm>
 #include <cstdlib>
 #include <dirent.h>
@@ -269,14 +270,10 @@ std::vector<ProcessInfo> SystemMetrics::topProcesses(std::size_t n)
         currentProcTicks[pid] = cpuTicks;
 
         float cpuPct = 0.0f;
-        if (sysTotalDiff > 0)
+        auto prev = g_lastProcTicks.find(pid);
+        if (prev != g_lastProcTicks.end())
         {
-            auto prev = g_lastProcTicks.find(pid);
-            if (prev != g_lastProcTicks.end() && cpuTicks >= prev->second)
-            {
-                unsigned long long procDiff = cpuTicks - prev->second;
-                cpuPct = (static_cast<float>(procDiff) / static_cast<float>(sysTotalDiff)) * 100.0f;
-            }
+            cpuPct = computeCpuPercentDelta(cpuTicks, prev->second, sysTotalDiff);
         }
 
         unsigned long long memKb = readProcMemKb(pid);

@@ -69,18 +69,7 @@ static ivec2 g_exitBtnMax;
 
 static bool compareProcesses(const ProcessInfo &a, const ProcessInfo &b)
 {
-    switch (g_sortColumn)
-    {
-    case SORT_PID:
-        return g_sortAscending ? (a.pid < b.pid) : (a.pid > b.pid);
-    case SORT_NAME:
-        return g_sortAscending ? (a.name < b.name) : (a.name > b.name);
-    case SORT_CPU:
-        return g_sortAscending ? (a.cpuPct < b.cpuPct) : (a.cpuPct > b.cpuPct);
-    case SORT_MEM:
-        return g_sortAscending ? (a.memPct < b.memPct) : (a.memPct > b.memPct);
-    }
-    return false;
+    return compareProcessByColumn(a, b, g_sortColumn, g_sortAscending);
 }
 
 static void buildScene()

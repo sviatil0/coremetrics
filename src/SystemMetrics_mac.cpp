@@ -1,6 +1,7 @@
 #ifdef __APPLE__
 
 #include "SystemMetrics.hpp"
+#include "ProcessUtils.hpp"
 #include <algorithm>
 #include <chrono>
 #include <cstring>
@@ -199,10 +200,9 @@ std::vector<ProcessInfo> SystemMetrics::topProcesses(std::size_t n)
 
         float cpuPct = 0.0f;
         auto it = g_lastProcCpuNs.find(pid);
-        if (it != g_lastProcCpuNs.end() && wallDiffNs > 0 && procCpuNs >= it->second)
+        if (it != g_lastProcCpuNs.end())
         {
-            uint64_t procDiffNs = procCpuNs - it->second;
-            cpuPct = (static_cast<float>(procDiffNs) / static_cast<float>(wallDiffNs)) * 100.0f;
+            cpuPct = computeCpuPercentDelta(procCpuNs, it->second, wallDiffNs);
         }
 
         ProcessInfo info;
