@@ -24,6 +24,7 @@
 #include "ProcessUtils.hpp"
 #include "Sparkline.hpp"
 #include "AssetPath.hpp"
+#include "SignalUtils.hpp"
 
 constexpr int RESX = 960;
 constexpr int RESY = 540;
@@ -90,6 +91,49 @@ static Sparkline *g_gpuSparkline = nullptr;
 // Refreshed every poll. Empty on Windows (backend not implemented yet) and
 // on the very first poll (no prior tick sample to diff against).
 static std::vector<float> g_perCoreCpu;
+
+// Process kill flow state.
+//
+// Mouse click on a row in the Processes tab sets g_selectedPid to that
+// row's pid; up/down keys move the selection one row at a time within
+// the bounds of g_visiblePids. 'k' opens the signal menu, 1-6 picks a
+// signal, Y/Enter confirms send, N/Esc cancels. The menu and the per-row
+// highlight are painted after the LayoutManager render so they sit on
+// top of the Processes table without modifying the Row widget.
+constexpr int PROCESSES_FIRST_ROW_Y = 100;
+constexpr int PROCESSES_ROW_X0 = 24;
+constexpr int PROCESSES_ROW_X1 = 936;
+constexpr int PROCESSES_VISIBLE_ROWS = 15;
+
+static int g_selectedPid = -1;
+static int g_selectedRowIndex = -1;
+static std::vector<int> g_visiblePids;
+
+static bool g_signalMenuVisible = false;
+static int g_signalMenuPickedIndex = -1; // -1 = picking, 0..5 = awaiting confirm
+
+static std::string g_statusFlash;
+static Uint64 g_statusFlashExpiryMs = 0;
+constexpr Uint64 STATUS_FLASH_DURATION_MS = 2500;
+
+static void flashStatus(const std::string &text)
+{
+    g_statusFlash = text;
+    g_statusFlashExpiryMs = SDL_GetTicks() + STATUS_FLASH_DURATION_MS;
+}
+
+static bool processesTabActive()
+{
+    Tree<Layout> *node = EventManager::findLayoutByName(
+        LayoutManager::getInstance().getRoot(), "processes");
+    return node != nullptr && node->getData().isActive();
+}
+
+static void closeSignalMenu()
+{
+    g_signalMenuVisible = false;
+    g_signalMenuPickedIndex = -1;
+}
 constexpr int PERCORE_Y0 = 218;
 constexpr int PERCORE_Y1 = 236;
 constexpr int PERCORE_X0 = 24;
@@ -310,6 +354,9 @@ static void pollMetrics()
         procs.resize(dataRowCount);
     }
 
+    g_visiblePids.clear();
+    g_visiblePids.reserve(procs.size());
+
     for (std::size_t i = 0; i < dataRowCount; ++i)
     {
         Row *row = g_processRows[i + 1];
@@ -320,6 +367,7 @@ static void pollMetrics()
         if (i < procs.size())
         {
             const ProcessInfo &info = procs[i];
+            g_visiblePids.push_back(info.pid);
             std::vector<std::string> cells = {
                 std::to_string(info.pid),
                 info.name,
@@ -331,6 +379,23 @@ static void pollMetrics()
         else
         {
             row->setCells({"", "", "", ""});
+        }
+    }
+
+    // After a re-poll the visible row index for the selected pid may have
+    // moved or the pid may have exited. Re-anchor the highlight so up/down
+    // navigation keeps making sense.
+    if (g_selectedPid >= 0)
+    {
+        auto it = std::find(g_visiblePids.begin(), g_visiblePids.end(), g_selectedPid);
+        if (it == g_visiblePids.end())
+        {
+            g_selectedPid = -1;
+            g_selectedRowIndex = -1;
+        }
+        else
+        {
+            g_selectedRowIndex = static_cast<int>(it - g_visiblePids.begin());
         }
     }
 }
@@ -620,8 +685,139 @@ int main(int argc, char **argv)
                     }
                     if (!headerHit)
                     {
-                        EventManager::getInstance().pushEvent(std::make_unique<ClickEvent>(mx, my));
+                        // If the click landed on a Processes data row, take
+                        // the click as a row selection instead of letting
+                        // the EventManager route it to the layout tree. The
+                        // row widget itself does not own click handling, so
+                        // there is nothing else competing for this region.
+                        bool consumedAsRowSelect = false;
+                        if (processesTabActive()
+                            && mx >= PROCESSES_ROW_X0 && mx <= PROCESSES_ROW_X1
+                            && my >= PROCESSES_FIRST_ROW_Y
+                            && my < PROCESSES_FIRST_ROW_Y + PROCESSES_VISIBLE_ROWS * PROCESS_ROW_HEIGHT)
+                        {
+                            int row = (my - PROCESSES_FIRST_ROW_Y) / PROCESS_ROW_HEIGHT;
+                            if (row >= 0 && row < static_cast<int>(g_visiblePids.size()))
+                            {
+                                g_selectedRowIndex = row;
+                                g_selectedPid = g_visiblePids[row];
+                                consumedAsRowSelect = true;
+                            }
+                        }
+                        if (!consumedAsRowSelect)
+                        {
+                            EventManager::getInstance().pushEvent(std::make_unique<ClickEvent>(mx, my));
+                        }
                     }
+                }
+                break;
+            }
+            case SDL_EVENT_KEY_DOWN:
+            {
+                SDL_Keycode key = event.key.key;
+
+                // Esc and N close the signal menu without sending; if no
+                // menu is open Esc clears the selection (the htop default).
+                if (key == SDLK_ESCAPE)
+                {
+                    if (g_signalMenuVisible)
+                    {
+                        closeSignalMenu();
+                    }
+                    else
+                    {
+                        g_selectedPid = -1;
+                        g_selectedRowIndex = -1;
+                    }
+                    break;
+                }
+
+                if (g_signalMenuVisible)
+                {
+                    if (g_signalMenuPickedIndex < 0)
+                    {
+                        // Picking phase: 1..6 chooses a signal, anything
+                        // else is ignored so a stray keystroke cannot send.
+                        if (key >= SDLK_1 && key <= SDLK_6)
+                        {
+                            g_signalMenuPickedIndex = static_cast<int>(key - SDLK_1);
+                        }
+                    }
+                    else
+                    {
+                        // Confirm phase: Y / Enter sends, N / Esc cancels.
+                        if (key == SDLK_Y || key == SDLK_RETURN || key == SDLK_KP_ENTER)
+                        {
+                            SignalUtils::Signal sig =
+                                static_cast<SignalUtils::Signal>(g_signalMenuPickedIndex);
+                            SignalUtils::SendStatus s = SignalUtils::send(g_selectedPid, sig);
+                            std::string label = std::string(SignalUtils::name(sig))
+                                                 + " -> " + std::to_string(g_selectedPid);
+                            switch (s)
+                            {
+                            case SignalUtils::SendStatus::Ok:
+                                flashStatus("sent " + label);
+                                break;
+                            case SignalUtils::SendStatus::NoSuchProcess:
+                                flashStatus(label + " : no such process");
+                                break;
+                            case SignalUtils::SendStatus::PermissionDenied:
+                                flashStatus(label + " : permission denied");
+                                break;
+                            case SignalUtils::SendStatus::InvalidSignal:
+                                flashStatus(label + " : invalid signal");
+                                break;
+                            case SignalUtils::SendStatus::InvalidPid:
+                                flashStatus(label + " : refused (pid <= 1)");
+                                break;
+                            case SignalUtils::SendStatus::Unsupported:
+                                flashStatus(label + " : windows: not implemented");
+                                break;
+                            }
+                            closeSignalMenu();
+                        }
+                        else if (key == SDLK_N)
+                        {
+                            closeSignalMenu();
+                        }
+                    }
+                    break;
+                }
+
+                // No menu open: arrow keys move row selection; 'k' opens
+                // the menu when a row is selected and the Processes tab
+                // is active.
+                if (!processesTabActive())
+                {
+                    break;
+                }
+                if (key == SDLK_UP || key == SDLK_DOWN)
+                {
+                    if (g_visiblePids.empty())
+                    {
+                        break;
+                    }
+                    int next = g_selectedRowIndex;
+                    if (next < 0)
+                    {
+                        next = 0;
+                    }
+                    else if (key == SDLK_UP)
+                    {
+                        next = (next > 0) ? next - 1 : 0;
+                    }
+                    else
+                    {
+                        int max = static_cast<int>(g_visiblePids.size()) - 1;
+                        next = (next < max) ? next + 1 : max;
+                    }
+                    g_selectedRowIndex = next;
+                    g_selectedPid = g_visiblePids[next];
+                }
+                else if (key == SDLK_K && g_selectedPid >= 0)
+                {
+                    g_signalMenuVisible = true;
+                    g_signalMenuPickedIndex = -1;
                 }
                 break;
             }
@@ -656,6 +852,79 @@ int main(int argc, char **argv)
                 }
             }
         }
+
+        // Process-kill overlays: selected-row highlight + signal menu + the
+        // brief status flash after a send. Painted over the layout tree so
+        // they sit on top of the Processes table without modifying the Row
+        // widget itself.
+        if (processesTabActive() && g_selectedRowIndex >= 0
+            && g_selectedRowIndex < PROCESSES_VISIBLE_ROWS)
+        {
+            int y0 = PROCESSES_FIRST_ROW_Y + g_selectedRowIndex * PROCESS_ROW_HEIGHT;
+            int y1 = y0 + PROCESS_ROW_HEIGHT - 1;
+            // Thin accent strip on the left edge of the row. Cheap to draw,
+            // does not overdraw the text in the row.
+            screen.drawBox(ivec2(PROCESSES_ROW_X0 - 6, y0),
+                           ivec2(PROCESSES_ROW_X0 - 2, y1),
+                           COLOR_ACCENT_GREEN);
+        }
+
+        if (g_signalMenuVisible)
+        {
+            // Centered panel. The overlay is small and the message is the
+            // information that matters; no decorative chrome beyond a 1px
+            // border in the accent color so it reads as an actionable
+            // foreground element.
+            const int panelX0 = 200;
+            const int panelY0 = 200;
+            const int panelX1 = 760;
+            const int panelY1 = 320;
+            const vec3 panelBg(0.08f, 0.08f, 0.08f);
+            const vec3 panelBorder(0.871f, 1.0f, 0.608f);
+            screen.drawBox(ivec2(panelX0, panelY0), ivec2(panelX1, panelY1), panelBg);
+            // Border. 4 thin boxes is cheaper than a stroked rectangle.
+            screen.drawBox(ivec2(panelX0, panelY0), ivec2(panelX1, panelY0 + 1), panelBorder);
+            screen.drawBox(ivec2(panelX0, panelY1 - 1), ivec2(panelX1, panelY1), panelBorder);
+            screen.drawBox(ivec2(panelX0, panelY0), ivec2(panelX0 + 1, panelY1), panelBorder);
+            screen.drawBox(ivec2(panelX1 - 1, panelY0), ivec2(panelX1, panelY1), panelBorder);
+
+            const vec3 textColor(1.0f, 1.0f, 1.0f);
+            const vec3 hintColor(0.6f, 0.6f, 0.6f);
+            if (g_signalMenuPickedIndex < 0)
+            {
+                Font::drawText(screen, "Send signal to pid " + std::to_string(g_selectedPid),
+                               ivec2(panelX0 + 24, panelY0 + 18), textColor);
+                Font::drawText(screen, "1 TERM   2 KILL   3 INT   4 HUP   5 STOP   6 CONT",
+                               ivec2(panelX0 + 24, panelY0 + 50), COLOR_ACCENT_GREEN);
+                Font::drawText(screen, "Esc cancels",
+                               ivec2(panelX0 + 24, panelY1 - 30), hintColor);
+            }
+            else
+            {
+                SignalUtils::Signal sig =
+                    static_cast<SignalUtils::Signal>(g_signalMenuPickedIndex);
+                std::string prompt = std::string("Send ")
+                                     + SignalUtils::name(sig)
+                                     + " to pid " + std::to_string(g_selectedPid) + "?";
+                Font::drawText(screen, prompt,
+                               ivec2(panelX0 + 24, panelY0 + 18), textColor);
+                Font::drawText(screen, "Y / Enter = send     N / Esc = cancel",
+                               ivec2(panelX0 + 24, panelY0 + 50), COLOR_ACCENT_GREEN);
+            }
+        }
+
+        if (!g_statusFlash.empty() && SDL_GetTicks() < g_statusFlashExpiryMs)
+        {
+            // Paint the flash over the right end of the footer status strip,
+            // before the EXIT button. The accent color is reused so the flash
+            // reads as part of the same status row, not a foreign popup.
+            Font::drawText(screen, g_statusFlash, ivec2(540, 492), COLOR_ACCENT_GREEN);
+        }
+        else if (!g_statusFlash.empty())
+        {
+            g_statusFlash.clear();
+        }
+
         screen.blitTo(SDL_GetWindowSurface(window));
         SDL_UpdateWindowSurface(window);
     }
