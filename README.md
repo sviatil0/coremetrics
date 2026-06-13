@@ -17,9 +17,9 @@
 | System tab | Processes tab |
 |:---:|:---:|
 | ![System tab](assets/screenshot-system.png) | ![Processes tab](assets/screenshot-processes.png) |
-| CPU / RAM / GPU bars, load-colored (RAM red past 80%) | Sortable PID / NAME / CPU% / MEM% table |
+| CPU / RAM / GPU bars, load-colored (RAM red past 80%), plus rolling sparklines under `--sparklines` | Sortable PID / NAME / CPU% / MEM% table |
 
-> Both frames are rendered by the app itself, headlessly: `coremetrics --screenshot out.bmp [system|processes]` runs one render pass to an offscreen surface and saves it, no window required.
+> Both frames are rendered by the app itself, headlessly: `coremetrics --screenshot out.png [system|processes]` runs one render pass to an offscreen surface and saves it, no window required. The extension picks the writer (`.png` via `IMG_SavePNG`, anything else via `SDL_SaveBMP`).
 
 New here? [**DOCS.md**](DOCS.md) maps the whole repo; [**API.md**](API.md) is the full public library reference (every class and method).
 
@@ -34,7 +34,7 @@ CoreMetrics is two things in one repo: a small **GUI toolkit written directly on
 - **Event-driven, no scene rebuilds.** Clicks trickle top-down through the layout tree; tab switches drain as paired show/hide events in a single pass; metrics mutate widgets in place every 500 ms.
 - **Modern C++ on purpose.** A `Cloneable<Derived>` CRTP mixin gives every widget a covariant `clone()` for free; ownership flows through `unique_ptr`; the layout tree is a generic `Tree<T>`.
 - **Parallel fills.** Wide `drawBox` / `drawTriangle` operations partition pixel rows across a `ThreadPool` and join on `std::future`s per frame (a teammate's work; see the contribution table).
-- **175 unit tests across 13 suites** and a Linux + macOS GitHub Actions matrix.
+- **214 unit tests across 16 suites** and a Linux + macOS GitHub Actions matrix, plus a non-blocking AddressSanitizer + UndefinedBehaviorSanitizer leg (`make asan`, `make ubsan`).
 
 > This is a 4-person team project, and I was the lead and primary author: **~72% of the source by line** (git-blame verified, 5,034 of 7,001). See [Team and my contribution](#team-and-my-contribution) for the per-file breakdown.
 
@@ -80,7 +80,10 @@ make                 # builds bin/coremetrics and launches it
 ./stress.sh          # 30s of CPU + RAM load; bars cross yellow/red thresholds
 
 # (optional) render a frame headlessly, no window needed
-./bin/coremetrics --screenshot shot.bmp
+./bin/coremetrics --screenshot shot.png             # System tab
+./bin/coremetrics --screenshot shot.png processes   # Processes tab
+./bin/coremetrics --sparklines                      # adds rolling CPU/RAM/GPU charts
+./bin/coremetrics --duration 5                      # auto-quit after 5s (for CI smoke tests)
 ```
 
 <details>
