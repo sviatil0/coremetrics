@@ -18,6 +18,8 @@
 
 > The System tab: live CPU / RAM / GPU bars with load-colored thresholds (RAM is red past 80%, GPU green at 28%). The Processes tab adds a sortable PID / NAME / CPU% / MEM% table. This frame is rendered by the app itself via `coremetrics --screenshot out.bmp`, a headless one-frame render path.
 
+New here? [**DOCS.md**](DOCS.md) is a guided map of the whole repo: what to read, in what order, down to each subsystem.
+
 ---
 
 ## Why this is interesting
