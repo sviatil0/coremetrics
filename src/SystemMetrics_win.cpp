@@ -64,6 +64,16 @@ float SystemMetrics::readCpuPercent()
     return usage * 100.0f;
 }
 
+std::vector<float> SystemMetrics::readPerCoreCpu()
+{
+    // Windows per-core CPU is available via NtQuerySystemInformation +
+    // SystemProcessorPerformanceInformation but pulls in ntdll headers that
+    // are not always present in the toolchain we ship in CI. Returning an
+    // empty vector keeps the UI silent on Windows until that backend lands;
+    // the aggregate CPU bar and process table still work.
+    return std::vector<float>();
+}
+
 float SystemMetrics::readGpuPercent()
 {
     static PDH_HQUERY query = nullptr;

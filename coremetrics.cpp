@@ -85,6 +85,16 @@ constexpr std::size_t SPARKLINE_CAPACITY = 64;
 static Sparkline *g_cpuSparkline = nullptr;
 static Sparkline *g_ramSparkline = nullptr;
 static Sparkline *g_gpuSparkline = nullptr;
+
+// Per-logical-CPU utilization for the small strip below the aggregate bars.
+// Refreshed every poll. Empty on Windows (backend not implemented yet) and
+// on the very first poll (no prior tick sample to diff against).
+static std::vector<float> g_perCoreCpu;
+constexpr int PERCORE_Y0 = 218;
+constexpr int PERCORE_Y1 = 236;
+constexpr int PERCORE_X0 = 24;
+constexpr int PERCORE_X1 = 936;
+constexpr int PERCORE_GAP = 4;
 static ivec2 g_headerColMin[4];
 static ivec2 g_headerColMax[4];
 static ivec2 g_muteBtnMin;
@@ -177,6 +187,48 @@ static void destroySparklines()
     g_gpuSparkline = nullptr;
 }
 
+static void renderPerCoreStrip(Screen &dest)
+{
+    if (g_perCoreCpu.empty())
+    {
+        return;
+    }
+    const std::size_t cores = g_perCoreCpu.size();
+    const int totalGap = PERCORE_GAP * static_cast<int>(cores - 1);
+    const int slot = (PERCORE_X1 - PERCORE_X0 - totalGap) / static_cast<int>(cores);
+    if (slot <= 0)
+    {
+        return;
+    }
+    const vec3 bg(0.12f, 0.12f, 0.12f);
+    const vec3 fillLow(0.871f, 1.0f, 0.608f);   // accent green
+    const vec3 fillMid(0.95f, 0.82f, 0.40f);    // yellow at 60%+
+    const vec3 fillHigh(0.95f, 0.35f, 0.35f);   // red at 80%+
+
+    for (std::size_t i = 0; i < cores; ++i)
+    {
+        int x0 = PERCORE_X0 + static_cast<int>(i) * (slot + PERCORE_GAP);
+        int x1 = x0 + slot;
+        dest.drawBox(ivec2(x0, PERCORE_Y0), ivec2(x1, PERCORE_Y1), bg);
+
+        float ratio = g_perCoreCpu[i] / 100.0f;
+        if (ratio <= 0.0f)
+        {
+            continue;
+        }
+        if (ratio > 1.0f) ratio = 1.0f;
+        int fillW = static_cast<int>(ratio * static_cast<float>(slot));
+        if (fillW <= 0)
+        {
+            continue;
+        }
+        vec3 color = fillLow;
+        if (ratio > 0.8f) color = fillHigh;
+        else if (ratio > 0.6f) color = fillMid;
+        dest.drawBox(ivec2(x0, PERCORE_Y0), ivec2(x0 + fillW, PERCORE_Y1), color);
+    }
+}
+
 static void pollMetrics()
 {
     float cpuPct = SystemMetrics::readCpuPercent();
@@ -220,6 +272,8 @@ static void pollMetrics()
     {
         g_gpuSparkline->push(gpuPct);
     }
+
+    g_perCoreCpu = SystemMetrics::readPerCoreCpu();
 
     bool cpuNowAlarm = cpuPct >= ALARM_THRESHOLD;
     bool ramNowAlarm = memPct >= ALARM_THRESHOLD;
@@ -369,11 +423,15 @@ int main(int argc, char **argv)
 
         shot.clear();
         LayoutManager::getInstance().render(shot, ivec2(0, 0), ivec2(RESX - 1, RESY - 1));
-        if (g_sparklinesEnabled && tab != "processes")
+        if (tab != "processes")
         {
-            if (g_cpuSparkline != nullptr) g_cpuSparkline->draw(shot);
-            if (g_ramSparkline != nullptr) g_ramSparkline->draw(shot);
-            if (g_gpuSparkline != nullptr) g_gpuSparkline->draw(shot);
+            renderPerCoreStrip(shot);
+            if (g_sparklinesEnabled)
+            {
+                if (g_cpuSparkline != nullptr) g_cpuSparkline->draw(shot);
+                if (g_ramSparkline != nullptr) g_ramSparkline->draw(shot);
+                if (g_gpuSparkline != nullptr) g_gpuSparkline->draw(shot);
+            }
         }
         SDL_Surface *out = SDL_CreateSurface(RESX, RESY, SDL_PIXELFORMAT_RGBA32);
         if (out == nullptr)
@@ -581,18 +639,21 @@ int main(int argc, char **argv)
 
         screen.clear();
         LayoutManager::getInstance().render(screen, ivec2(0, 0), ivec2(RESX - 1, RESY - 1));
-        if (g_sparklinesEnabled)
         {
-            // Only paint sparklines while the System tab is the active layout;
-            // when the user is on Processes the rows already occupy the same
-            // pixel range, so a sparkline would overdraw the table.
+            // Per-core strip and sparklines only paint while the System tab
+            // is the active layout. On Processes, the rows occupy the same
+            // pixel range, so painting either would overdraw the table.
             Tree<Layout> *systemNode = EventManager::findLayoutByName(
                 LayoutManager::getInstance().getRoot(), "system");
             if (systemNode != nullptr && systemNode->getData().isActive())
             {
-                if (g_cpuSparkline != nullptr) g_cpuSparkline->draw(screen);
-                if (g_ramSparkline != nullptr) g_ramSparkline->draw(screen);
-                if (g_gpuSparkline != nullptr) g_gpuSparkline->draw(screen);
+                renderPerCoreStrip(screen);
+                if (g_sparklinesEnabled)
+                {
+                    if (g_cpuSparkline != nullptr) g_cpuSparkline->draw(screen);
+                    if (g_ramSparkline != nullptr) g_ramSparkline->draw(screen);
+                    if (g_gpuSparkline != nullptr) g_gpuSparkline->draw(screen);
+                }
             }
         }
         screen.blitTo(SDL_GetWindowSurface(window));

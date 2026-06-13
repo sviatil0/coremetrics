@@ -12,6 +12,9 @@
 
 extern bool systemMetricsCompareByMemDesc(const ProcessInfo &a, const ProcessInfo &b);
 
+static std::vector<unsigned long long> g_lastPerCoreTotal;
+static std::vector<unsigned long long> g_lastPerCoreIdle;
+
 static unsigned long long g_lastTotal = 0;
 static unsigned long long g_lastIdle = 0;
 
@@ -114,6 +117,46 @@ float SystemMetrics::readCpuPercent()
     }
     float usage = 1.0f - (static_cast<float>(idleDiff) / static_cast<float>(totalDiff));
     return usage * 100.0f;
+}
+
+std::vector<float> SystemMetrics::readPerCoreCpu()
+{
+    std::vector<ProcParsers::CpuTicks> ticks;
+    if (!ProcParsers::parseProcStatPerCore(slurpFile("/proc/stat"), ticks))
+    {
+        return std::vector<float>();
+    }
+
+    std::vector<float> result(ticks.size(), 0.0f);
+    bool firstSample = (g_lastPerCoreTotal.size() != ticks.size());
+    if (firstSample)
+    {
+        g_lastPerCoreTotal.assign(ticks.size(), 0);
+        g_lastPerCoreIdle.assign(ticks.size(), 0);
+    }
+
+    for (std::size_t i = 0; i < ticks.size(); ++i)
+    {
+        if (!firstSample)
+        {
+            unsigned long long totalDiff = (ticks[i].total >= g_lastPerCoreTotal[i])
+                                               ? ticks[i].total - g_lastPerCoreTotal[i]
+                                               : 0;
+            unsigned long long idleDiff = (ticks[i].idle >= g_lastPerCoreIdle[i])
+                                              ? ticks[i].idle - g_lastPerCoreIdle[i]
+                                              : 0;
+            if (totalDiff > 0)
+            {
+                float usage = 1.0f - (static_cast<float>(idleDiff) / static_cast<float>(totalDiff));
+                if (usage < 0.0f) usage = 0.0f;
+                if (usage > 1.0f) usage = 1.0f;
+                result[i] = usage * 100.0f;
+            }
+        }
+        g_lastPerCoreTotal[i] = ticks[i].total;
+        g_lastPerCoreIdle[i] = ticks[i].idle;
+    }
+    return result;
 }
 
 float SystemMetrics::readGpuPercent()

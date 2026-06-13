@@ -17,10 +17,12 @@ static const mach_port_t MS_IO_DEFAULT_PORT = MACH_PORT_NULL;
 #include <mach/mach.h>
 #include <mach/mach_host.h>
 #include <mach/host_info.h>
+#include <mach/processor_info.h>
 #include <sys/sysctl.h>
 #include <sys/types.h>
 #include <unistd.h>
 #include <unordered_map>
+#include <vector>
 
 extern bool systemMetricsCompareByMemDesc(const ProcessInfo &a, const ProcessInfo &b);
 
@@ -29,6 +31,12 @@ static uint64_t g_lastIdle = 0;
 
 static std::unordered_map<pid_t, uint64_t> g_lastProcCpuNs;
 static uint64_t g_lastSampleNs = 0;
+
+// Per-core tick history. Vector size = logical CPU count. Two slots per
+// core: [previousTotalTicks, previousIdleTicks]. Resized lazily on the
+// first call to readPerCoreCpu().
+static std::vector<uint64_t> g_lastPerCoreTotal;
+static std::vector<uint64_t> g_lastPerCoreIdle;
 
 float SystemMetrics::readCpuPercent()
 {
@@ -64,6 +72,56 @@ float SystemMetrics::readCpuPercent()
     }
     float usage = 1.0f - (static_cast<float>(idleDiff) / static_cast<float>(totalDiff));
     return usage * 100.0f;
+}
+
+std::vector<float> SystemMetrics::readPerCoreCpu()
+{
+    natural_t cpuCount = 0;
+    processor_info_array_t infoArray = nullptr;
+    mach_msg_type_number_t infoCount = 0;
+    if (host_processor_info(mach_host_self(), PROCESSOR_CPU_LOAD_INFO,
+                            &cpuCount, &infoArray, &infoCount) != KERN_SUCCESS)
+    {
+        return std::vector<float>();
+    }
+
+    std::vector<float> result(cpuCount, 0.0f);
+    bool firstSample = (g_lastPerCoreTotal.size() != cpuCount);
+    if (firstSample)
+    {
+        g_lastPerCoreTotal.assign(cpuCount, 0);
+        g_lastPerCoreIdle.assign(cpuCount, 0);
+    }
+
+    processor_cpu_load_info_t loads = reinterpret_cast<processor_cpu_load_info_t>(infoArray);
+    for (natural_t i = 0; i < cpuCount; ++i)
+    {
+        uint64_t user = loads[i].cpu_ticks[CPU_STATE_USER];
+        uint64_t sys = loads[i].cpu_ticks[CPU_STATE_SYSTEM];
+        uint64_t nice = loads[i].cpu_ticks[CPU_STATE_NICE];
+        uint64_t idle = loads[i].cpu_ticks[CPU_STATE_IDLE];
+        uint64_t total = user + sys + nice + idle;
+
+        if (!firstSample)
+        {
+            uint64_t totalDiff = total - g_lastPerCoreTotal[i];
+            uint64_t idleDiff = idle - g_lastPerCoreIdle[i];
+            if (totalDiff > 0)
+            {
+                float usage = 1.0f - (static_cast<float>(idleDiff) / static_cast<float>(totalDiff));
+                if (usage < 0.0f) usage = 0.0f;
+                if (usage > 1.0f) usage = 1.0f;
+                result[i] = usage * 100.0f;
+            }
+        }
+        g_lastPerCoreTotal[i] = total;
+        g_lastPerCoreIdle[i] = idle;
+    }
+
+    vm_deallocate(mach_task_self(),
+                  reinterpret_cast<vm_address_t>(infoArray),
+                  static_cast<vm_size_t>(infoCount * sizeof(integer_t)));
+    return result;
 }
 
 float SystemMetrics::readGpuPercent()
