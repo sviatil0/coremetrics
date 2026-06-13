@@ -36,6 +36,16 @@
   </screenshots>
   <content_rating type="oars-1.1" />
   <releases>
+    <release version="0.2.2" date="2026-06-13">
+      <description>
+        <p>
+          Root volume disk usage on the System tab: 'DISK used/total GB
+          (NN%)' status line with the same yellow-at-60% / red-at-80%
+          color thresholds the RAM bar uses. Cross-platform backend via
+          statvfs on linux and mac, GetDiskFreeSpaceEx on windows.
+        </p>
+      </description>
+    </release>
     <release version="0.2.1" date="2026-06-13">
       <description>
         <p>
