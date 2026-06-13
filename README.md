@@ -13,6 +13,9 @@
 [![C/C++ CI](https://github.com/sviatil0/coremetrics/actions/workflows/c-cpp.yml/badge.svg?branch=main)](https://github.com/sviatil0/coremetrics/actions/workflows/c-cpp.yml)
 [![Stefan's code](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fsviatil0%2Fcoremetrics%2Fmain%2F.github%2Fbadges%2Fcontribution.json)](#team-and-my-contribution)
 [![Latest release](https://img.shields.io/github/v/release/sviatil0/coremetrics?label=release)](https://github.com/sviatil0/coremetrics/releases/latest)
+[![Homebrew tap](https://img.shields.io/badge/Homebrew-sviatil0%2Fcoremetrics-orange?logo=homebrew&logoColor=white)](https://github.com/sviatil0/homebrew-coremetrics)
+[![Debian .deb](https://img.shields.io/badge/Debian-.deb-A81D33?logo=debian&logoColor=white)](https://github.com/sviatil0/coremetrics/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/sviatil0/coremetrics/total?label=downloads)](https://github.com/sviatil0/coremetrics/releases)
 
 </div>
 
