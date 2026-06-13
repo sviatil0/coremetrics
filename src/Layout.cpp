@@ -56,8 +56,6 @@ void Layout::draw(Screen& screen, ivec2 parentStart, ivec2 parentEnd) const
     {
         return;
     }
-    ivec2 absStart = resolveAbsStart(parentStart, parentEnd);
-    ivec2 absEnd = resolveAbsEnd(parentStart, parentEnd);
     for (const auto& element : elements)
     {
         element->draw(screen);

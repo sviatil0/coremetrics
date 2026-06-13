@@ -34,14 +34,14 @@ collapsible "API reference" section.
 
 Suggested reading order, simplest to most involved:
 
-1. **Math** — [`include/vec2.hpp`](include/vec2.hpp), [`vec3.hpp`](include/vec3.hpp), [`src/matrix.cpp`](src/matrix.cpp). Templated vectors and a 3x3 matrix.
-2. **Rasterizer** — [`src/screen.cpp`](src/screen.cpp). `drawPixel`, Bresenham `drawLine` (`plotLineLow` / `plotLineHigh`), `drawBox`, barycentric `drawTriangle`, `drawText`, `blitTo`. The heart of the graphics stack.
-3. **Threading** — [`src/ThreadPool.cpp`](src/ThreadPool.cpp). The worker pool that `drawBox` / `drawTriangle` partition pixel rows across.
-4. **Widgets** — [`src/Bar.cpp`](src/Bar.cpp), [`Row.cpp`](src/Row.cpp), [`Label.cpp`](src/Label.cpp), [`Button.cpp`](src/Button.cpp), [`selection.cpp`](src/selection.cpp), and the `Cloneable` / `GUIElementFactory` plumbing.
-5. **Layout** — [`src/Layout.cpp`](src/Layout.cpp), [`LayoutManager.cpp`](src/LayoutManager.cpp), [`include/Tree.hpp`](include/Tree.hpp). The render tree and the painter's algorithm.
-6. **Events** — [`src/EventManager.cpp`](src/EventManager.cpp), `ClickEvent` / `ShowEvent` / `SoundEvent`, [`SoundPlayer.cpp`](src/SoundPlayer.cpp).
-7. **Metrics** — [`src/SystemMetrics_linux.cpp`](src/SystemMetrics_linux.cpp) (`/proc`), [`SystemMetrics_mac.cpp`](src/SystemMetrics_mac.cpp) (IOKit), [`SystemMetrics_win.cpp`](src/SystemMetrics_win.cpp) (PDH), selected by `#ifdef`.
-8. **The app** — [`coremetrics.cpp`](coremetrics.cpp). Builds the two-tab scene, the 500 ms poll loop, and the `--screenshot` render path.
+1. **Math**: [`include/vec2.hpp`](include/vec2.hpp), [`vec3.hpp`](include/vec3.hpp), [`src/matrix.cpp`](src/matrix.cpp). Templated vectors and a 3x3 matrix.
+2. **Rasterizer**: [`src/screen.cpp`](src/screen.cpp). `drawPixel`, Bresenham `drawLine` (`plotLineLow` / `plotLineHigh`), `drawBox`, barycentric `drawTriangle`, `drawText`, `blitTo`. The heart of the graphics stack.
+3. **Threading**: [`src/ThreadPool.cpp`](src/ThreadPool.cpp). The worker pool that `drawBox` / `drawTriangle` partition pixel rows across.
+4. **Widgets**: [`src/Bar.cpp`](src/Bar.cpp), [`Row.cpp`](src/Row.cpp), [`Label.cpp`](src/Label.cpp), [`Button.cpp`](src/Button.cpp), [`selection.cpp`](src/selection.cpp), and the `Cloneable` / `GUIElementFactory` plumbing.
+5. **Layout**: [`src/Layout.cpp`](src/Layout.cpp), [`LayoutManager.cpp`](src/LayoutManager.cpp), [`include/Tree.hpp`](include/Tree.hpp). The render tree and the painter's algorithm.
+6. **Events**: [`src/EventManager.cpp`](src/EventManager.cpp), `ClickEvent` / `ShowEvent` / `SoundEvent`, [`SoundPlayer.cpp`](src/SoundPlayer.cpp).
+7. **Metrics**: [`src/SystemMetrics_linux.cpp`](src/SystemMetrics_linux.cpp) (`/proc`), [`SystemMetrics_mac.cpp`](src/SystemMetrics_mac.cpp) (IOKit), [`SystemMetrics_win.cpp`](src/SystemMetrics_win.cpp) (PDH), selected by `#ifdef`.
+8. **The app**: [`coremetrics.cpp`](coremetrics.cpp). Builds the two-tab scene, the 500 ms poll loop, and the `--screenshot` render path.
 
 ## 4. Run and verify
 

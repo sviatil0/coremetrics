@@ -29,12 +29,12 @@ New here? [**DOCS.md**](DOCS.md) maps the whole repo; [**API.md**](API.md) is th
 
 CoreMetrics is two things in one repo: a small **GUI toolkit written directly on SDL3 pixel surfaces** (no Dear ImGui, no Qt, no game framework) and a **real system monitor built on top of it**. A few things worth a look:
 
-- **From-scratch UI stack.** Every widget rasterizes itself onto a raw `SDL_Surface` through one `Screen` primitive layer (`drawPixel` / `drawLine` / `drawBox` / `drawTriangle` / `drawText`). No retained-mode GUI library underneath.
 - **Three native metrics backends, one header.** `SystemMetrics` reads live data from `/proc` + `/sys` on Linux, mach + IOKit on macOS, and PDH + Toolhelp on Windows, selected at compile time via `#ifdef`.
-- **Parallel fills.** Wide `drawBox` / `drawTriangle` operations partition pixel rows across a `ThreadPool` and join on `std::future`s per frame.
-- **Modern C++ on purpose.** A `Cloneable<Derived>` CRTP mixin gives every widget a covariant `clone()` for free; ownership flows through `unique_ptr`; the layout tree is a generic `Tree<T>`.
+- **From-scratch UI stack.** Every widget rasterizes itself onto a raw `SDL_Surface` through one `Screen` primitive layer (`drawPixel`, Bresenham `drawLine`, `drawBox`, `drawTriangle`, `blitTo`). No retained-mode GUI library underneath; geometry is hand-rasterized, text and image decode go through SDL's debug renderer and SDL_image/SDL_ttf.
 - **Event-driven, no scene rebuilds.** Clicks trickle top-down through the layout tree; tab switches drain as paired show/hide events in a single pass; metrics mutate widgets in place every 500 ms.
-- **175 unit tests across 13 suites** and a 3-OS GitHub Actions matrix.
+- **Modern C++ on purpose.** A `Cloneable<Derived>` CRTP mixin gives every widget a covariant `clone()` for free; ownership flows through `unique_ptr`; the layout tree is a generic `Tree<T>`.
+- **Parallel fills.** Wide `drawBox` / `drawTriangle` operations partition pixel rows across a `ThreadPool` and join on `std::future`s per frame (a teammate's work; see the contribution table).
+- **175 unit tests across 13 suites** and a Linux + macOS GitHub Actions matrix.
 
 > This is a 4-person team project, and I was the lead and primary author: **~72% of the source by line** (git-blame verified, 5,034 of 7,001). See [Team and my contribution](#team-and-my-contribution) for the per-file breakdown.
 
@@ -192,7 +192,7 @@ Tab switching is event-driven: each tab button emits a hide event for the other 
 - GUI library, rasterizer, event system, layout tree, and the CoreMetrics demo build and run.
 - Live CPU / RAM and per-process stats on macOS, Linux, and Windows.
 - Total GPU usage on Linux (`gpu_busy_percent`), macOS (`IOAccelerator`), and Windows (PDH).
-- 175 unit tests across 13 suites; full 3-OS compile + test matrix in CI.
+- 175 unit tests across 13 suites; Linux + macOS compile + test matrix in CI (Windows builds locally only).
 
 **Known limitations**
 
@@ -238,7 +238,7 @@ The math core is the most reused surface; the full per-class reference is folded
 - `void drawLine(ivec2 start, ivec2 end, vec3 color)`: horizontal, vertical, or diagonal line.
 - `void drawBox(ivec2 min, ivec2 max, vec3 color)`: filled rectangle.
 - `void drawTriangle(ivec2 v1, ivec2 v2, ivec2 v3, vec3 color)`: filled triangle, winding-agnostic.
-- `void drawText(ivec2 pos, vec3 color, std::string text)`: text via the bundled font.
+- `void drawText(ivec2 pos, vec3 color, std::string text)`: text via `SDL_RenderDebugText` (SDL3 built-in debug font). The bundled TTF is used by `Font::drawText`, which `Label` calls.
 - `void blitTo(SDL_Surface*)`: copy the internal buffer to a display surface.
 
 **`ThreadPool`**: singleton worker pool sized to `std::thread::hardware_concurrency`. `drawBox` / `drawTriangle` partition pixel rows across it via `submit` and join on returned futures. Copy/assign deleted; destructor signals stop and joins.
@@ -261,7 +261,7 @@ The math core is the most reused surface; the full per-class reference is folded
 **`GUIElementFactory`**: static factory mapping a `GUIElementType` to a concrete element.
 - `createPoint`, `createLine`, `createBox`, and a generic `create(type, pos1, pos2, color)` (returns `nullptr` + logs to `std::cerr` on unknown types).
 
-**`Label`**: text component; currently renders a proportional box per character as a layout placeholder ahead of a full font engine. `draw`, `getText`.
+**`Label`**: text component; renders its text via the bundled font (`Font::drawText`, TTF). `draw`, `getText`, `setText`, `setPos`.
 
 **`Selection`**: stateful checkbox (border, background, conditional check mark). `draw`, `toggle`, `isSelected`.
 
@@ -281,7 +281,7 @@ The math core is the most reused surface; the full per-class reference is folded
 
 **`LayoutManager`**: singleton owning the root `Tree<Layout>`; renders with the painter's algorithm (depth-first, parent before children). `getInstance`, `getRoot`, `addChild`, `render`.
 
-**`GUIFile`**: loads/stages/saves GUI layout elements to/from XML. Holds `std::vector<Point/Line/Box>`; clears containers before each load. `setPoint/Line/Box`, `getPoints/Lines/Boxes`, `readFile`, `writeFile`.
+**`GUIFile`**: loads and saves the GUI layout tree to and from a file via `readFile` / `writeFile`; the parse helpers are private.
 
 ### Events
 
@@ -321,10 +321,12 @@ mcastel5      ██████░░░░░░░░░░░░░░░░
 
 | Contributor | What they owned |
 |---|---|
-| **Sviatoslav (me)** | The graphics core (vector/matrix math, the `Screen` rasterizer and its pixel tests), the event system, the GUI element hierarchy and factory, all three `SystemMetrics` platform backends, the demo app, CI, and tooling. The `ThreadPool` and `Cloneable` are teammates'; I wrote the rasterizer code that uses them. |
-| **Alicia Melotik** | The XML parser and `GUIFile`, the `Cloneable` / CRTP clone path, Windows GPU, layout helpers. |
-| **Martin Castellanos** | `Layout` core methods, the `Button` event functor, the `ThreadPool`, drawing parallelism. |
+| **Sviatoslav (me)** | All three `SystemMetrics` platform backends (`/proc`, IOKit, PDH), the event system, the GUI element hierarchy and factory, the `Layout` / `LayoutManager` tree, the Bresenham line rasterizer (`plotLineLow` / `plotLineHigh`) plus `blitTo` / `clear`, the CoreMetrics demo app, the test suites, CI, and tooling. |
+| **Alicia Melotik** | The XML parser and `GUIFile`, the `Cloneable` / CRTP clone path, `drawPixel` / `drawLine` / `drawText`, Windows GPU, layout helpers. |
+| **Martin Castellanos** | The `ThreadPool` and the parallel fills in `drawBox` / `drawTriangle`, plus `Button` event handling. |
 | **Daniel Rehberg** (instructor) | Early scaffolding and review. |
+
+`screen.cpp` is shared (me ~140 lines, Alicia ~110, Martin ~59); the line-drawing and blit are mine, the box/triangle fills and their parallelization are Martin's, the pixel/line/text entry points are Alicia's.
 
 Reproduce the split yourself:
 

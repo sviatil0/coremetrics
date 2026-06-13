@@ -3,6 +3,7 @@ obj/
 bin/
 .vscode/
 main
-uml/*.pnga.out
+uml/*.png
+a.out
 build_warnings.txt
 *.bmp
