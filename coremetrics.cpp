@@ -290,7 +290,11 @@ static void renderUptimeAndLoad(Screen &dest)
     // Dim white for the labels, accent green so it reads as a status row.
     const vec3 dimColor(0.55f, 0.55f, 0.55f);
     Font::drawText(dest, formatUptime(g_uptimeSeconds), ivec2(24, 44), dimColor);
-    Font::drawText(dest, formatLoadAverages(), ivec2(220, 56), dimColor);
+    // Uptime + Load + Disk all share the y=44 baseline so the status
+    // row reads as a single line instead of a staircase. The earlier
+    // y=56 placement for Load predated the DISK strip and left Load
+    // ~12 px below Up, which was visible as a misaligned middle field.
+    Font::drawText(dest, formatLoadAverages(), ivec2(220, 44), dimColor);
 }
 
 static std::string formatGb(unsigned long long kb)
