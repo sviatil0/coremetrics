@@ -1,32 +1,79 @@
 # CoreMetrics
 
-A real-time system process monitor (CPU, RAM, GPU, process table) built in C++ on
-top of a from-scratch 2D graphics library over SDL3. Cross-platform (Linux, macOS,
-Windows) with templated vector math, a Bresenham rasterizer, an event-driven GUI
-layer, and a thread-pool that parallelizes wide fills.
+A real-time system process monitor (CPU, RAM, GPU, sortable process table) built in
+**C++23** on top of a **from-scratch 2D graphics library** over SDL3. Cross-platform
+(Linux, macOS, Windows): templated vector math, a Bresenham rasterizer, an event-driven
+GUI layer, and a thread pool that parallelizes wide pixel fills.
 
-**Team project (Notre Dame CSE 40232, Software Engineering, Spring 2026).** Built by a
-four-person team over three months. I was the lead and primary author: `git blame`
-across the source attributes roughly 72% of the surviving lines (about 4,900 of 6,900)
-to me, including the graphics core (vector math, the `Screen` rasterizer, the thread
-pool), the event system, and the system-metrics layer. Teammates: Alicia Melotik and
-mcastel5; instructor: Prof. Daniel Rehberg. Released publicly with the team's and
-instructor's consent under LGPL-2.1.
+![What CoreMetrics is](assets/what-we-built.png)
 
-Verify authorship yourself:
+The graphics stack is written from the pixel up. There is no UI toolkit underneath; SDL3
+only provides the window and the raw surface. Everything above that (drawing primitives,
+layout, widgets, events, sound) is in this repo.
+
+## What it does
+
+A developer notices a slowdown, opens CoreMetrics, sees the CPU bar go red, switches to
+the Processes tab, and finds the offending PID.
+
+![User story](assets/user-story.png)
+
+- Live CPU / RAM / GPU bars, sampled from real OS sources: `/proc` on Linux, IOKit on
+  macOS, PDH on Windows (one platform file compiled per target).
+- A sortable process table (by PID, name, CPU, memory).
+- An alarm that fires with sound at an 80% utilization threshold.
+- Two tabs, event-driven switching, click / sort / exit / mute.
+
+## My contribution
+
+Team project (Notre Dame CSE 40232, Software Engineering, Spring 2026), four people over
+three months. I was the lead and primary author. `git blame` across every source file:
+
+| Contributor | Lines | Share |
+|---|---:|---:|
+| **Sviatoslav (me)** | **4,943** | **71%** |
+| Alicia Melotik | 1,138 | 16% |
+| mcastel5 | 805 | 12% |
+| Daniel Rehberg (instructor) | 25 | <1% |
+
+My work is the engine: the graphics core (templated vector math, the `Screen`
+rasterizer, the `ThreadPool`), the event system, the GUI element hierarchy and factory,
+and all three `SystemMetrics` platform layers. Verify it yourself:
 
 ```sh
 git ls-files '*.cpp' '*.hpp' '*.h' | while read f; do
   git blame --line-porcelain "$f"; done | grep '^author ' | sort | uniq -c | sort -rn
 ```
 
-## Class Diagram
+Released publicly with the team's and instructor's consent under LGPL-2.1.
+
+## Build and run
+
+Dependencies: SDL3, SDL3_ttf, SDL3_image.
+
+```sh
+brew install sdl3 sdl3_ttf sdl3_image     # macOS
+# sudo apt install libsdl3-dev libsdl3-ttf-dev libsdl3-image-dev   # Debian/Ubuntu
+make            # builds bin/coremetrics
+make test       # 80+ unit tests across 11 suites
+./bin/coremetrics
+```
+
+Builds clean under C++23 (`g++ -std=c++23 -Wall`) on macOS and Linux; the CI matrix
+covers Ubuntu, macOS, and Windows.
+
+## Slides
+
+A short [final presentation](docs/CoreMetrics-Final-Presentation.pdf) walks through the
+architecture, the cross-platform proof, and a demo.
+
+## Architecture (class diagrams)
 
 High-level overview, grouped by package:
 
 ![Class Diagram Overview](assets/overview.png)
 
-Per-package detail diagrams (each is small enough to fit on a normal screen):
+Per-package detail (each fits on a normal screen):
 
 - Core (math + Screen + ThreadPool): ![Core](assets/core.png)
 - GUI elements (GUIElement hierarchy + Cloneable + Factory): ![GUI](assets/gui.png)
@@ -34,7 +81,13 @@ Per-package detail diagrams (each is small enough to fit on a normal screen):
 - Events (Event hierarchy, EventManager, SoundPlayer): ![Events](assets/events.png)
 - System metrics: ![Metrics](assets/metrics.png)
 
-The single combined diagram in `uml/classes.puml` is kept for archival reference; it renders wide and is not embedded here.
+The combined diagram in `uml/classes.puml` is kept for archival reference; it renders
+wide and is not embedded here.
+
+---
+
+> The sections below are the original course engineering spec the team built against,
+> kept for reference.
 
 ---
 
