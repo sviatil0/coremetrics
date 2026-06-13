@@ -357,8 +357,19 @@ std::vector<ProcessInfo> SystemMetrics::topProcesses(std::size_t n)
             cpuPct = computeCpuPercentDelta(procCpuNs, it->second, wallDiffNs);
         }
 
+        // PROC_PIDTBSDINFO has pbi_ppid which is the parent pid the
+        // BSD layer tracks. Falls back to 0 if the call fails so the
+        // tree-view treats unknown parents as roots.
+        int parentPid = 0;
+        struct proc_bsdinfo bsdInfo;
+        if (proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, &bsdInfo, sizeof(bsdInfo)) > 0)
+        {
+            parentPid = static_cast<int>(bsdInfo.pbi_ppid);
+        }
+
         ProcessInfo info;
         info.pid = pid;
+        info.parentPid = parentPid;
         info.name = name;
         info.cpuPct = cpuPct;
         if (memSize > 0)

@@ -8,6 +8,7 @@
 struct ProcessInfo
 {
     int pid;
+    int parentPid;
     std::string name;
     float cpuPct;
     float memPct;

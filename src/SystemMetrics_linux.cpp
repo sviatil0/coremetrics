@@ -357,8 +357,36 @@ std::vector<ProcessInfo> SystemMetrics::topProcesses(std::size_t n)
         {
             memPct = (static_cast<float>(memKb) / static_cast<float>(memTotalKb)) * 100.0f;
         }
+        // /proc/[pid]/stat field 4 is the parent pid (1-based after the
+        // ppid_position offset that ProcParsers uses for the ticks). The
+        // parser already grabs utime+stime; we read ppid here without
+        // adding a second pure helper since it's a one-off field.
+        int parentPid = 0;
+        {
+            std::ostringstream statPath;
+            statPath << "/proc/" << pid << "/stat";
+            std::ifstream statFile(statPath.str());
+            if (statFile.is_open())
+            {
+                std::string content;
+                std::getline(statFile, content);
+                std::size_t rparen = content.rfind(')');
+                if (rparen != std::string::npos && rparen + 1 < content.size())
+                {
+                    std::istringstream iss(content.substr(rparen + 1));
+                    std::string state;
+                    int ppid = 0;
+                    if (iss >> state >> ppid)
+                    {
+                        parentPid = ppid;
+                    }
+                }
+            }
+        }
+
         ProcessInfo info;
         info.pid = pid;
+        info.parentPid = parentPid;
         info.name = procName;
         info.cpuPct = cpuPct;
         info.memPct = memPct;

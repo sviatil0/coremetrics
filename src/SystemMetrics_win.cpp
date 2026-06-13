@@ -230,6 +230,10 @@ std::vector<ProcessInfo> SystemMetrics::topProcesses(std::size_t n)
                                    FALSE, entry.th32ProcessID);
         ProcessInfo info;
         info.pid = static_cast<int>(entry.th32ProcessID);
+        // PROCESSENTRY32.th32ParentProcessID is the parent pid as the
+        // Toolhelp snapshot saw it; same source the Task Manager hierarchy
+        // view uses.
+        info.parentPid = static_cast<int>(entry.th32ParentProcessID);
         info.name = entry.szExeFile;
         info.cpuPct = 0.0f;
         info.memPct = 0.0f;
