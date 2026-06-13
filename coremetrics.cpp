@@ -10,6 +10,7 @@
 #include "LayoutManager.hpp"
 #include "EventManager.hpp"
 #include "ClickEvent.hpp"
+#include "ShowEvent.hpp"
 #include "SoundEvent.hpp"
 #include "SoundPlayer.hpp"
 #include "font.hpp"
@@ -256,10 +257,28 @@ int main(int argc, char **argv)
 
     if (!screenshotPath.empty())
     {
+        // Optional second arg selects the tab: --screenshot out.bmp processes
+        std::string tab = "system";
+        for (int i = 1; i < argc - 1; ++i)
+        {
+            if (std::string(argv[i]) == "--screenshot" && i + 2 < argc)
+            {
+                tab = argv[i + 2];
+            }
+        }
+
         Screen shot(RESX, RESY);
         buildScene();
         cacheElementPointers();
         pollMetrics();
+
+        if (tab == "processes")
+        {
+            EventManager::getInstance().pushEvent(std::make_unique<ShowEvent>("system", false));
+            EventManager::getInstance().pushEvent(std::make_unique<ShowEvent>("processes", true));
+            EventManager::getInstance().processEvents(ivec2(0, 0), ivec2(RESX - 1, RESY - 1));
+        }
+
         shot.clear();
         LayoutManager::getInstance().render(shot, ivec2(0, 0), ivec2(RESX - 1, RESY - 1));
         SDL_Surface *out = SDL_CreateSurface(RESX, RESY, SDL_PIXELFORMAT_RGBA32);

@@ -14,9 +14,12 @@
 
 </div>
 
-![CoreMetrics System tab](assets/screenshot-system.png)
+| System tab | Processes tab |
+|:---:|:---:|
+| ![System tab](assets/screenshot-system.png) | ![Processes tab](assets/screenshot-processes.png) |
+| CPU / RAM / GPU bars, load-colored (RAM red past 80%) | Sortable PID / NAME / CPU% / MEM% table |
 
-> The System tab: live CPU / RAM / GPU bars with load-colored thresholds (RAM is red past 80%, GPU green at 28%). The Processes tab adds a sortable PID / NAME / CPU% / MEM% table. This frame is rendered by the app itself via `coremetrics --screenshot out.bmp`, a headless one-frame render path.
+> Both frames are rendered by the app itself, headlessly: `coremetrics --screenshot out.bmp [system|processes]` runs one render pass to an offscreen surface and saves it, no window required.
 
 New here? [**DOCS.md**](DOCS.md) is a guided map of the whole repo: what to read, in what order, down to each subsystem.
 
