@@ -30,6 +30,14 @@ SoundPlayer& SoundPlayer::getInstance()
 
 void SoundPlayer::play(const std::string& filePath)
 {
+    // Audio init is the caller's responsibility (skipped in --screenshot path).
+    // If the audio subsystem isn't initialized, silently no-op instead of
+    // spamming stderr with "Audio subsystem is not initialized" on every call.
+    if (SDL_WasInit(SDL_INIT_AUDIO) == 0)
+    {
+        return;
+    }
+
     SDL_AudioSpec wavSpec;
     Uint8* wavBuffer = nullptr;
     Uint32 wavLength = 0;
