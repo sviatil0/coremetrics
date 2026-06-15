@@ -359,22 +359,28 @@ static void buildSparklines()
     // matches the same accent color, so the polyline reads as a continuation
     // of its bar. Heights are 56px / row with 12px gaps.
     const vec3 accent(0.871f, 1.0f, 0.608f);
-    g_cpuSparkline = new Sparkline(ivec2(24, 240), ivec2(864, 296), accent,
+    // Sparkline stack: 4 charts at 40px each with a 14px label band above
+    // each chart. Labels live at chart-top minus 12px so they sit cleanly
+    // above the polyline instead of being overwritten by the fill. Tick
+    // labels ("100" / "0") render at maxPos.x + 4 in the 80px right
+    // gutter (chart maxPos.x = 864, screen width = 960). 0 tick now sits
+    // 4px BELOW the chart (maxPos.y + 4) so it never sits inside the
+    // polyline fill area.
+    g_cpuSparkline = new Sparkline(ivec2(24, 246), ivec2(864, 286), accent,
                                    0.0f, 100.0f, SPARKLINE_CAPACITY);
-    g_ramSparkline = new Sparkline(ivec2(24, 308), ivec2(864, 364), accent,
+    g_ramSparkline = new Sparkline(ivec2(24, 312), ivec2(864, 352), accent,
                                    0.0f, 100.0f, SPARKLINE_CAPACITY);
-    g_gpuSparkline = new Sparkline(ivec2(24, 376), ivec2(864, 432), accent,
+    g_gpuSparkline = new Sparkline(ivec2(24, 378), ivec2(864, 418), accent,
                                    0.0f, 100.0f, SPARKLINE_CAPACITY);
-    // NET strip sits in the gap between the GPU sparkline (ends at y=432)
-    // and the footer chrome (y=492). 40px tall instead of 56px so the
-    // label above (y=434) and the footer below both have breathing room.
-    // tx (orange) is constructed first so it renders behind the rx (green)
-    // line in the draw pass; incoming traffic reads as more important.
+    // tx (orange) is constructed first so it renders behind the rx
+    // (green) line in the draw pass; incoming traffic reads as more
+    // important. NET strip ends at y=474 leaving 8px clear of the
+    // y=482..516 EXIT button + footer chrome.
     const vec3 netTx(0.95f, 0.65f, 0.30f);
     const vec3 netRx(0.5f, 0.85f, 0.5f);
-    g_netTxSparkline = new Sparkline(ivec2(24, 444), ivec2(864, 484), netTx,
+    g_netTxSparkline = new Sparkline(ivec2(24, 444), ivec2(864, 474), netTx,
                                      0.0f, NET_SPARKLINE_MAX_KBPS, SPARKLINE_CAPACITY);
-    g_netRxSparkline = new Sparkline(ivec2(24, 444), ivec2(864, 484), netRx,
+    g_netRxSparkline = new Sparkline(ivec2(24, 444), ivec2(864, 474), netRx,
                                      0.0f, NET_SPARKLINE_MAX_KBPS, SPARKLINE_CAPACITY);
 }
 
@@ -752,15 +758,14 @@ static void renderHelpOverlay(Screen &dest)
 static void renderSparklineLabels(Screen &dest)
 {
     const vec3 dim(0.55f, 0.55f, 0.55f);
-    // CPU history label moved from y=230 (inside the per-core strip
-    // y=218..236) to y=240, just below the strip. Otherwise the
-    // per-core fill boxes redraw over it every poll.
-    Font::drawText(dest, "CPU history", ivec2(24, 240), dim);
-    Font::drawText(dest, "RAM history", ivec2(24, 298), dim);
-    Font::drawText(dest, "GPU history", ivec2(24, 366), dim);
-    // NET history sits in the same column at the bottom of the sparkline
-    // stack, 10px above its strip (y=444..484) the way RAM/GPU labels do.
-    Font::drawText(dest, "NET history", ivec2(24, 434), dim);
+    // One label per sparkline, painted 12px above the chart's top edge
+    // so the text sits in clear sky above the polyline fill instead of
+    // getting overwritten on every peak. Chart rects are CPU 246..286,
+    // RAM 312..352, GPU 378..418, NET 444..474.
+    Font::drawText(dest, "CPU history", ivec2(24, 230), dim);
+    Font::drawText(dest, "RAM history", ivec2(24, 296), dim);
+    Font::drawText(dest, "GPU history", ivec2(24, 362), dim);
+    Font::drawText(dest, "NET history", ivec2(24, 428), dim);
 }
 
 static void pollMetrics()

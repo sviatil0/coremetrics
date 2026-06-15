@@ -84,4 +84,42 @@ jobs:
             exit 0
           fi
           git commit -m "chore(contribution): refresh badge and per-author breakdown from git blame"
-          git push origin HEAD:main
+          # Race-resilient push: another merge may land on main between the
+          # checkout and this push. Retry with a fetch + rebase up to 5
+          # times so the recompute lands on top of whatever main currently
+          # points at, instead of failing the workflow on the
+          # non-fast-forward.
+          for attempt in 1 2 3 4 5; do
+            if git push origin HEAD:main; then
+              echo "Pushed on attempt $attempt."
+              exit 0
+            fi
+            echo "Push rejected, attempt $attempt; refetching main and rebasing."
+            git fetch origin main
+            git rebase origin/main || {
+              echo "Rebase failed; recomputing from fresh tip and retrying."
+              git rebase --abort
+              git reset --hard origin/main
+              bash scripts/compute-contributions.sh
+              python3 - <<'PY'
+          import pathlib, re
+          readme = pathlib.Path("README.md")
+          section = pathlib.Path(".github/badges/contributions.md").read_text()
+          pattern = re.compile(
+              r"<!--\s*contribution:start\s*-->.*?<!--\s*contribution:end\s*-->",
+              re.DOTALL,
+          )
+          original = readme.read_text()
+          if pattern.search(original):
+              readme.write_text(pattern.sub(section.strip(), original))
+          PY
+              git add .github/badges/contribution.json .github/badges/contributions.md README.md
+              if git diff --cached --quiet; then
+                echo "Nothing to commit on retry $attempt."
+                exit 0
+              fi
+              git commit -m "chore(contribution): refresh badge and per-author breakdown from git blame"
+            }
+          done
+          echo "::error::Failed to push contribution badge update after 5 attempts."
+          exit 1

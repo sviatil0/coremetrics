@@ -156,10 +156,13 @@ void Sparkline::draw(Screen &screen) const
     // Axis tick labels at the right edge anchor the rect to absolute
     // values (0..100). Typical sparkline rects are (24,*)..(864,*) inside
     // a 960px window, leaving ~96px of room past maxPos.x, so the labels
-    // fit comfortably outside the data area.
+    // fit comfortably outside the data area. The "100" label sits at the
+    // chart's top edge and "0" at the bottom edge, both above the chart's
+    // visual midline so they read as endpoint markers without bleeding
+    // into the next chart's space.
     vec3 labelColor(0.30f, 0.30f, 0.30f);
-    ivec2 hiPos(maxPos.x + 4, minPos.y - 6);
-    ivec2 loPos(maxPos.x + 4, maxPos.y - 14);
+    ivec2 hiPos(maxPos.x + 4, minPos.y - 4);
+    ivec2 loPos(maxPos.x + 4, maxPos.y - 16);
     Font::drawText(screen, "100", hiPos, labelColor);
     Font::drawText(screen, "0", loPos, labelColor);
 }
