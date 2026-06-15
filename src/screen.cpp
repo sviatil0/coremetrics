@@ -226,7 +226,11 @@ void Screen::drawBox(const Tvec2<int> &a, const Tvec2<int> &b, const Tvec3<float
     // smaller than a few hundred pixels. The cutoff is conservative;
     // even 32 rows times 32 cols is still well under the wakeup +
     // future::get round-trip cost on a cold thread.
-    if (numRows <= 4 || numRows * numCols <= 1024)
+    // 4096-pixel threshold keeps per-core strip cells, mem-breakdown
+    // segments, and 5-column row cells on the inline path; ThreadPool
+    // dispatch round-trip dominates these small boxes. Per-row
+    // separator strokes (<= 4 rows) always skip the pool.
+    if (numRows <= 4 || numRows * numCols <= 4096)
     {
         for (int row = yMin; row <= yMax; ++row)
         {
