@@ -1,18 +1,14 @@
-pkgbase = coremetrics
-	pkgdesc = Cross-platform desktop system metrics monitor (CPU / RAM / GPU / processes)
-	pkgver = 0.1.1
+pkgbase = coremetrics-bin
+	pkgdesc = Cross-platform desktop system metrics monitor (CPU, RAM, GPU, processes)
+	pkgver = 0.2.16
 	pkgrel = 1
 	url = https://github.com/sviatil0/coremetrics
 	arch = x86_64
-	arch = aarch64
-	license = LGPL2.1
-	makedepends = gcc
-	makedepends = make
-	makedepends = pkg-config
+	license = LGPL-2.1-only
 	depends = sdl3
 	depends = sdl3_ttf
 	depends = sdl3_image
-	source = coremetrics-0.1.1.tar.gz::https://github.com/sviatil0/coremetrics/archive/refs/tags/v0.1.1.tar.gz
-	sha256sums = SKIP
+	source = https://github.com/sviatil0/coremetrics/releases/download/v0.2.16/coremetrics-v0.2.16-linux-x86_64.tar.gz
+	sha256sums = 86fa4d7dc7ca18f96000188e891242097510cf3b5edd22e99d872beb16f8bb9e
 
-pkgname = coremetrics
+pkgname = coremetrics-bin

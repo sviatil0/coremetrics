@@ -1,30 +1,17 @@
 # Maintainer: Sviatoslav Oleksiienko <soleksiienko1@gmail.com>
-pkgname=coremetrics
-pkgver=0.1.1
+pkgname=coremetrics-bin
+pkgver=0.2.16
 pkgrel=1
-pkgdesc="Cross-platform desktop system metrics monitor (CPU / RAM / GPU / processes)"
-arch=('x86_64' 'aarch64')
-url="https://github.com/sviatil0/coremetrics"
-license=('LGPL2.1')
+pkgdesc='Cross-platform desktop system metrics monitor (CPU, RAM, GPU, processes)'
+arch=('x86_64')
+url='https://github.com/sviatil0/coremetrics'
+license=('LGPL-2.1-only')
 depends=('sdl3' 'sdl3_ttf' 'sdl3_image')
-makedepends=('gcc' 'make' 'pkg-config')
-source=("$pkgname-$pkgver.tar.gz::https://github.com/sviatil0/coremetrics/archive/refs/tags/v${pkgver}.tar.gz")
-sha256sums=('SKIP')
-
-build() {
-    cd "$srcdir/$pkgname-$pkgver"
-    mkdir -p obj bin
-    make CXXFLAGS="-std=c++23 -Wall -O2 -I ./include $(pkg-config --cflags sdl3 sdl3-ttf sdl3-image)" \
-         LDFLAGS="$(pkg-config --libs sdl3 sdl3-ttf sdl3-image)" \
-         bin/coremetrics
-}
+source=("https://github.com/sviatil0/coremetrics/releases/download/v${pkgver}/coremetrics-v${pkgver}-linux-x86_64.tar.gz")
+sha256sums=('86fa4d7dc7ca18f96000188e891242097510cf3b5edd22e99d872beb16f8bb9e')
 
 package() {
-    cd "$srcdir/$pkgname-$pkgver"
-    install -D -m 0755 bin/coremetrics "$pkgdir/usr/bin/coremetrics"
-    install -D -m 0644 base.xml "$pkgdir/usr/share/coremetrics/base.xml"
-    cp -r assets "$pkgdir/usr/share/coremetrics/assets"
-    install -D -m 0644 README.md "$pkgdir/usr/share/doc/$pkgname/README.md"
-    install -D -m 0644 CONTRIBUTING.md "$pkgdir/usr/share/doc/$pkgname/CONTRIBUTING.md"
-    install -D -m 0644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE" 2>/dev/null || true
+  install -Dm755 "coremetrics-v${pkgver}-linux-x86_64/coremetrics" "$pkgdir/usr/bin/coremetrics"
+  install -Dm644 "coremetrics-v${pkgver}-linux-x86_64/base.xml" "$pkgdir/usr/share/coremetrics/base.xml"
+  cp -r "coremetrics-v${pkgver}-linux-x86_64/assets" "$pkgdir/usr/share/coremetrics/"
 }
