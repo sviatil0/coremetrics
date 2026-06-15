@@ -1140,7 +1140,18 @@ int main(int argc, char **argv)
     std::signal(SIGINT, handleShutdownSignal);
     std::signal(SIGTERM, handleShutdownSignal);
 
-    if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO))
+    // Headless --screenshot does not play sound, so initializing the
+    // SDL audio subsystem is wasted work and on macOS the AudioQueue
+    // background thread races the screenshot teardown, producing a
+    // sporadic EXC_BAD_ACCESS in pthread_mutex_lock during static
+    // destructors after the PNG has already been written. Init only
+    // VIDEO in the screenshot path; the live path still inits both.
+    Uint32 sdlInitFlags = SDL_INIT_VIDEO;
+    if (screenshotPath.empty())
+    {
+        sdlInitFlags |= SDL_INIT_AUDIO;
+    }
+    if (!SDL_Init(sdlInitFlags))
     {
         std::cerr << "Failed to init SDL: " << SDL_GetError() << '\n';
         return -1;
