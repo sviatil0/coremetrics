@@ -256,6 +256,23 @@ static void cacheElementPointers()
         g_cpuReadout = nthLabelInLayout(*systemNode, 1);
         g_ramReadout = nthLabelInLayout(*systemNode, 3);
         g_gpuReadout = nthLabelInLayout(*systemNode, 5);
+        // The percent readouts are the heaviest piece of information on the
+        // System dashboard; UI audit wave 5 flagged them as visually equal to
+        // the static "CPU"/"RAM"/"GPU" stems. Tagging them bold double-blits
+        // the glyph surface (see Font::drawTextBold) so the numbers carry
+        // more weight without bundling a second TTF.
+        if (g_cpuReadout != nullptr)
+        {
+            g_cpuReadout->setBold(true);
+        }
+        if (g_ramReadout != nullptr)
+        {
+            g_ramReadout->setBold(true);
+        }
+        if (g_gpuReadout != nullptr)
+        {
+            g_gpuReadout->setBold(true);
+        }
     }
     g_gpuBar = findBarByMetric(root, "gpu");
 
