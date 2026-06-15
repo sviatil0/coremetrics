@@ -31,7 +31,13 @@
 constexpr int RESX = 960;
 constexpr int RESY = 540;
 constexpr int PROCESS_ROW_HEIGHT = 20;
-constexpr Uint64 POLL_INTERVAL_MS = 500;
+// Default poll interval is 500ms; overridable at startup via the
+// --poll-ms <N> CLI flag (clamped to [100, 10000] so the UI cannot
+// be told to repaint faster than the OS can serve samples or so slow
+// the chrome looks frozen).
+static Uint64 g_pollIntervalMs = 500;
+constexpr Uint64 POLL_INTERVAL_MIN_MS = 100;
+constexpr Uint64 POLL_INTERVAL_MAX_MS = 10000;
 
 constexpr float ALARM_THRESHOLD = 80.0f;
 static const std::string ALARM_SOUND_PATH = AssetPath::resolve("assets/click.wav");
@@ -58,6 +64,7 @@ static Label *g_cpuReadout = nullptr;
 static Label *g_ramReadout = nullptr;
 static Label *g_gpuReadout = nullptr;
 static Label *g_muteLabel = nullptr;
+static Label *g_pollLabel = nullptr;
 static std::vector<Row *> g_processRows;
 
 static bool g_alarmEnabled = true;
@@ -152,11 +159,11 @@ static void closeSignalMenu()
 }
 constexpr int PERCORE_Y0 = 218;
 constexpr int PERCORE_Y1 = 236;
-// Start the strip at x=84 so a 'cores' label fits at x=24, mirroring
-// the CPU / RAM / GPU labels above. The previous x=24 start used the
-// full row width but left the strip unlabeled, so a reviewer reading
-// fast saw three bars + an unexplained mosaic.
-constexpr int PERCORE_X0 = 84;
+// Full row width. The strip sits directly under the GPU bar and reads
+// as a per-core continuation without a separate label; the earlier
+// 'cores' label at x=24 collided with the 'CPU history' sparkline
+// label at y=230 (12-px gap, ~16-px glyph height).
+constexpr int PERCORE_X0 = 24;
 constexpr int PERCORE_X1 = 936;
 constexpr int PERCORE_GAP = 4;
 
@@ -203,7 +210,7 @@ static void buildScene()
     g_muteBtnMin = ivec2(812, 8);
     g_muteBtnMax = ivec2(952, 40);
 
-    g_exitBtnMin = ivec2(832, 480);
+    g_exitBtnMin = ivec2(820, 478);
     g_exitBtnMax = ivec2(944, 520);
 
     int rowY = 64;
@@ -246,6 +253,35 @@ static void cacheElementPointers()
     if (!g_processRows.empty())
     {
         g_headerRow = g_processRows.front();
+    }
+
+    // Find the footer 'POLL_PLACEHOLDER' label so the displayed poll
+    // interval can track the --poll-ms override at runtime. Walk every
+    // layout in the tree because the footer labels could end up at any
+    // depth depending on base.xml structure.
+    std::vector<Tree<Layout> *> stack;
+    stack.push_back(&root);
+    while (!stack.empty() && g_pollLabel == nullptr)
+    {
+        Tree<Layout> *node = stack.back();
+        stack.pop_back();
+        for (const auto &element : node->getData().elements)
+        {
+            Label *lbl = dynamic_cast<Label *>(element.get());
+            if (lbl != nullptr && lbl->getText() == "POLL_PLACEHOLDER")
+            {
+                g_pollLabel = lbl;
+                break;
+            }
+        }
+        for (auto &child : node->getChildren())
+        {
+            stack.push_back(child.get());
+        }
+    }
+    if (g_pollLabel != nullptr)
+    {
+        g_pollLabel->setText("poll " + std::to_string(g_pollIntervalMs) + "ms");
     }
 }
 
@@ -376,12 +412,6 @@ static void renderPerCoreStrip(Screen &dest)
     {
         return;
     }
-    // Left-edge label matches the CPU / RAM / GPU column style. Text
-    // is rendered with its top-left anchor at (24, 218); the bundled
-    // 20px font puts the glyph bowl inside the 218..236 strip vertical
-    // band so the label aligns with the cell centers.
-    const vec3 labelColor(0.55f, 0.55f, 0.55f);
-    Font::drawText(dest, "cores", ivec2(24, 218), labelColor);
     const std::size_t cores = g_perCoreCpu.size();
     const int totalGap = PERCORE_GAP * static_cast<int>(cores - 1);
     const int slot = (PERCORE_X1 - PERCORE_X0 - totalGap) / static_cast<int>(cores);
@@ -748,6 +778,20 @@ int main(int argc, char **argv)
         if (std::string(argv[i]) == "--filter" && i + 1 < argc)
         {
             g_filterText = argv[i + 1];
+        }
+        // --poll-ms <N> overrides the default 500ms refresh cadence.
+        // Clamped so a typo (0 or '--poll-ms 999999999') cannot
+        // freeze or pin the UI.
+        if (std::string(argv[i]) == "--poll-ms" && i + 1 < argc)
+        {
+            char *end = nullptr;
+            unsigned long long n = std::strtoull(argv[i + 1], &end, 10);
+            if (end != argv[i + 1] && n > 0)
+            {
+                if (n < POLL_INTERVAL_MIN_MS) n = POLL_INTERVAL_MIN_MS;
+                if (n > POLL_INTERVAL_MAX_MS) n = POLL_INTERVAL_MAX_MS;
+                g_pollIntervalMs = static_cast<Uint64>(n);
+            }
         }
     }
 
@@ -1232,7 +1276,7 @@ int main(int argc, char **argv)
         EventManager::getInstance().processEvents(ivec2(0, 0), ivec2(RESX - 1, RESY - 1));
 
         Uint64 now = SDL_GetTicks();
-        if (now - lastPoll >= POLL_INTERVAL_MS)
+        if (now - lastPoll >= g_pollIntervalMs)
         {
             pollMetrics();
             lastPoll = now;
