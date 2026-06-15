@@ -2,12 +2,14 @@
 #define __SETTINGS_HPP__
 
 #include <cstdint>
+#include <unordered_set>
 
-// Tiny disk-backed preferences for CoreMetrics. The live UI keeps four
+// Tiny disk-backed preferences for CoreMetrics. The live UI keeps five
 // pieces of state worth surviving a relaunch: the poll cadence, whether
-// sparklines are drawn over the System tab, and the active sort column +
-// direction on the Processes tab. Anything else (window size, mute,
-// filter, tree mode) is intentionally session-only.
+// sparklines are drawn over the System tab, the active sort column +
+// direction on the Processes tab, and the set of pids the user has
+// collapsed in tree mode. Anything else (window size, mute, filter,
+// tree-mode toggle itself) is intentionally session-only.
 //
 // File layout is a single flat key=value text file written line per key.
 // Unknown keys are tolerated; malformed lines are skipped. Missing values
@@ -38,17 +40,22 @@ namespace Settings
     bool load(std::uint64_t &pollIntervalMs,
               bool &sparklinesEnabled,
               int &sortColumn,
-              bool &sortAscending);
+              bool &sortAscending,
+              std::unordered_set<int> &collapsedPids);
 
     // Write the current values to disk, creating the parent directory
     // tree if it does not exist. Returns true on a clean write, false
     // if the directory could not be created or the file could not be
     // opened. The caller does not treat this as fatal because losing
-    // prefs is strictly better than crashing on exit.
+    // prefs is strictly better than crashing on exit. The collapsedPids
+    // set is emitted as a comma-separated list under `collapsed_pids`;
+    // an empty set omits the line entirely so a fresh user's config
+    // stays minimal.
     bool save(std::uint64_t pollIntervalMs,
               bool sparklinesEnabled,
               int sortColumn,
-              bool sortAscending);
+              bool sortAscending,
+              const std::unordered_set<int> &collapsedPids);
 }
 
 #endif

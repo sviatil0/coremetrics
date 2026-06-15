@@ -1134,7 +1134,8 @@ int main(int argc, char **argv)
     Settings::load(g_pollIntervalMs,
                    g_sparklinesEnabled,
                    loadedSortColumn,
-                   g_sortAscending);
+                   g_sortAscending,
+                   g_collapsedPids);
     g_sortColumn = static_cast<SortColumn>(loadedSortColumn);
 
     for (int i = 1; i < argc; ++i)
@@ -1973,7 +1974,8 @@ int main(int argc, char **argv)
     Settings::save(g_pollIntervalMs,
                    g_sparklinesEnabled,
                    static_cast<int>(g_sortColumn),
-                   g_sortAscending);
+                   g_sortAscending,
+                   g_collapsedPids);
 
     return 0;
 }

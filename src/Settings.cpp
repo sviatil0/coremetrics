@@ -1,11 +1,13 @@
 #include "Settings.hpp"
 
+#include <algorithm>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <sstream>
 #include <string>
 #include <system_error>
+#include <vector>
 
 // Persistence for the four runtime-tweakable knobs CoreMetrics tracks
 // (poll cadence, sparklines toggle, sort column, sort direction). The
@@ -34,6 +36,14 @@ namespace
     const std::string KEY_SPARKLINES = "sparklines_enabled";
     const std::string KEY_SORT_COLUMN = "sort_column";
     const std::string KEY_SORT_ASCENDING = "sort_ascending";
+    const std::string KEY_COLLAPSED_PIDS = "collapsed_pids";
+
+    // Pid values come from kernel APIs that always return non-negative
+    // integers, so the parsed list rejects anything outside this range.
+    // Cap at INT32_MAX so a corrupt file with a giant number cannot
+    // overflow the int the set is keyed on.
+    constexpr int PID_MIN = 0;
+    constexpr int PID_MAX = 2147483647;
 
     // Lower and upper bounds on the persisted poll cadence. These match
     // the clamp the CLI parser applies, so a hand-edited config file
@@ -131,6 +141,45 @@ namespace
         return true;
     }
 
+    // Split the comma-separated `collapsed_pids` value and insert each
+    // valid pid into the destination set. Invalid tokens (empty, non-
+    // digit, out-of-range) are silently skipped so a partially corrupt
+    // line does not prevent the rest of the pids from being restored.
+    // The destination is appended to rather than overwritten so a
+    // hypothetical future split into multiple keys would compose.
+    void parseCollapsedPids(const std::string &raw,
+                            std::unordered_set<int> &out)
+    {
+        std::size_t cursor = 0;
+        while (cursor <= raw.size())
+        {
+            std::size_t comma = raw.find(',', cursor);
+            std::size_t end = (comma == std::string::npos)
+                                  ? raw.size()
+                                  : comma;
+            std::string token = raw.substr(cursor, end - cursor);
+            trimInPlace(token);
+            if (!token.empty())
+            {
+                std::uint64_t parsed = 0;
+                if (parseUnsigned(token, parsed)
+                    && parsed <= static_cast<std::uint64_t>(PID_MAX))
+                {
+                    int pid = static_cast<int>(parsed);
+                    if (pid >= PID_MIN)
+                    {
+                        out.insert(pid);
+                    }
+                }
+            }
+            if (comma == std::string::npos)
+            {
+                break;
+            }
+            cursor = comma + 1;
+        }
+    }
+
     // Accept both word-form and digit-form booleans so a hand-edited
     // file with `true`/`false` round-trips and so the writer can keep
     // emitting `0`/`1` for the smallest possible footprint.
@@ -153,7 +202,8 @@ namespace
 bool Settings::load(std::uint64_t &pollIntervalMs,
                     bool &sparklinesEnabled,
                     int &sortColumn,
-                    bool &sortAscending)
+                    bool &sortAscending,
+                    std::unordered_set<int> &collapsedPids)
 {
     std::filesystem::path configPath = resolveConfigPath();
     if (configPath.empty())
@@ -246,6 +296,16 @@ bool Settings::load(std::uint64_t &pollIntervalMs,
                 sortAscending = parsed;
             }
         }
+        else if (key == KEY_COLLAPSED_PIDS)
+        {
+            // Replace whatever the caller seeded the set with: if the
+            // file says "these are the collapsed pids", we honour it
+            // even when the seed was non-empty. Stale pids from prior
+            // runs are pruned by the renderer the moment those pids
+            // are no longer alive, so persisting them carries no cost.
+            collapsedPids.clear();
+            parseCollapsedPids(value, collapsedPids);
+        }
         // Unknown keys are ignored so future versions can drop or
         // rename keys without making old configs unreadable.
     }
@@ -256,7 +316,8 @@ bool Settings::load(std::uint64_t &pollIntervalMs,
 bool Settings::save(std::uint64_t pollIntervalMs,
                     bool sparklinesEnabled,
                     int sortColumn,
-                    bool sortAscending)
+                    bool sortAscending,
+                    const std::unordered_set<int> &collapsedPids)
 {
     std::filesystem::path configPath = resolveConfigPath();
     if (configPath.empty())
@@ -291,6 +352,27 @@ bool Settings::save(std::uint64_t pollIntervalMs,
     body << KEY_SPARKLINES << '=' << (sparklinesEnabled ? 1 : 0) << '\n';
     body << KEY_SORT_COLUMN << '=' << sortColumn << '\n';
     body << KEY_SORT_ASCENDING << '=' << (sortAscending ? 1 : 0) << '\n';
+
+    // Emit the collapsed-pids line only when the set is non-empty so a
+    // user who never touches tree mode keeps a clean four-line config.
+    // Sort the pids before writing so the on-disk format is stable
+    // across runs (unordered_set iteration order is implementation
+    // defined) and so diffing two configs is meaningful.
+    if (!collapsedPids.empty())
+    {
+        std::vector<int> sorted(collapsedPids.begin(), collapsedPids.end());
+        std::sort(sorted.begin(), sorted.end());
+        body << KEY_COLLAPSED_PIDS << '=';
+        for (std::size_t i = 0; i < sorted.size(); ++i)
+        {
+            if (i > 0)
+            {
+                body << ',';
+            }
+            body << sorted[i];
+        }
+        body << '\n';
+    }
     out << body.str();
 
     return out.good();
