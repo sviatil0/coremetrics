@@ -120,6 +120,26 @@ bool processNameMatchesFilter(const std::string &name,
     return lowerName.find(lowerNeedle) != std::string::npos;
 }
 
+std::string formatGbString(unsigned long long kb)
+{
+    unsigned long long gb = kb / (1024ULL * 1024ULL);
+    return std::to_string(gb);
+}
+
+float computeDiskUsedPct(unsigned long long totalKb,
+                         unsigned long long freeKb)
+{
+    if (totalKb == 0 || freeKb >= totalKb)
+    {
+        return 0.0f;
+    }
+    unsigned long long usedKb = totalKb - freeKb;
+    float pct = 100.0f * static_cast<float>(usedKb) / static_cast<float>(totalKb);
+    if (pct < 0.0f) return 0.0f;
+    if (pct > 100.0f) return 100.0f;
+    return pct;
+}
+
 std::string formatUptimeString(unsigned long long seconds)
 {
     if (seconds == 0)
