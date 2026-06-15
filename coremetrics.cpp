@@ -366,11 +366,20 @@ static void renderNetIo(Screen &dest)
         return;
     }
     const vec3 dim(0.55f, 0.55f, 0.55f);
-    // Single combined disk+net string; keeps the footer compact by
-    // dropping unit suffixes (the absolute throughput is on the
-    // Processes tab if exact numbers are needed). Stream-arrow
-    // glyphs would clip in Roboto so plain ASCII is used.
+    // Compact units (K/M/G) keep the worst-case string bounded: even a
+    // 10 GB/s host renders as '10.0G' (5 chars) rather than '10240.0M'
+    // (8 chars). Caps the right edge of the footer well before x=810
+    // (the EXIT button's left edge).
     auto compact = [](unsigned long long kbPerSec) -> std::string {
+        if (kbPerSec >= 1024ULL * 1024ULL)
+        {
+            std::ostringstream oss;
+            oss.precision(1);
+            oss << std::fixed
+                << (static_cast<double>(kbPerSec) / (1024.0 * 1024.0))
+                << "G";
+            return oss.str();
+        }
         if (kbPerSec >= 1024)
         {
             std::ostringstream oss;
@@ -391,6 +400,14 @@ static void renderNetIo(Screen &dest)
         if (!text.empty()) text += "  ";
         text += "NET " + compact(g_netIo.rxKbPerSec)
                 + "/" + compact(g_netIo.txKbPerSec);
+    }
+    // Worst-case string at G-scale is roughly 34 chars; at 10px/glyph
+    // that lands the right edge at ~x=800, just left of the EXIT
+    // button at x=820. Hard-clip the string at 36 chars so a future
+    // unit-format change cannot blow through the budget.
+    if (text.size() > 36)
+    {
+        text = text.substr(0, 36);
     }
     Font::drawText(dest, text, ivec2(460, 492), dim);
 }
@@ -520,11 +537,15 @@ static std::size_t g_lastProcCount = 0;
 
 static void renderFooterLiveStats(Screen &dest)
 {
-    // procs N moved to the chrome line just under the tabs (x=370,
-    // y=14 area would collide with SOUND ON); for now keep in footer
-    // at x=370 in a tighter slot.
+    // procs N at x=370. The DISK+NET text begins at x=460. To survive
+    // a 4-digit proc count (10 chars * ~10px = 100px ending at x=470),
+    // truncate the count to a max width budget rather than printing
+    // arbitrary integers. Real-world process counts above ~9999 are
+    // already pathological on a personal machine.
     const vec3 dim(0.5f, 0.5f, 0.5f);
-    std::string text = std::to_string(g_lastProcCount) + " procs";
+    std::size_t n = g_lastProcCount;
+    if (n > 9999) n = 9999;
+    std::string text = std::to_string(n) + " procs";
     Font::drawText(dest, text, ivec2(370, 492), dim);
 }
 
@@ -535,7 +556,10 @@ static void renderFooterLiveStats(Screen &dest)
 static void renderSparklineLabels(Screen &dest)
 {
     const vec3 dim(0.55f, 0.55f, 0.55f);
-    Font::drawText(dest, "CPU history", ivec2(24, 230), dim);
+    // CPU history label moved from y=230 (inside the per-core strip
+    // y=218..236) to y=240, just below the strip. Otherwise the
+    // per-core fill boxes redraw over it every poll.
+    Font::drawText(dest, "CPU history", ivec2(24, 240), dim);
     Font::drawText(dest, "RAM history", ivec2(24, 298), dim);
     Font::drawText(dest, "GPU history", ivec2(24, 366), dim);
 }
