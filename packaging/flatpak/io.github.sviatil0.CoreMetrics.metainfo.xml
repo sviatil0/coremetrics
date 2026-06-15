@@ -36,6 +36,19 @@
   </screenshots>
   <content_rating type="oars-1.1" />
   <releases>
+    <release version="0.2.8" date="2026-06-15">
+      <description>
+        <p>
+          Network I/O backend (cross-platform readNetIo): getifaddrs on
+          mac, /proc/net/dev on linux, GetIfTable on windows; loopback
+          excluded. System tab gains an aggregate disk-I/O strip on the
+          left and an aggregate net-I/O strip on the right at y=68.
+          Screen::drawBox fast path for boxes &lt;= 1024 pixels (signal
+          menu borders, separators, small overlays) skips the
+          ThreadPool dispatch overhead.
+        </p>
+      </description>
+    </release>
     <release version="0.2.7" date="2026-06-15">
       <description>
         <p>
