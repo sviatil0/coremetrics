@@ -29,6 +29,7 @@
 #include "Thresholds.hpp"
 #include "AssetPath.hpp"
 #include "SignalUtils.hpp"
+#include "KillLog.hpp"
 #include "Exporter.hpp"
 #include "Settings.hpp"
 
@@ -1662,6 +1663,18 @@ int main(int argc, char **argv)
                             {
                             case SignalUtils::SendStatus::Ok:
                                 flashStatus("sent " + label);
+                                // Audit trail: one line per successful kill so a
+                                // user can later reconstruct which signal landed
+                                // on which pid. Best-effort and silent on I/O
+                                // failure so the live UI never blocks on disk.
+                                KillLog::append(g_selectedPid,
+                                                (g_selectedRowIndex >= 0
+                                                 && g_selectedRowIndex + 1 < static_cast<int>(g_processRows.size())
+                                                 && g_processRows[g_selectedRowIndex + 1] != nullptr
+                                                 && g_processRows[g_selectedRowIndex + 1]->getCells().size() > 1)
+                                                    ? g_processRows[g_selectedRowIndex + 1]->getCells()[1]
+                                                    : std::string{},
+                                                SignalUtils::name(sig));
                                 break;
                             case SignalUtils::SendStatus::NoSuchProcess:
                                 flashStatus(label + " : no such process");
