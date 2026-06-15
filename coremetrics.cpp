@@ -617,6 +617,12 @@ static void renderPerCoreStrip(Screen &dest)
 // (coremetrics / v0.2.0 / poll 500ms) so it reads as a continuation.
 // Latest process count is set by pollMetrics().
 static std::size_t g_lastProcCount = 0;
+// Latest summed CPU% / MEM% across the topProcesses sample. Maintained
+// alongside g_lastProcCount in pollMetrics() and read by the Processes
+// tab summary strip so a reviewer can eyeball aggregate pressure without
+// summing the visible table.
+static float g_sumCpuPct = 0.0f;
+static float g_sumMemPct = 0.0f;
 
 static void renderFooterLiveStats(Screen &dest)
 {
@@ -630,6 +636,33 @@ static void renderFooterLiveStats(Screen &dest)
     if (n > 9999) n = 9999;
     std::string text = std::to_string(n) + " procs";
     Font::drawText(dest, text, ivec2(370, 492), dim);
+}
+
+// Processes-tab aggregate strip painted above the column headers, below
+// the tab strip. Reads the cached g_lastProcCount / g_sumCpuPct /
+// g_sumMemPct that pollMetrics() refreshes each tick so the strip stays
+// in sync with the table without a second pass over the process list.
+// Total count uses accent green; the CPU/MEM sums use the dim grey the
+// rest of the footer chrome uses so the eye lands on the count first.
+static void renderProcessesSummary(Screen &dest)
+{
+    // y=40..60 sits below the tab strip (y=0..36) and above the
+    // column header row defined in base.xml at y=64..84, so the
+    // summary annotates the table without hiding the PID / NAME /
+    // CPU% / MEM% / DISK I/O labels.
+    const vec3 stripBg(0.08f, 0.08f, 0.08f);
+    dest.drawBox(ivec2(24, 40), ivec2(936, 60), stripBg);
+
+    const vec3 dim(0.65f, 0.65f, 0.65f);
+    std::size_t n = g_lastProcCount;
+    if (n > 9999) n = 9999;
+    std::string totalText = "Total: " + std::to_string(n) + " procs";
+    std::string cpuText = "Sum CPU: " + formatPct(g_sumCpuPct) + "%";
+    std::string memText = "Sum MEM: " + formatPct(g_sumMemPct) + "%";
+
+    Font::drawText(dest, totalText, ivec2(32, 44), COLOR_ACCENT_GREEN);
+    Font::drawText(dest, cpuText, ivec2(280, 44), dim);
+    Font::drawText(dest, memText, ivec2(520, 44), dim);
 }
 
 // Keyboard shortcuts overlay. Painted last so it sits on top of every
@@ -839,13 +872,21 @@ static void pollMetrics()
     // practice without needing /proc/diskstats or PDH PhysicalDisk.
     unsigned long long aggReadKb = 0;
     unsigned long long aggWriteKb = 0;
+    float sumCpuPct = 0.0f;
+    float sumMemPct = 0.0f;
     for (const auto &p : procs)
     {
         aggReadKb += p.diskReadKbPerSec;
         aggWriteKb += p.diskWriteKbPerSec;
+        sumCpuPct += p.cpuPct;
+        sumMemPct += p.memPct;
     }
     g_aggregateDiskReadKbPerSec = aggReadKb;
     g_aggregateDiskWriteKbPerSec = aggWriteKb;
+    // Cached for renderProcessesSummary so the strip can paint each frame
+    // without rewalking the process list. Stale by at most one poll tick.
+    g_sumCpuPct = sumCpuPct;
+    g_sumMemPct = sumMemPct;
     // Sample aggregate net I/O on the same cadence as the rest of the
     // System tab data. First call returns zeros (no prior sample).
     g_netIo = SystemMetrics::readNetIo();
@@ -1283,6 +1324,10 @@ int main(int argc, char **argv)
             const vec3 textColor(1.0f, 1.0f, 1.0f);
             Font::drawText(shot, "filter: ", ivec2(24, 44), labelColor);
             Font::drawText(shot, g_filterText, ivec2(120, 44), textColor);
+        }
+        if (tab == "processes")
+        {
+            renderProcessesSummary(shot);
         }
         SDL_Surface *out = SDL_CreateSurface(RESX, RESY, SDL_PIXELFORMAT_RGBA32);
         if (out == nullptr)
@@ -1800,6 +1845,15 @@ int main(int argc, char **argv)
             }
         }
         renderFooterLiveStats(screen);
+
+        // Aggregate summary strip sits above the Processes table column
+        // headers (y=72) so a glance at the top of the tab shows the
+        // running totals without summing the visible rows. Painted after
+        // the layout tree so it is not overdrawn by the table chrome.
+        if (processesTabActive())
+        {
+            renderProcessesSummary(screen);
+        }
 
         // Process-kill overlays: selected-row highlight + signal menu + the
         // brief status flash after a send. Painted over the layout tree so
