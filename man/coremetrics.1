@@ -1,0 +1,125 @@
+.TH COREMETRICS 1 "2026" "0.2.17" "User Commands"
+.SH NAME
+coremetrics \- cross-platform desktop system metrics monitor
+.SH SYNOPSIS
+.B coremetrics
+[\fB--sparklines\fR]
+[\fB--tree\fR]
+[\fB--filter\fR \fIPATTERN\fR]
+[\fB--poll-ms\fR \fIN\fR]
+[\fB--duration\fR \fISECONDS\fR]
+[\fB--screenshot\fR \fIPATH\fR [system|processes]]
+[\fB--export-csv\fR \fIPATH\fR]
+[\fB--export-json\fR \fIPATH\fR]
+.SH DESCRIPTION
+.B coremetrics
+is a real-time system monitor (CPU, RAM, GPU, processes) built on a from-scratch
+C++23 GUI toolkit over raw SDL3 pixel surfaces. Three native metrics backends are
+selected at compile time: /proc on Linux, Mach and IOKit on macOS, PDH and
+Toolhelp on Windows.
+.PP
+By default
+.B coremetrics
+opens a windowed UI that polls the host every 500 ms and renders a tabbed
+dashboard. The CLI flags below pre-configure that UI, run a one-shot headless
+export, or capture a single screenshot for documentation and CI.
+.SH OPTIONS
+.TP
+.B --sparklines
+Show CPU, RAM, and GPU history sparklines in the lower half of the System tab.
+.TP
+.B --tree
+Open the Processes tab in parent/child indented tree mode instead of the flat
+table. Toggleable at runtime with the
+.B t
+key.
+.TP
+.BI --filter " PATTERN"
+Seed the Processes tab name filter with
+.IR PATTERN .
+Only processes whose command name contains the substring are shown.
+.TP
+.BI --poll-ms " N"
+Override the default 500 ms polling cadence.
+.I N
+is clamped to the range [100, 10000] so the UI cannot be starved or spun.
+.TP
+.BI --duration " SECONDS"
+Exit the live UI cleanly after
+.I SECONDS
+of wall-clock time. Useful for CI smoke runs and demo recordings.
+.TP
+.BI --screenshot " PATH " "\fR[\fBsystem\fR|\fBprocesses\fR]\fR"
+Run headless: render one frame to
+.I PATH
+as a BMP and exit. The optional second argument picks which tab to capture;
+the default is the System tab.
+.TP
+.BI --export-csv " PATH"
+Write a one-shot CSV dump of the current process list to
+.I PATH
+and exit. No window is opened.
+.TP
+.BI --export-json " PATH"
+Write a one-shot JSON dump of the current process list to
+.I PATH
+and exit. No window is opened.
+.SH KEYBOARD
+.TP
+.B ?
+Toggle the help overlay.
+.TP
+.B 1..N
+Switch tab (System, Processes, and any additional tabs in build order).
+.TP
+.B /
+Enter filter input mode on the Processes tab. Type to filter by command name.
+.TP
+.B t
+Toggle tree mode on the Processes tab.
+.TP
+.B up / down
+Move the selected row in the Processes table.
+.TP
+.B space
+Select the highlighted row.
+.TP
+.B k
+Open the signal / kill menu for the selected process.
+.TP
+.B 1..6
+Pick a signal in the kill menu.
+.TP
+.B y / enter
+Confirm the pending action (kill, filter commit).
+.TP
+.B esc
+Cancel the current action, clear the filter, or dismiss an overlay.
+.SH FILES
+.TP
+.I ~/.config/coremetrics/config
+Persisted settings (poll-ms, sparklines toggle, active sort column).
+.SH EXAMPLES
+.PP
+Open the live UI with sparklines and a seeded process filter:
+.PP
+.RS 4
+coremetrics --sparklines --filter chrome
+.RE
+.PP
+Capture a headless screenshot of the Processes tab for documentation:
+.PP
+.RS 4
+coremetrics --screenshot processes.bmp processes
+.RE
+.PP
+Dump the current process list to JSON and exit:
+.PP
+.RS 4
+coremetrics --export-json snapshot.json
+.RE
+.SH AUTHOR
+Sviatoslav Oleksiienko <soleksiienko1@gmail.com>
+.SH SEE ALSO
+.BR htop (1),
+.BR top (1)
