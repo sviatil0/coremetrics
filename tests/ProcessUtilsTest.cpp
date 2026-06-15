@@ -153,6 +153,67 @@ static void testFormatDiskIoKilobytes()
            formatDiskIo(100, 50) == "150 KB/s");
 }
 
+static void testFormatDiskIoBoundary1023KB()
+{
+    // 1023 KB/s must stay in the KB branch; the >= 1024 guard sits
+    // immediately above and an off-by-one would silently mislabel.
+    report("formatDiskIo 1023 KB/s stays in KB branch",
+           formatDiskIo(1023, 0) == "1023 KB/s");
+    report("formatDiskIo 512+511 KB/s stays in KB branch",
+           formatDiskIo(512, 511) == "1023 KB/s");
+}
+
+static void testComputeIoKbPerSecSubKBFloors()
+{
+    // Sub-KB delta truncates to 0 KB/sec (documented floor).
+    report("computeIoKbPerSec 1023 B/s floors to 0",
+           computeIoKbPerSec(0, 1023, 1.0) == 0);
+    report("computeIoKbPerSec 1500 B/s yields 1 KB/s",
+           computeIoKbPerSec(0, 1500, 1.0) == 1);
+}
+
+static void testComputeIoKbPerSecLargeDelta()
+{
+    // 2 GiB delta over 2 seconds -> 1 GiB/s = 1048576 KB/s. Must not
+    // overflow the uint64 intermediate.
+    std::uint64_t twoGib = 2ULL * 1024ULL * 1024ULL * 1024ULL;
+    report("computeIoKbPerSec 1 GiB/s does not overflow",
+           computeIoKbPerSec(0, twoGib, 2.0) == 1024ULL * 1024ULL);
+}
+
+static void testFormatUptimeStringSubMinute()
+{
+    // Pin the current behavior: any 1..59 seconds renders as 'Up 0m'.
+    report("formatUptimeString 45s yields 'Up 0m'",
+           formatUptimeString(45) == "Up 0m");
+    report("formatUptimeString 59s yields 'Up 0m'",
+           formatUptimeString(59) == "Up 0m");
+}
+
+static void testFormatGbString()
+{
+    report("formatGbString 0 KB -> '0'",
+           formatGbString(0) == "0");
+    report("formatGbString sub-GB rounds down to 0",
+           formatGbString(512) == "0");
+    report("formatGbString exactly 1 GB -> '1'",
+           formatGbString(1024ULL * 1024ULL) == "1");
+    report("formatGbString 234 GB -> '234'",
+           formatGbString(234ULL * 1024ULL * 1024ULL) == "234");
+}
+
+static void testComputeDiskUsedPct()
+{
+    report("computeDiskUsedPct total 0 yields 0",
+           computeDiskUsedPct(0, 0) == 0.0f);
+    report("computeDiskUsedPct free > total yields 0 (bad data)",
+           computeDiskUsedPct(100, 200) == 0.0f);
+    report("computeDiskUsedPct 50% used",
+           computeDiskUsedPct(1000, 500) == 50.0f);
+    report("computeDiskUsedPct 85% used (red threshold)",
+           computeDiskUsedPct(100, 15) == 85.0f);
+}
+
 static void testFormatDiskIoMegabytesThreshold()
 {
     // 1024 KB/s is the MB/s threshold.
@@ -311,7 +372,13 @@ void processUtilsTestSuite()
     testCompareByDisk();
     testFormatDiskIoIdle();
     testFormatDiskIoKilobytes();
+    testFormatDiskIoBoundary1023KB();
     testFormatDiskIoMegabytesThreshold();
+    testComputeIoKbPerSecSubKBFloors();
+    testComputeIoKbPerSecLargeDelta();
+    testFormatGbString();
+    testComputeDiskUsedPct();
+    testFormatUptimeStringSubMinute();
     testCompareUnknownColumnFallback();
 
     testComputeIoKbPerSecZeroElapsed();

@@ -131,9 +131,13 @@ std::vector<float> SystemMetrics::readPerCoreCpu()
         g_lastPerCoreIdle[i] = idle;
     }
 
+    // host_processor_info returns infoCount slots of type natural_t (the
+    // Apple-documented contract); each slot is one integer_t today but
+    // pinning the dealloc to sizeof(natural_t) follows the header API
+    // exactly and survives any future widening of the slot type.
     vm_deallocate(mach_task_self(),
                   reinterpret_cast<vm_address_t>(infoArray),
-                  static_cast<vm_size_t>(infoCount * sizeof(integer_t)));
+                  static_cast<vm_size_t>(infoCount) * sizeof(natural_t));
     return result;
 }
 

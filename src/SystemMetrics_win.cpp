@@ -146,13 +146,23 @@ float SystemMetrics::readGpuPercent()
     if (!initialized)
     {
         if (PdhOpenQuery(NULL, 0, &query) != ERROR_SUCCESS)
+        {
+            query = nullptr;
             return 0.0f;
+        }
 
         if (PdhAddEnglishCounter(query,
             "\\GPU Engine(*)\\Utilization Percentage",
             0,
             &counter) != ERROR_SUCCESS)
+        {
+            // Close the open query before bailing; otherwise the next
+            // call (initialized still false) reopens, leaking the prior
+            // handle every 500 ms and exhausting PDH over time.
+            PdhCloseQuery(query);
+            query = nullptr;
             return 0.0f;
+        }
 
         PdhCollectQueryData(query);
 
