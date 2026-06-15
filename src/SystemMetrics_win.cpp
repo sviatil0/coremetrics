@@ -4,11 +4,19 @@
 #include "ProcessUtils.hpp"
 #include <algorithm>
 #define WIN32_LEAN_AND_MEAN
+// GetIfTable2 / MIB_IF_TABLE2 are exposed only when _WIN32_WINNT is at
+// least Vista (0x0600). Bump to Win7 (0x0601) so we get the newer
+// 64-bit-counter interface table before windows.h is pulled in.
+#ifndef _WIN32_WINNT
+#define _WIN32_WINNT 0x0601
+#endif
 #include <windows.h>
 #include <psapi.h>
 #include <tlhelp32.h>
 #include <pdh.h>
 #include <pdhmsg.h>
+#include <iphlpapi.h>
+#include <netioapi.h>
 #include <map>
 #include <vector>
 
@@ -88,6 +96,61 @@ std::vector<float> SystemMetrics::readLoadAverages()
     // PDH and emulate the 1/5/15 EMA the way procps does. Out of scope
     // for now; return zeros so the UI string just shows '--'.
     return std::vector<float>{0.0f, 0.0f, 0.0f};
+}
+
+NetIo SystemMetrics::readNetIo()
+{
+    static ULONGLONG lastRx = 0;
+    static ULONGLONG lastTx = 0;
+    static ULONGLONG lastTickMs = 0;
+
+    // GetIfTable is the legacy DWORD-counter path; MinGW headers do not
+    // expose GetIfTable2 (which would give 64-bit counters) even with
+    // _WIN32_WINNT=0x0601. Live with the 32-bit wrap for now and
+    // diff-clamp at the delta below; a saturated gigabit link wraps
+    // every ~34 s, so a 500ms poll catches the rollback cleanly.
+    DWORD size = 0;
+    GetIfTable(nullptr, &size, FALSE);
+    if (size == 0)
+    {
+        return NetIo{0, 0};
+    }
+    std::vector<BYTE> buf(size);
+    PMIB_IFTABLE table = reinterpret_cast<PMIB_IFTABLE>(buf.data());
+    if (GetIfTable(table, &size, FALSE) != NO_ERROR)
+    {
+        return NetIo{0, 0};
+    }
+
+    ULONGLONG curRx = 0;
+    ULONGLONG curTx = 0;
+    for (DWORD i = 0; i < table->dwNumEntries; ++i)
+    {
+        const MIB_IFROW &row = table->table[i];
+        if (row.dwType == IF_TYPE_SOFTWARE_LOOPBACK) continue;
+        curRx += row.dwInOctets;
+        curTx += row.dwOutOctets;
+    }
+
+    ULONGLONG nowMs = GetTickCount64();
+    NetIo out{0, 0};
+    if (lastTickMs != 0 && nowMs > lastTickMs)
+    {
+        double elapsedSec = static_cast<double>(nowMs - lastTickMs) / 1000.0;
+        if (elapsedSec > 0.0)
+        {
+            ULONGLONG rxDelta = (curRx >= lastRx) ? curRx - lastRx : 0;
+            ULONGLONG txDelta = (curTx >= lastTx) ? curTx - lastTx : 0;
+            out.rxKbPerSec = static_cast<unsigned long long>(
+                (static_cast<double>(rxDelta) / 1024.0) / elapsedSec);
+            out.txKbPerSec = static_cast<unsigned long long>(
+                (static_cast<double>(txDelta) / 1024.0) / elapsedSec);
+        }
+    }
+    lastRx = curRx;
+    lastTx = curTx;
+    lastTickMs = nowMs;
+    return out;
 }
 
 DiskUsage SystemMetrics::readDiskUsage()
