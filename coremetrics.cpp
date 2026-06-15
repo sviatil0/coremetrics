@@ -203,8 +203,8 @@ static void buildScene()
     g_muteBtnMin = ivec2(812, 8);
     g_muteBtnMax = ivec2(952, 40);
 
-    g_exitBtnMin = ivec2(880, 460);
-    g_exitBtnMax = ivec2(944, 524);
+    g_exitBtnMin = ivec2(832, 480);
+    g_exitBtnMax = ivec2(944, 520);
 
     int rowY = 64;
     std::vector<float> weights = {0.10f, 0.42f, 0.12f, 0.12f, 0.24f};
