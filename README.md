@@ -37,6 +37,8 @@ New here? [**DOCS.md**](DOCS.md) maps the whole repo; [**API.md**](API.md) is th
 
 CoreMetrics is two things in one repo: a small **GUI toolkit written directly on SDL3 pixel surfaces** (no Dear ImGui, no Qt, no game framework) and a **real system monitor built on top of it**. A few things worth a look:
 
+Detailed comparison: [docs/COMPARISON.md](docs/COMPARISON.md).
+
 - **htop-comparable Processes tab.** Five-column table (PID / NAME / CPU% / MEM% / DISK I/O); click any header to sort. Search and filter by name (`/`), parent-child tree view (`t`), row selection + signal menu (`k`) covering TERM / KILL / INT / HUP / STOP / CONT. System tab pairs these with per-process disk I/O backend, memory breakdown, uptime, 1/5/15-minute load averages, and a root-volume DISK readout.
 - **Three native metrics backends, one header.** `SystemMetrics` reads live data from `/proc` + `/sys` on Linux, mach + IOKit on macOS, and PDH + Toolhelp on Windows, selected at compile time via `#ifdef`.
 - **From-scratch UI stack.** Every widget rasterizes itself onto a raw `SDL_Surface` through one `Screen` primitive layer (`drawPixel`, Bresenham `drawLine`, `drawBox`, `drawTriangle`, `blitTo`). No retained-mode GUI library underneath; geometry is hand-rasterized, text and image decode go through SDL's debug renderer and SDL_image/SDL_ttf.
