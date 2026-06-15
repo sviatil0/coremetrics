@@ -151,7 +151,11 @@ constexpr int PERCORE_Y1 = 236;
 // as a per-core continuation without a separate label; the earlier
 // 'cores' label at x=24 collided with the 'CPU history' sparkline
 // label at y=230 (12-px gap, ~16-px glyph height).
-constexpr int PERCORE_X0 = 24;
+// Strip starts at x=84 so a "cores" label fits at x=24, mirroring the
+// CPU / RAM / GPU column above. Label color hidden when --sparklines
+// is on (the CPU history label at y=230 would collide visually if both
+// rendered at full opacity).
+constexpr int PERCORE_X0 = 84;
 constexpr int PERCORE_X1 = 936;
 constexpr int PERCORE_GAP = 4;
 
@@ -342,39 +346,53 @@ static std::string formatRate(unsigned long long kbPerSec)
     return std::to_string(kbPerSec) + " KB/s";
 }
 
-static void renderNetIo(Screen &dest)
-{
-    if (g_netIo.rxKbPerSec == 0 && g_netIo.txKbPerSec == 0)
-    {
-        return;
-    }
-    const vec3 dim(0.55f, 0.55f, 0.55f);
-    std::string text = "NET R " + formatRate(g_netIo.rxKbPerSec)
-                       + "  T " + formatRate(g_netIo.txKbPerSec);
-    // Right-side counterpart to renderAggregateDiskIo at y=68, so the
-    // two read as one combined disk-and-net pressure strip rather than
-    // stacked rows.
-    Font::drawText(dest, text, ivec2(560, 68), dim);
-}
-
 static void renderAggregateDiskIo(Screen &dest)
 {
-    // Sit just below the DISK strip on the status row at y=58. Same
-    // dim color family as the rest of the status row chrome. Hidden
-    // when both rates are zero so the row stays uncluttered on idle
-    // systems.
-    if (g_aggregateDiskReadKbPerSec == 0 && g_aggregateDiskWriteKbPerSec == 0)
+    // Disk I/O is now sampled but rendered as part of renderNetIo to
+    // produce a single right-aligned 'disk + net' string in the footer
+    // chrome. This function is left as a no-op so the existing call
+    // sites do not need to change; consolidating both rates into one
+    // line keeps the footer compact and predictable.
+    (void)dest;
+}
+
+static void renderNetIo(Screen &dest)
+{
+    bool anyDisk = (g_aggregateDiskReadKbPerSec != 0
+                    || g_aggregateDiskWriteKbPerSec != 0);
+    bool anyNet = (g_netIo.rxKbPerSec != 0 || g_netIo.txKbPerSec != 0);
+    if (!anyDisk && !anyNet)
     {
         return;
     }
     const vec3 dim(0.55f, 0.55f, 0.55f);
-    std::string text = "I/O R " + formatRate(g_aggregateDiskReadKbPerSec)
-                       + "  W " + formatRate(g_aggregateDiskWriteKbPerSec);
-    // Place the I/O strip just above the CPU bar (y=88) so it does
-    // not collide with the y=44 status row that already shows Up,
-    // Load, and DISK. y=68 leaves a 6 px gap from the y=44 baseline
-    // top + 16 px glyph height and a 14 px gap from the CPU bar top.
-    Font::drawText(dest, text, ivec2(24, 68), dim);
+    // Single combined disk+net string; keeps the footer compact by
+    // dropping unit suffixes (the absolute throughput is on the
+    // Processes tab if exact numbers are needed). Stream-arrow
+    // glyphs would clip in Roboto so plain ASCII is used.
+    auto compact = [](unsigned long long kbPerSec) -> std::string {
+        if (kbPerSec >= 1024)
+        {
+            std::ostringstream oss;
+            oss.precision(1);
+            oss << std::fixed << (static_cast<double>(kbPerSec) / 1024.0) << "M";
+            return oss.str();
+        }
+        return std::to_string(kbPerSec) + "K";
+    };
+    std::string text;
+    if (anyDisk)
+    {
+        text = "DISK " + compact(g_aggregateDiskReadKbPerSec)
+               + "/" + compact(g_aggregateDiskWriteKbPerSec);
+    }
+    if (anyNet)
+    {
+        if (!text.empty()) text += "  ";
+        text += "NET " + compact(g_netIo.rxKbPerSec)
+                + "/" + compact(g_netIo.txKbPerSec);
+    }
+    Font::drawText(dest, text, ivec2(460, 492), dim);
 }
 
 static void renderDiskUsage(Screen &dest)
@@ -450,6 +468,14 @@ static void renderPerCoreStrip(Screen &dest)
     {
         return;
     }
+    // Left-edge label sits in the same x=24 column as the CPU/RAM/GPU
+    // labels above. Hidden when --sparklines is enabled because the
+    // CPU history label at y=230 would crowd it.
+    if (!g_sparklinesEnabled)
+    {
+        const vec3 dim(0.55f, 0.55f, 0.55f);
+        Font::drawText(dest, "cores", ivec2(24, 218), dim);
+    }
     const std::size_t cores = g_perCoreCpu.size();
     const int totalGap = PERCORE_GAP * static_cast<int>(cores - 1);
     const int slot = (PERCORE_X1 - PERCORE_X0 - totalGap) / static_cast<int>(cores);
@@ -494,8 +520,11 @@ static std::size_t g_lastProcCount = 0;
 
 static void renderFooterLiveStats(Screen &dest)
 {
+    // procs N moved to the chrome line just under the tabs (x=370,
+    // y=14 area would collide with SOUND ON); for now keep in footer
+    // at x=370 in a tighter slot.
     const vec3 dim(0.5f, 0.5f, 0.5f);
-    std::string text = "procs " + std::to_string(g_lastProcCount);
+    std::string text = std::to_string(g_lastProcCount) + " procs";
     Font::drawText(dest, text, ivec2(370, 492), dim);
 }
 
