@@ -780,18 +780,13 @@ int main(int argc, char **argv)
             g_filterText = argv[i + 1];
         }
         // --poll-ms <N> overrides the default 500ms refresh cadence.
-        // Clamped so a typo (0 or '--poll-ms 999999999') cannot
-        // freeze or pin the UI.
+        // Validation + clamp delegated to ProcessUtils so the same
+        // logic gets unit coverage and negative / non-numeric inputs
+        // fall back to the default instead of wrapping.
         if (std::string(argv[i]) == "--poll-ms" && i + 1 < argc)
         {
-            char *end = nullptr;
-            unsigned long long n = std::strtoull(argv[i + 1], &end, 10);
-            if (end != argv[i + 1] && n > 0)
-            {
-                if (n < POLL_INTERVAL_MIN_MS) n = POLL_INTERVAL_MIN_MS;
-                if (n > POLL_INTERVAL_MAX_MS) n = POLL_INTERVAL_MAX_MS;
-                g_pollIntervalMs = static_cast<Uint64>(n);
-            }
+            g_pollIntervalMs = static_cast<Uint64>(
+                clampPollIntervalMs(argv[i + 1], g_pollIntervalMs));
         }
     }
 

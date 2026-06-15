@@ -19,7 +19,7 @@ make test          # runs the full test suite
 
 Dependencies are SDL3, SDL3_ttf, and SDL3_image. The `Makefile` is preconfigured for macOS Homebrew layouts (`-I/opt/homebrew/include` and `-L/opt/homebrew/lib`); swap the paths or use the commented-out `pkg-config`-based block for Linux.
 
-CI checks the build on Linux and macOS. Both legs must stay green before a PR is mergeable.
+CI checks the build on Linux, macOS, and Windows. All three legs must stay green before a PR is mergeable.
 
 ## Sanitizers
 
