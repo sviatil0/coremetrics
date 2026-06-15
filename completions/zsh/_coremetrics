@@ -1,0 +1,27 @@
+#compdef coremetrics
+# zsh completion for the coremetrics CLI.
+#
+# Install:
+#   - Drop this file into any directory on your $fpath, e.g.
+#       cp completions/zsh/_coremetrics ~/.zsh/completions/
+#       fpath=(~/.zsh/completions $fpath)
+#       autoload -U compinit && compinit
+#   - Or, for Homebrew zsh users:
+#       cp completions/zsh/_coremetrics "$(brew --prefix)/share/zsh/site-functions/"
+
+_coremetrics() {
+    # _arguments handles flag descriptions, required arg types, and
+    # mutual exclusion implicitly. Keep the flag list in sync with
+    # the argv parsing block in coremetrics.cpp.
+    _arguments -s \
+        '--sparklines[enable sparkline graphs in the live UI]' \
+        '--tree[open Processes tab in parent/child tree mode]' \
+        '--filter[seed Processes-tab name filter]:substring:' \
+        '--poll-ms[override default 500ms poll cadence]:milliseconds:' \
+        '--duration[run for N seconds then exit (headless friendly)]:seconds:' \
+        '--screenshot[render one frame and write PNG to path, then exit]:path:_files' \
+        '--export-csv[write a one-shot CSV snapshot to path, then exit]:path:_files' \
+        '--export-json[write a one-shot JSON snapshot to path, then exit]:path:_files'
+}
+
+_coremetrics "$@"

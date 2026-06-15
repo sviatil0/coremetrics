@@ -1,0 +1,48 @@
+# bash completion for the coremetrics CLI.
+#
+# Install:
+#   - User-local:   cp completions/bash/coremetrics ~/.local/share/bash-completion/completions/
+#   - System-wide:  sudo cp completions/bash/coremetrics /usr/share/bash-completion/completions/
+#
+# Or source directly from a shell rc file:
+#   source /path/to/coremetrics/completions/bash/coremetrics
+
+_coremetrics()
+{
+    local cur prev opts file_opts
+    COMPREPLY=()
+    cur="${COMP_WORDS[COMP_CWORD]}"
+    prev="${COMP_WORDS[COMP_CWORD-1]}"
+
+    # Every long flag the binary understands. Keep in sync with
+    # the argv parsing block in coremetrics.cpp.
+    opts="--sparklines --tree --filter --poll-ms --duration --screenshot --export-csv --export-json"
+
+    # Flags whose next token is a filesystem path. For these we
+    # defer to bash's built-in filename completion so users get
+    # tab-expansion of real paths instead of a flag list.
+    file_opts="--screenshot --export-csv --export-json"
+
+    case "${prev}" in
+        --screenshot|--export-csv|--export-json)
+            COMPREPLY=( $(compgen -f -- "${cur}") )
+            return 0
+            ;;
+        --filter|--poll-ms|--duration)
+            # Free-form value: no useful completion, leave blank
+            # so the shell does not propose stale flags.
+            COMPREPLY=()
+            return 0
+            ;;
+    esac
+
+    if [[ "${cur}" == -* ]] ; then
+        COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+        return 0
+    fi
+
+    COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+    return 0
+}
+
+complete -F _coremetrics coremetrics
