@@ -36,6 +36,19 @@
   </screenshots>
   <content_rating type="oars-1.1" />
   <releases>
+    <release version="0.2.11" date="2026-06-15">
+      <description>
+        <p>
+          mac mem readers cache HW_MEMSIZE and host_page_size (both
+          static for the process life), so each poll only does the
+          live host_statistics64 mach call. README gains a 'Where to
+          start reading' subsection under Architecture pointing at the
+          three highest-signal source files for reviewers, and a
+          one-line submission hook front-loads scale + authorship +
+          3-OS testing.
+        </p>
+      </description>
+    </release>
     <release version="0.2.10" date="2026-06-15">
       <description>
         <p>
