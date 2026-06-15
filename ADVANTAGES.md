@@ -25,7 +25,7 @@ Why this matters:
 
 ## One UI codebase, three native metrics backends
 
-`include/SystemMetrics.hpp` declares four static methods:
+`include/SystemMetrics.hpp` declares the cross-platform reader surface. Abbreviated; see [`API.md`](API.md) for the full interface.
 
 ```cpp
 class SystemMetrics
@@ -34,6 +34,11 @@ public:
     static float readCpuPercent();
     static float readMemPercent();
     static float readGpuPercent();
+    static std::vector<float> readPerCoreCpu();
+    static MemBreakdown readMemBreakdown();
+    static unsigned long long readUptimeSeconds();
+    static std::vector<float> readLoadAverages();
+    static DiskUsage readDiskUsage();
     static std::vector<ProcessInfo> topProcesses(std::size_t n = 20);
 };
 ```

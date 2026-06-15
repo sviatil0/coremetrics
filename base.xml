@@ -138,12 +138,12 @@
     </layout>
 
         <button>
-            <ivec2><x>880</x><y>484</y></ivec2>
-            <ivec2><x>944</x><y>516</y></ivec2>
-            <vec3><x>0.18</x><y>0.05</y><z>0.05</z></vec3>
+            <ivec2><x>820</x><y>478</y></ivec2>
+            <ivec2><x>944</x><y>520</y></ivec2>
+            <vec3><x>0.85</x><y>0.20</y><z>0.20</z></vec3>
         </button>
         <label>
-            <ivec2><x>896</x><y>492</y></ivec2>
+            <ivec2><x>858</x><y>494</y></ivec2>
             <vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3>
             <text>EXIT</text>
         </label>
@@ -162,12 +162,12 @@
         <label>
             <ivec2><x>148</x><y>492</y></ivec2>
             <vec3><x>0.5</x><y>0.5</y><z>0.5</z></vec3>
-            <text>v0.2.5</text>
+            <text>v0.2.6</text>
         </label>
         <label>
             <ivec2><x>240</x><y>492</y></ivec2>
             <vec3><x>0.5</x><y>0.5</y><z>0.5</z></vec3>
-            <text>poll 500ms</text>
+            <text>POLL_PLACEHOLDER</text>
         </label>
 
 </layout>

@@ -72,4 +72,21 @@ std::string formatGbString(unsigned long long kb);
 float computeDiskUsedPct(unsigned long long totalKb,
                          unsigned long long freeKb);
 
+// Pure parse + clamp for the --poll-ms CLI flag. Returns the clamped
+// value when input parses as a positive integer in [100, 10000];
+// returns `fallbackMs` for null / empty / non-numeric / negative
+// inputs and for zero. Centralizes the validation so a typo cannot
+// freeze or pin the UI.
+unsigned long long clampPollIntervalMs(const char *arg,
+                                       unsigned long long fallbackMs);
+
+// Pure AABB hit-test used by the EXIT button click handler. Inclusive
+// on all four edges (matches the painted-button visual extent).
+struct IVec2
+{
+    int x;
+    int y;
+};
+bool pointInRect(IVec2 pt, IVec2 minXY, IVec2 maxXY);
+
 #endif

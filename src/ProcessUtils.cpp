@@ -1,5 +1,6 @@
 #include "ProcessUtils.hpp"
 #include <cctype>
+#include <cstdlib>
 
 std::string formatPct(float value)
 {
@@ -162,4 +163,34 @@ std::string formatUptimeString(unsigned long long seconds)
     }
     out += std::to_string(mins) + "m";
     return out;
+}
+
+unsigned long long clampPollIntervalMs(const char *arg,
+                                       unsigned long long fallbackMs)
+{
+    // strtoull happily wraps negative input to a huge unsigned value
+    // (e.g. -1 -> 18446744073709551615). Reject the negative prefix
+    // before the parse so a typo does not silently land at the upper
+    // clamp.
+    if (arg == nullptr || arg[0] == '\0' || arg[0] == '-')
+    {
+        return fallbackMs;
+    }
+    char *end = nullptr;
+    unsigned long long n = std::strtoull(arg, &end, 10);
+    if (end == arg || n == 0)
+    {
+        return fallbackMs;
+    }
+    constexpr unsigned long long minMs = 100;
+    constexpr unsigned long long maxMs = 10000;
+    if (n < minMs) return minMs;
+    if (n > maxMs) return maxMs;
+    return n;
+}
+
+bool pointInRect(IVec2 pt, IVec2 minXY, IVec2 maxXY)
+{
+    return pt.x >= minXY.x && pt.x <= maxXY.x
+        && pt.y >= minXY.y && pt.y <= maxXY.y;
 }

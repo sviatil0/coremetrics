@@ -43,7 +43,7 @@ Suggested reading order, simplest to most involved:
 6. **Events**: [`src/EventManager.cpp`](src/EventManager.cpp), `ClickEvent` / `ShowEvent` / `SoundEvent`, [`SoundPlayer.cpp`](src/SoundPlayer.cpp).
 7. **Metrics**: [`src/SystemMetrics_linux.cpp`](src/SystemMetrics_linux.cpp) (`/proc`), [`SystemMetrics_mac.cpp`](src/SystemMetrics_mac.cpp) (IOKit), [`SystemMetrics_win.cpp`](src/SystemMetrics_win.cpp) (PDH), selected by `#ifdef`. Each delegates per-process CPU% to the pure `computeCpuPercentDelta` helper in [`src/ProcessUtils.cpp`](src/ProcessUtils.cpp); the Linux parsers live in [`src/ProcParsers.cpp`](src/ProcParsers.cpp) so they can be fixture-tested without `/proc`.
 8. **Sparklines** (optional): [`include/RingBuffer.hpp`](include/RingBuffer.hpp) (header-only template, mirrors `Tree<T>`) and [`src/Sparkline.cpp`](src/Sparkline.cpp) (renders a polyline through `Screen::drawLine`). Activated at runtime with `--sparklines`.
-9. **The app**: [`coremetrics.cpp`](coremetrics.cpp). Builds the two-tab scene, the 500 ms poll loop, the `--screenshot` render path (`.png` via `IMG_SavePNG`, `.bmp` via `SDL_SaveBMP`), and the `SIGINT` / `SIGTERM` / `--duration` lifecycle controls.
+9. **The app**: [`coremetrics.cpp`](coremetrics.cpp). Builds the two-tab scene, the configurable poll loop (default 500 ms, override with `--poll-ms <N>` clamped 100..10000), the `--screenshot` render path (`.png` via `IMG_SavePNG`, `.bmp` via `SDL_SaveBMP`), and the `SIGINT` / `SIGTERM` / `--duration` lifecycle controls.
 
 ## 4. Run and verify
 
@@ -58,6 +58,7 @@ make ubsan                                 # tests under UndefinedBehaviorSaniti
 ./bin/coremetrics --screenshot shot.png    # render one frame headlessly, PNG output
 ./bin/coremetrics --sparklines             # add rolling CPU/RAM/GPU charts
 ./bin/coremetrics --duration 5             # auto-quit after 5s (for backgrounded smoke tests)
+./bin/coremetrics --poll-ms 250            # custom refresh cadence (clamped 100..10000)
 ```
 
 Each subsystem has a matching test in [`tests/`](tests/): `screenTest` (the rasterizer,

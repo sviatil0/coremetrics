@@ -91,6 +91,7 @@ make                 # builds bin/coremetrics and launches it
 ./bin/coremetrics --screenshot shot.png processes   # Processes tab
 ./bin/coremetrics --sparklines                      # adds rolling CPU/RAM/GPU charts
 ./bin/coremetrics --duration 5                      # auto-quit after 5s (for CI smoke tests)
+./bin/coremetrics --poll-ms 250                     # custom refresh cadence (clamped 100..10000)
 ```
 
 <details>
@@ -219,7 +220,7 @@ Per-package class diagrams (PlantUML): [Core](assets/core.png) · [GUI](assets/g
   - click a row to select, `Up`/`Down` to move selection, `k` to open the signal menu (TERM / KILL / INT / HUP / STOP / CONT), `Y`/`Enter` to confirm, `N`/`Esc` to cancel
 - **Footer:** live `procs N` counter shows how many processes the monitor is currently tracking.
 
-Tab switching is event-driven: each tab button emits a hide event for the other tab and a show event for its own, both drained in one `processEvents` pass so the switch is atomic. Metrics refresh every 500 ms; the main loop walks the layout tree and mutates bars, rows, and labels in place rather than rebuilding the scene.
+Tab switching is event-driven: each tab button emits a hide event for the other tab and a show event for its own, both drained in one `processEvents` pass so the switch is atomic. Metrics refresh every 500 ms by default; override with `--poll-ms <N>` (clamped to the 100..10000 ms band). The main loop walks the layout tree and mutates bars, rows, and labels in place rather than rebuilding the scene.
 
 ## Status
 
@@ -228,12 +229,12 @@ Tab switching is event-driven: each tab button emits a hide event for the other 
 - GUI library, rasterizer, event system, layout tree, and the CoreMetrics demo build and run.
 - Live CPU / RAM and per-process stats on macOS, Linux, and Windows.
 - Total GPU usage on Linux (`gpu_busy_percent`), macOS (`IOAccelerator`), and Windows (PDH).
-- 17 test suites; Linux + macOS compile + test matrix in CI (Windows build leg is non-blocking).
+- 17 test suites; Linux, macOS, and Windows compile + test matrix in CI, all three legs required.
 
 **Known limitations**
 
 - **Per-process GPU attribution** is not exposed by the cross-platform API yet; only total GPU usage is reported. (NVIDIA NVML on Linux is a backlog item.)
-- **Windows GUI is not visually verified end-to-end.** The Windows metrics layer exists, but mouse/click/tab interaction is verified on macOS and Linux only, so CI is gated on Linux + macOS (the Windows SDL3 + pkg-config toolchain on the runner is also flaky). Local cross-platform verification runs via `./run-cross-platform-tests.sh` (macOS native + Ubuntu in Docker).
+- **Windows GUI is not visually verified end-to-end.** The Windows metrics layer compiles cleanly and the test suite runs green on every PR (Windows is a required CI leg as of v0.2.4), but mouse / click / tab interaction is verified on macOS and Linux only. Local cross-platform verification runs via `./run-cross-platform-tests.sh` (macOS native + Ubuntu in Docker); the Win11 ARM live-test path is `scripts/windows-arm64-smoke.ps1`.
 
 ## API reference
 
