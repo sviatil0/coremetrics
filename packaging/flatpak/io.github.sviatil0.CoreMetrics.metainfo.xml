@@ -36,6 +36,19 @@
   </screenshots>
   <content_rating type="oars-1.1" />
   <releases>
+    <release version="0.2.7" date="2026-06-15">
+      <description>
+        <p>
+          Audit roundup from a 4-agent parallel review wave: --poll-ms
+          parse + clamp centralized in ProcessUtils with full unit
+          coverage (rejects negative-wrap inputs), pointInRect helper
+          for the EXIT-button hit test, sparkline first push pre-fills
+          the ring buffer so polylines span full width from frame 1.
+          README, DOCS, CONTRIBUTING, ADVANTAGES brought back in sync
+          with the v0.2.6 shipped surface and the now-gating Windows CI.
+        </p>
+      </description>
+    </release>
     <release version="0.2.6" date="2026-06-15">
       <description>
         <p>
