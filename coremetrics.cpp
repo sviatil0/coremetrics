@@ -29,6 +29,7 @@
 #include "Thresholds.hpp"
 #include "AssetPath.hpp"
 #include "SignalUtils.hpp"
+#include "Exporter.hpp"
 
 constexpr int RESX = 960;
 constexpr int RESY = 540;
@@ -907,6 +908,11 @@ int main(int argc, char **argv)
     // seconds. Useful for backgrounded smoke tests and screenshot capture
     // pipelines that need a guaranteed-finite run. 0 means "run forever".
     double durationSeconds = 0.0;
+    // Optional `--export-csv <path>` / `--export-json <path>` write one
+    // sample of the live aggregates plus the top-N process list to a flat
+    // file and exit. Both run before SDL_Init so they need no display.
+    std::string exportCsvPath;
+    std::string exportJsonPath;
     for (int i = 1; i < argc; ++i)
     {
         if (std::string(argv[i]) == "--screenshot" && i + 1 < argc)
@@ -948,6 +954,53 @@ int main(int argc, char **argv)
             g_pollIntervalMs = static_cast<Uint64>(
                 clampPollIntervalMs(argv[i + 1], g_pollIntervalMs));
         }
+        // --export-csv <path> / --export-json <path>: one-shot dump of the
+        // live aggregates + top-N process list, written to `path` and then
+        // the process exits 0. Lets external tools consume CoreMetrics data
+        // without scraping screenshots.
+        if (std::string(argv[i]) == "--export-csv" && i + 1 < argc)
+        {
+            exportCsvPath = argv[i + 1];
+        }
+        if (std::string(argv[i]) == "--export-json" && i + 1 < argc)
+        {
+            exportJsonPath = argv[i + 1];
+        }
+    }
+
+    // Export path runs before SDL_Init: no window, no audio, no font.
+    // SystemMetrics calls are pure platform queries so they work fine
+    // headless. If both flags are present we honor both.
+    if (!exportCsvPath.empty() || !exportJsonPath.empty())
+    {
+        int exportStatus = 0;
+        if (!exportCsvPath.empty())
+        {
+            if (!Exporter::writeCsv(exportCsvPath))
+            {
+                std::cerr << "Failed to write CSV export to "
+                          << exportCsvPath << '\n';
+                exportStatus = 1;
+            }
+            else
+            {
+                std::cout << "Wrote CSV export to " << exportCsvPath << '\n';
+            }
+        }
+        if (!exportJsonPath.empty())
+        {
+            if (!Exporter::writeJson(exportJsonPath))
+            {
+                std::cerr << "Failed to write JSON export to "
+                          << exportJsonPath << '\n';
+                exportStatus = 1;
+            }
+            else
+            {
+                std::cout << "Wrote JSON export to " << exportJsonPath << '\n';
+            }
+        }
+        return exportStatus;
     }
 
     std::signal(SIGINT, handleShutdownSignal);
