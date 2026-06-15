@@ -1,0 +1,37 @@
+name: Lint
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+
+# Lock the workflow-wide GITHUB_TOKEN to read-only so a compromised
+# third-party action can't push commits, modify releases, or open
+# PRs from this job. The actionlint step only needs to read the
+# checked-out tree.
+permissions:
+  contents: read
+
+jobs:
+  actionlint:
+    runs-on: ubuntu-latest
+    # Non-blocking: actionlint surfaces shellcheck findings (e.g. SC2015
+    # `A && B || C` patterns, SC2046 unquoted command substitution) in
+    # existing workflows. Fix those incrementally; for now don't gate PRs
+    # on them so the lint feedback is advisory.
+    continue-on-error: true
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run actionlint
+        # fail-on-error keeps the action exit code at 0 even when
+        # shellcheck reports issues, so the step (and therefore the
+        # gh-pr-checks line) shows green while still rendering the
+        # findings in the job log as advisory feedback.
+        uses: raven-actions/actionlint@v2
+        with:
+          matcher: true
+          fail-on-error: false
+          files: '.github/workflows/*.yml'
