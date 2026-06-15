@@ -27,6 +27,7 @@
 #include "ProcessUtils.hpp"
 #include "Sparkline.hpp"
 #include "Thresholds.hpp"
+#include "Theme.hpp"
 #include "AssetPath.hpp"
 #include "SignalUtils.hpp"
 #include "KillLog.hpp"
@@ -359,7 +360,7 @@ static void buildSparklines()
     // the same horizontal range as the bars above (x in [24, 864]) and
     // matches the same accent color, so the polyline reads as a continuation
     // of its bar. Heights are 56px / row with 12px gaps.
-    const vec3 accent(0.871f, 1.0f, 0.608f);
+    const vec3 accent = Theme::accentGreen();
     // Sparkline stack: 4 charts at 40px each with a 14px label band above
     // each chart. Labels live at chart-top minus 12px so they sit cleanly
     // above the polyline instead of being overwritten by the fill. Tick
@@ -414,7 +415,7 @@ static std::string formatLoadAverages()
 static void renderUptimeAndLoad(Screen &dest)
 {
     // Dim white for the labels, accent green so it reads as a status row.
-    const vec3 dimColor(0.55f, 0.55f, 0.55f);
+    const vec3 dimColor = Theme::textDim();
     Font::drawText(dest, formatUptimeString(g_uptimeSeconds), ivec2(24, 44), dimColor);
     // Uptime + Load + Disk all share the y=44 baseline so the status
     // row reads as a single line instead of a staircase. The earlier
@@ -454,7 +455,7 @@ static void renderNetIo(Screen &dest)
     {
         return;
     }
-    const vec3 dim(0.55f, 0.55f, 0.55f);
+    const vec3 dim = Theme::textDim();
     // Compact units (K/M/G) keep the worst-case string bounded: even a
     // 10 GB/s host renders as '10.0G' (5 chars) rather than '10240.0M'
     // (8 chars). Caps the right edge of the footer well before x=810
@@ -512,7 +513,7 @@ static void renderDiskUsage(Screen &dest)
                                     : 0;
     float pct = computeDiskUsedPct(g_diskUsage.totalKb, g_diskUsage.freeKb);
 
-    vec3 color(0.55f, 0.55f, 0.55f);
+    vec3 color = Theme::textDim();
     if (pct >= Thresholds::RED_PCT)
     {
         color = Thresholds::colorRed();
@@ -551,7 +552,7 @@ static void renderMemBreakdownStrip(Screen &dest)
         return static_cast<int>(n / g_memBreakdown.totalKb);
     };
 
-    const vec3 colActive(0.95f, 0.35f, 0.35f); // red: in-use by processes
+    const vec3 colActive = Theme::accentRed(); // red: in-use by processes
     const vec3 colWired(0.95f, 0.66f, 0.30f);  // orange: kernel + pinned
     const vec3 colCached(0.45f, 0.78f, 0.95f); // blue: reclaimable cache
     const vec3 colFree(0.18f, 0.18f, 0.18f);   // dark: free
@@ -585,7 +586,7 @@ static void renderPerCoreStrip(Screen &dest)
     // CPU history label at y=230 would crowd it.
     if (!g_sparklinesEnabled)
     {
-        const vec3 dim(0.55f, 0.55f, 0.55f);
+        const vec3 dim = Theme::textDim();
         Font::drawText(dest, "cores", ivec2(24, 218), dim);
     }
     const std::size_t cores = g_perCoreCpu.size();
@@ -595,7 +596,7 @@ static void renderPerCoreStrip(Screen &dest)
     {
         return;
     }
-    const vec3 bg(0.12f, 0.12f, 0.12f);
+    const vec3 bg = Theme::panelBg();
 
     for (std::size_t i = 0; i < cores; ++i)
     {
@@ -684,8 +685,8 @@ static void renderHelpOverlay(Screen &dest)
     const int panelY0 = 80;
     const int panelX1 = 840;
     const int panelY1 = 460;
-    const vec3 panelBg(0.05f, 0.05f, 0.05f);
-    const vec3 panelBorder(0.871f, 1.0f, 0.608f);
+    const vec3 panelBg = Theme::bgDark();
+    const vec3 panelBorder = Theme::accentGreen();
     dest.drawBox(ivec2(panelX0, panelY0), ivec2(panelX1, panelY1), panelBg);
     // Four thin boxes draw the 1px border; cheaper than a stroked rect
     // and matches the signal menu treatment.
@@ -758,7 +759,7 @@ static void renderHelpOverlay(Screen &dest)
 // / RAM / GPU history. y-baseline picked to sit just above each strip.
 static void renderSparklineLabels(Screen &dest)
 {
-    const vec3 dim(0.55f, 0.55f, 0.55f);
+    const vec3 dim = Theme::textDim();
     // One label per sparkline, painted 12px above the chart's top edge
     // so the text sits in clear sky above the polyline fill instead of
     // getting overwritten on every peak. Chart rects are CPU 246..286,
@@ -1327,7 +1328,7 @@ int main(int argc, char **argv)
         }
         else if (!g_filterText.empty())
         {
-            const vec3 labelColor(0.871f, 1.0f, 0.608f);
+            const vec3 labelColor = Theme::accentGreen();
             const vec3 textColor(1.0f, 1.0f, 1.0f);
             Font::drawText(shot, "filter: ", ivec2(24, 44), labelColor);
             Font::drawText(shot, g_filterText, ivec2(120, 44), textColor);
@@ -1838,7 +1839,7 @@ int main(int argc, char **argv)
         if (g_treeMode && processesTabActive())
         {
             const vec3 expandedColor(0.40f, 0.85f, 0.40f);
-            const vec3 collapsedColor(0.55f, 0.55f, 0.55f);
+            const vec3 collapsedColor = Theme::textDim();
             // Name cell x = PROCESSES_ROW_X0 + weight[0] * rowWidth + 4
             // (same layout the Row widget uses to position cell text).
             int nameCellX = PROCESSES_ROW_X0
@@ -1883,9 +1884,9 @@ int main(int argc, char **argv)
             // Filter input strip at the top of the Processes tab, above
             // the header row. Two-tone: accent label, white query text,
             // a blinking cursor when input is active.
-            const vec3 labelColor(0.871f, 1.0f, 0.608f);
+            const vec3 labelColor = Theme::accentGreen();
             const vec3 textColor(1.0f, 1.0f, 1.0f);
-            const vec3 hintColor(0.55f, 0.55f, 0.55f);
+            const vec3 hintColor = Theme::textDim();
             std::string prefix = g_filterInputActive ? "filter> " : "filter: ";
             std::string body = g_filterText;
             if (g_filterInputActive && ((SDL_GetTicks() / 400) % 2) == 0)
@@ -1923,7 +1924,7 @@ int main(int argc, char **argv)
             const int panelX1 = 760;
             const int panelY1 = 320;
             const vec3 panelBg(0.08f, 0.08f, 0.08f);
-            const vec3 panelBorder(0.871f, 1.0f, 0.608f);
+            const vec3 panelBorder = Theme::accentGreen();
             screen.drawBox(ivec2(panelX0, panelY0), ivec2(panelX1, panelY1), panelBg);
             // Border. 4 thin boxes is cheaper than a stroked rectangle.
             screen.drawBox(ivec2(panelX0, panelY0), ivec2(panelX1, panelY0 + 1), panelBorder);
