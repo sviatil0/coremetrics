@@ -19,6 +19,15 @@ INCDIR = include
 OBJDIR = obj
 BINDIR = bin
 
+# Default install prefix for the manpage. Homebrew sets DESTDIR + prefix in
+# its formula; distro packagers can override MANPATH on the command line
+# (command-line assignments win over the makefile default below). Using
+# plain `=` rather than `?=` so the user's shell MANPATH env var, which is
+# a colon-separated search list and not a single install dir, does not
+# poison the install location.
+PREFIX  ?= /usr/local
+MANPATH  = $(PREFIX)/share/man
+
 DEMO_TARGET = $(BINDIR)/demo
 TEST_TARGET = $(BINDIR)/tests
 BENCH_TARGET = $(BINDIR)/bench
@@ -32,7 +41,7 @@ OBJECTS = $(SOURCES:$(SRCDIR)/%.cpp=$(OBJDIR)/%.o)
 TEST_OBJECTS = $(TEST_SOURCES:$(TESTDIR)/%.cpp=$(OBJDIR)/%.o)
 BENCH_OBJECTS = $(BENCH_SOURCES:$(BENCHDIR)/%.cpp=$(OBJDIR)/%.o)
 
-.PHONY: all demo test bench coremetrics directories clean asan ubsan
+.PHONY: all demo test bench coremetrics directories clean asan ubsan install-man
 
 # Rebuild the test suite under AddressSanitizer or UndefinedBehaviorSanitizer.
 # These re-invoke `make test` with extra flags appended via EXTRA_CXXFLAGS /
@@ -95,6 +104,13 @@ $(OBJDIR)/main.o: main.cpp
 
 $(OBJDIR)/coremetrics.o: coremetrics.cpp
 	$(CXX) $(CXXFLAGS) $(EXTRA_CXXFLAGS) $(CPPFLAGS) -c $< -o $@
+
+# Install the section 1 manpage so `man coremetrics` works after `make
+# install-man`. Homebrew's formula invokes this target with DESTDIR pointed
+# at its keg; distro packagers can override MANPATH on the command line.
+install-man:
+	install -d $(DESTDIR)$(MANPATH)/man1
+	install -m 0644 man/coremetrics.1 $(DESTDIR)$(MANPATH)/man1/coremetrics.1
 
 clean:
 	rm -rf $(OBJDIR) $(BINDIR)
