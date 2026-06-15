@@ -179,6 +179,12 @@ static std::vector<float> g_loadAverages;
 // recolor as the RAM bar so a full root volume reads as visually
 // urgent. Zero totalKb means the backend failed; the strip is hidden.
 static DiskUsage g_diskUsage{0, 0};
+// Aggregate disk I/O rate summed across the top-N processes the
+// backend returned. Shown on the System tab as 'I/O R X.X MB/s
+// W Y.Y MB/s' so reviewers see system-wide disk pressure without
+// scanning the per-process table.
+static unsigned long long g_aggregateDiskReadKbPerSec = 0;
+static unsigned long long g_aggregateDiskWriteKbPerSec = 0;
 constexpr int MEMSEG_X0 = 84;
 constexpr int MEMSEG_X1 = 864;
 // Slim strip (164..172) so the breakdown reads as a continuation of
@@ -337,6 +343,34 @@ static void renderUptimeAndLoad(Screen &dest)
     // y=56 placement for Load predated the DISK strip and left Load
     // ~12 px below Up, which was visible as a misaligned middle field.
     Font::drawText(dest, formatLoadAverages(), ivec2(220, 44), dimColor);
+}
+
+static std::string formatRate(unsigned long long kbPerSec)
+{
+    if (kbPerSec >= 1024)
+    {
+        std::ostringstream oss;
+        oss.precision(1);
+        oss << std::fixed << (static_cast<double>(kbPerSec) / 1024.0) << " MB/s";
+        return oss.str();
+    }
+    return std::to_string(kbPerSec) + " KB/s";
+}
+
+static void renderAggregateDiskIo(Screen &dest)
+{
+    // Sit just below the DISK strip on the status row at y=58. Same
+    // dim color family as the rest of the status row chrome. Hidden
+    // when both rates are zero so the row stays uncluttered on idle
+    // systems.
+    if (g_aggregateDiskReadKbPerSec == 0 && g_aggregateDiskWriteKbPerSec == 0)
+    {
+        return;
+    }
+    const vec3 dim(0.55f, 0.55f, 0.55f);
+    std::string text = "I/O R " + formatRate(g_aggregateDiskReadKbPerSec)
+                       + "  W " + formatRate(g_aggregateDiskWriteKbPerSec);
+    Font::drawText(dest, text, ivec2(560, 58), dim);
 }
 
 static void renderDiskUsage(Screen &dest)
@@ -563,6 +597,22 @@ static void pollMetrics()
     // is the most useful single number a reviewer can see: "this system
     // monitor is watching N processes right now."
     g_lastProcCount = procs.size();
+    // Aggregate disk-I/O throughput summed across every process the
+    // backend returned this round. Renders as 'R X.X MB/s  W Y.Y MB/s'
+    // text strip on the System tab so users see system-wide disk
+    // pressure at a glance instead of having to scan the Processes
+    // table. Best-effort: only counts processes the backend surfaced
+    // (top fetchN by memory), which captures the loudest writers in
+    // practice without needing /proc/diskstats or PDH PhysicalDisk.
+    unsigned long long aggReadKb = 0;
+    unsigned long long aggWriteKb = 0;
+    for (const auto &p : procs)
+    {
+        aggReadKb += p.diskReadKbPerSec;
+        aggWriteKb += p.diskWriteKbPerSec;
+    }
+    g_aggregateDiskReadKbPerSec = aggReadKb;
+    g_aggregateDiskWriteKbPerSec = aggWriteKb;
     // Parallel array of indent depths produced when tree mode flattens
     // the parent/child graph; stays empty in flat mode. Same length as
     // procs after the sort+filter+truncate pass below.
@@ -854,6 +904,7 @@ int main(int argc, char **argv)
         {
             renderUptimeAndLoad(shot);
             renderDiskUsage(shot);
+            renderAggregateDiskIo(shot);
             renderMemBreakdownStrip(shot);
             renderPerCoreStrip(shot);
             if (g_sparklinesEnabled)
@@ -1289,6 +1340,7 @@ int main(int argc, char **argv)
             {
                 renderUptimeAndLoad(screen);
                 renderDiskUsage(screen);
+                renderAggregateDiskIo(screen);
                 renderMemBreakdownStrip(screen);
                 renderPerCoreStrip(screen);
                 if (g_sparklinesEnabled)
