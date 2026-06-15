@@ -259,6 +259,20 @@ std::vector<float> SystemMetrics::readLoadAverages()
 
 MemBreakdown SystemMetrics::readMemBreakdown()
 {
+    // Map /proc/meminfo onto the same four-bucket split the mac backend
+    // produces (active / wired / cached / free), so the UI's segmented
+    // bar reads the same on both platforms.
+    //
+    //   activeKb = Active                    (anonymous + dirty working set)
+    //   cachedKb = Cached + Buffers          (page cache reclaimable on demand)
+    //   wiredKb  = Slab + KernelStack        (kernel-allocated, non-swappable;
+    //                                         the Linux analogue of mac "wired")
+    //   freeKb   = MemFree
+    //   totalKb  = MemTotal
+    //
+    // Every field defaults to zero. If /proc/meminfo is unreadable or any
+    // individual line is missing, that field stays at zero rather than
+    // failing the whole read.
     MemBreakdown out{0, 0, 0, 0, 0};
     std::ifstream file("/proc/meminfo");
     if (!file.is_open())
@@ -270,9 +284,9 @@ MemBreakdown SystemMetrics::readMemBreakdown()
     unsigned long long memFree = 0;
     unsigned long long buffers = 0;
     unsigned long long cached = 0;
-    unsigned long long sReclaimable = 0;
-    unsigned long long shmem = 0;
     unsigned long long active = 0;
+    unsigned long long slab = 0;
+    unsigned long long kernelStack = 0;
 
     std::string line;
     while (std::getline(file, line))
@@ -280,33 +294,24 @@ MemBreakdown SystemMetrics::readMemBreakdown()
         std::istringstream iss(line);
         std::string key;
         unsigned long long value = 0;
-        iss >> key >> value;
+        if (!(iss >> key >> value))
+        {
+            continue;
+        }
         if (key == "MemTotal:") memTotal = value;
         else if (key == "MemFree:") memFree = value;
         else if (key == "Buffers:") buffers = value;
         else if (key == "Cached:") cached = value;
-        else if (key == "SReclaimable:") sReclaimable = value;
-        else if (key == "Shmem:") shmem = value;
         else if (key == "Active:") active = value;
-    }
-    if (memTotal == 0)
-    {
-        return out;
+        else if (key == "Slab:") slab = value;
+        else if (key == "KernelStack:") kernelStack = value;
     }
 
     out.totalKb = memTotal;
     out.freeKb = memFree;
-    // htop's cached bucket: page cache + reclaimable slab + buffers,
-    // minus shmem which is double-counted between Cached and Shmem on
-    // Linux. Guarded against underflow.
-    unsigned long long cachedAll = cached + sReclaimable + buffers;
-    if (shmem <= cachedAll) cachedAll -= shmem;
-    out.cachedKb = cachedAll;
+    out.cachedKb = cached + buffers;
+    out.wiredKb = slab + kernelStack;
     out.activeKb = active;
-    // Wired ~= total - (active + cached + free). Bounded at zero so the
-    // math cannot go negative on an unusual layout.
-    unsigned long long accounted = out.cachedKb + out.activeKb + out.freeKb;
-    out.wiredKb = (memTotal > accounted) ? (memTotal - accounted) : 0;
     return out;
 }
 

@@ -48,8 +48,11 @@ struct DiskUsage
 // to `total` for the UI's segmented-bar math.
 //
 // "active"  = currently in use by running processes (anon + dirty)
-// "wired"   = kernel + drivers + memory pinned by mlock / IOKit
+// "wired"   = kernel-allocated, non-swappable memory
+//             - mac:   kernel + drivers + memory pinned by mlock / IOKit
+//             - linux: Slab + KernelStack from /proc/meminfo
 // "cached"  = file-backed page cache, reclaimable on demand
+//             - linux: Cached + Buffers from /proc/meminfo
 // "free"    = immediately available
 struct MemBreakdown
 {
