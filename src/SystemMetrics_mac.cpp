@@ -250,10 +250,19 @@ MemBreakdown SystemMetrics::readMemBreakdown()
 {
     MemBreakdown out{0, 0, 0, 0, 0};
 
-    int mib[2] = {CTL_HW, HW_MEMSIZE};
-    uint64_t memSize = 0;
-    size_t memSizeLen = sizeof(memSize);
-    if (sysctl(mib, 2, &memSize, &memSizeLen, nullptr, 0) != 0 || memSize == 0)
+    // HW_MEMSIZE and host_page_size never change for the life of the
+    // process; cache after the first sysctl / mach call.
+    static uint64_t cachedMemSize = 0;
+    if (cachedMemSize == 0)
+    {
+        int mib[2] = {CTL_HW, HW_MEMSIZE};
+        size_t memSizeLen = sizeof(cachedMemSize);
+        if (sysctl(mib, 2, &cachedMemSize, &memSizeLen, nullptr, 0) != 0)
+        {
+            cachedMemSize = 0;
+        }
+    }
+    if (cachedMemSize == 0)
     {
         return out;
     }
@@ -266,18 +275,22 @@ MemBreakdown SystemMetrics::readMemBreakdown()
         return out;
     }
 
-    vm_size_t pageSize = 0;
-    host_page_size(mach_host_self(), &pageSize);
-    if (pageSize == 0)
+    static vm_size_t cachedPageSize = 0;
+    if (cachedPageSize == 0)
+    {
+        host_page_size(mach_host_self(), &cachedPageSize);
+    }
+    if (cachedPageSize == 0)
     {
         return out;
     }
+    vm_size_t pageSize = cachedPageSize;
 
     auto pagesToKb = [pageSize](uint64_t pages) -> unsigned long long {
         return (static_cast<unsigned long long>(pages) * pageSize) / 1024ULL;
     };
 
-    out.totalKb = memSize / 1024ULL;
+    out.totalKb = cachedMemSize / 1024ULL;
     out.activeKb = pagesToKb(static_cast<uint64_t>(vmStats.active_count));
     out.wiredKb = pagesToKb(static_cast<uint64_t>(vmStats.wire_count));
     // External page count is Darwin's file-backed reclaimable bucket; fall
@@ -358,10 +371,19 @@ float SystemMetrics::readGpuPercent()
 
 float SystemMetrics::readMemPercent()
 {
-    int mib[2] = {CTL_HW, HW_MEMSIZE};
-    uint64_t memSize = 0;
-    size_t memSizeLen = sizeof(memSize);
-    if (sysctl(mib, 2, &memSize, &memSizeLen, nullptr, 0) != 0 || memSize == 0)
+    // HW_MEMSIZE is fixed for the life of the process; cache after the
+    // first sysctl to skip the trap on every poll.
+    static uint64_t cachedMemSize = 0;
+    if (cachedMemSize == 0)
+    {
+        int mib[2] = {CTL_HW, HW_MEMSIZE};
+        size_t memSizeLen = sizeof(cachedMemSize);
+        if (sysctl(mib, 2, &cachedMemSize, &memSizeLen, nullptr, 0) != 0)
+        {
+            cachedMemSize = 0;
+        }
+    }
+    if (cachedMemSize == 0)
     {
         return 0.0f;
     }
@@ -374,16 +396,23 @@ float SystemMetrics::readMemPercent()
         return 0.0f;
     }
 
-    vm_size_t pageSize = 0;
-    host_page_size(mach_host_self(), &pageSize);
-
-    uint64_t freeBytes = static_cast<uint64_t>(vmStats.free_count + vmStats.inactive_count) * pageSize;
-    if (freeBytes >= memSize)
+    static vm_size_t cachedPageSize = 0;
+    if (cachedPageSize == 0)
+    {
+        host_page_size(mach_host_self(), &cachedPageSize);
+    }
+    if (cachedPageSize == 0)
     {
         return 0.0f;
     }
-    float used = static_cast<float>(memSize - freeBytes);
-    return (used / static_cast<float>(memSize)) * 100.0f;
+
+    uint64_t freeBytes = static_cast<uint64_t>(vmStats.free_count + vmStats.inactive_count) * cachedPageSize;
+    if (freeBytes >= cachedMemSize)
+    {
+        return 0.0f;
+    }
+    float used = static_cast<float>(cachedMemSize - freeBytes);
+    return (used / static_cast<float>(cachedMemSize)) * 100.0f;
 }
 
 std::vector<ProcessInfo> SystemMetrics::topProcesses(std::size_t n)
