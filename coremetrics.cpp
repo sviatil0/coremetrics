@@ -116,6 +116,14 @@ constexpr int PROCESSES_VISIBLE_ROWS = 15;
 static int g_selectedPid = -1;
 static int g_selectedRowIndex = -1;
 static std::vector<int> g_visiblePids;
+// Per-visible-row glyph overlay state for tree mode. When non-empty,
+// the prefix string contains the indent spaces + '+ ' or '- ' that
+// should be re-painted in color over the white text the Row already
+// drew. Same length as g_visiblePids; empty string means no glyph
+// (leaf row or flat mode). Parallel bool flags whether the row is
+// collapsed (true => grey '+') or expanded (false => green '-').
+static std::vector<std::string> g_rowGlyphPrefix;
+static std::vector<bool> g_rowGlyphCollapsed;
 
 static bool g_signalMenuVisible = false;
 static int g_signalMenuPickedIndex = -1; // -1 = picking, 0..5 = awaiting confirm
@@ -137,6 +145,11 @@ static bool g_filterInputActive = false;
 // by 't' on the Processes tab. When off the table sorts by the active
 // column the way it has since the SAFE wave.
 static bool g_treeMode = false;
+// Per-pid collapse state for tree mode. Pids in this set hide their
+// descendants in the flattened row list; pressing 'space' on a row
+// toggles membership. Initial state: empty (everything expanded).
+// Kept across tree-mode toggles so the user's layout sticks.
+static std::unordered_set<int> g_collapsedPids;
 
 // Help overlay: a translucent-feel dark panel listing every hotkey,
 // toggled by '?' and dismissed with '?' or Esc. Painted last in the
@@ -850,6 +863,10 @@ static void pollMetrics()
     // the parent/child graph; stays empty in flat mode. Same length as
     // procs after the sort+filter+truncate pass below.
     std::vector<int> procDepth;
+    // Parallel flag: row has at least one child in the current sample,
+    // so its name cell should carry a '+' or '-' collapse glyph. Stays
+    // empty in flat mode. Same length policy as procDepth.
+    std::vector<bool> procHasChildren;
     if (g_treeMode)
     {
         // Build a parent -> children index. Roots are entries whose parentPid
@@ -877,6 +894,7 @@ static void pollMetrics()
         std::vector<ProcessInfo> flat;
         flat.reserve(procs.size());
         procDepth.reserve(procs.size());
+        procHasChildren.reserve(procs.size());
 
         // Iterative DFS so we don't recurse into a kernel-thread chain that
         // could be thousands deep on weird hosts.
@@ -906,11 +924,25 @@ static void pollMetrics()
             emitted[idx] = true;
             flat.push_back(procs[idx]);
             procDepth.push_back(depth);
-            auto it = childIndices.find(procs[idx].pid);
-            if (it != childIndices.end())
+            // Cache whether this pid has any child in the current sample
+            // so the render loop can decide whether to draw a +/- glyph.
+            // Checked against childIndices BEFORE the collapse short-circuit
+            // so collapsed parents still get a glyph (the '+').
+            auto childIt = childIndices.find(procs[idx].pid);
+            bool hasChildren = (childIt != childIndices.end()
+                                && !childIt->second.empty());
+            procHasChildren.push_back(hasChildren);
+            // Skip descendants when this pid is in the collapsed set so
+            // 'space' on a row hides the subtree without dropping the row
+            // itself. Set is empty by default => fully expanded tree.
+            if (g_collapsedPids.count(procs[idx].pid) != 0)
+            {
+                continue;
+            }
+            if (hasChildren)
             {
                 // Push in reverse so the highest-mem child is popped first.
-                for (auto rit = it->second.rbegin(); rit != it->second.rend(); ++rit)
+                for (auto rit = childIt->second.rbegin(); rit != childIt->second.rend(); ++rit)
                 {
                     if (!emitted[*rit])
                     {
@@ -928,6 +960,7 @@ static void pollMetrics()
             {
                 flat.push_back(procs[i]);
                 procDepth.push_back(0);
+                procHasChildren.push_back(false);
             }
         }
         procs = std::move(flat);
@@ -956,6 +989,8 @@ static void pollMetrics()
 
     g_visiblePids.clear();
     g_visiblePids.reserve(procs.size());
+    g_rowGlyphPrefix.assign(procs.size(), std::string());
+    g_rowGlyphCollapsed.assign(procs.size(), false);
 
     for (std::size_t i = 0; i < dataRowCount; ++i)
     {
@@ -971,7 +1006,10 @@ static void pollMetrics()
             // Tree mode: prefix the NAME cell with indent + connector so
             // the parent/child relationship is visible. Cap depth at 6 to
             // avoid pushing the name out of its column on a deeply nested
-            // chain (which is rare in practice).
+            // chain (which is rare in practice). Nodes that have children
+            // get a '+ ' (collapsed) or '- ' (expanded) glyph in the
+            // indent area; leaf rows fall back to the previous '|- '
+            // connector so the parent/child line stays readable.
             std::string nameCell = info.name;
             if (g_treeMode && i < procDepth.size())
             {
@@ -982,7 +1020,18 @@ static void pollMetrics()
                 {
                     prefix += "  ";
                 }
-                if (depth > 0)
+                bool hasChildren = (i < procHasChildren.size()) && procHasChildren[i];
+                bool collapsed = (g_collapsedPids.count(info.pid) != 0);
+                if (hasChildren)
+                {
+                    prefix += collapsed ? "+ " : "- ";
+                    // Stash the colored-overlay prefix so the render
+                    // pass can repaint the glyph in green/grey on top
+                    // of the Row's default white text.
+                    g_rowGlyphPrefix[i] = prefix;
+                    g_rowGlyphCollapsed[i] = collapsed;
+                }
+                else if (depth > 0)
                 {
                     prefix += "|- ";
                 }
@@ -1640,6 +1689,24 @@ int main(int argc, char **argv)
                     g_treeMode = !g_treeMode;
                     flashStatus(g_treeMode ? "tree mode on" : "tree mode off");
                 }
+                else if (key == SDLK_SPACE && g_treeMode && g_selectedPid >= 0)
+                {
+                    // Space collapses/expands the subtree rooted at the
+                    // selected pid. State lives in g_collapsedPids and is
+                    // consulted by the tree-mode flattener; the next poll
+                    // hides (or restores) the descendants.
+                    auto it = g_collapsedPids.find(g_selectedPid);
+                    if (it == g_collapsedPids.end())
+                    {
+                        g_collapsedPids.insert(g_selectedPid);
+                        flashStatus("collapsed pid " + std::to_string(g_selectedPid));
+                    }
+                    else
+                    {
+                        g_collapsedPids.erase(it);
+                        flashStatus("expanded pid " + std::to_string(g_selectedPid));
+                    }
+                }
                 break;
             }
             }
@@ -1695,6 +1762,41 @@ int main(int argc, char **argv)
                     if (g_netRxSparkline != nullptr) g_netRxSparkline->draw(screen);
                     renderSparklineLabels(screen);
                 }
+            }
+        }
+        // Tree-mode collapse glyph overlay. The Row widget renders every
+        // cell in a single textColor (white), so we repaint the leading
+        // indent + '+ ' / '- ' fragment in a green/grey accent on top of
+        // the row text it just drew. Same string at the same anchor, so
+        // the cached glyph surface lines up exactly and the rest of the
+        // name cell stays white. Skipped in flat mode and when nothing
+        // visible.
+        if (g_treeMode && processesTabActive())
+        {
+            const vec3 expandedColor(0.40f, 0.85f, 0.40f);
+            const vec3 collapsedColor(0.55f, 0.55f, 0.55f);
+            // Name cell x = PROCESSES_ROW_X0 + weight[0] * rowWidth + 4
+            // (same layout the Row widget uses to position cell text).
+            int nameCellX = PROCESSES_ROW_X0
+                          + static_cast<int>(0.10f
+                              * static_cast<float>(PROCESSES_ROW_X1 - PROCESSES_ROW_X0))
+                          + 4;
+            std::size_t glyphRowCount = g_rowGlyphPrefix.size();
+            if (glyphRowCount > static_cast<std::size_t>(PROCESSES_VISIBLE_ROWS))
+            {
+                glyphRowCount = static_cast<std::size_t>(PROCESSES_VISIBLE_ROWS);
+            }
+            for (std::size_t i = 0; i < glyphRowCount; ++i)
+            {
+                if (g_rowGlyphPrefix[i].empty())
+                {
+                    continue;
+                }
+                int rowY = PROCESSES_FIRST_ROW_Y
+                         + static_cast<int>(i) * PROCESS_ROW_HEIGHT;
+                vec3 color = g_rowGlyphCollapsed[i] ? collapsedColor : expandedColor;
+                Font::drawText(screen, g_rowGlyphPrefix[i],
+                               ivec2(nameCellX, rowY), color);
             }
         }
         renderFooterLiveStats(screen);
