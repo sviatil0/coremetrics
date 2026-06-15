@@ -646,8 +646,12 @@ static void renderFooterLiveStats(Screen &dest)
 // rest of the footer chrome uses so the eye lands on the count first.
 static void renderProcessesSummary(Screen &dest)
 {
+    // y=40..60 sits below the tab strip (y=0..36) and above the
+    // column header row defined in base.xml at y=64..84, so the
+    // summary annotates the table without hiding the PID / NAME /
+    // CPU% / MEM% / DISK I/O labels.
     const vec3 stripBg(0.08f, 0.08f, 0.08f);
-    dest.drawBox(ivec2(24, 70), ivec2(936, 88), stripBg);
+    dest.drawBox(ivec2(24, 40), ivec2(936, 60), stripBg);
 
     const vec3 dim(0.65f, 0.65f, 0.65f);
     std::size_t n = g_lastProcCount;
@@ -656,9 +660,9 @@ static void renderProcessesSummary(Screen &dest)
     std::string cpuText = "Sum CPU: " + formatPct(g_sumCpuPct) + "%";
     std::string memText = "Sum MEM: " + formatPct(g_sumMemPct) + "%";
 
-    Font::drawText(dest, totalText, ivec2(32, 74), COLOR_ACCENT_GREEN);
-    Font::drawText(dest, cpuText, ivec2(280, 74), dim);
-    Font::drawText(dest, memText, ivec2(520, 74), dim);
+    Font::drawText(dest, totalText, ivec2(32, 44), COLOR_ACCENT_GREEN);
+    Font::drawText(dest, cpuText, ivec2(280, 44), dim);
+    Font::drawText(dest, memText, ivec2(520, 44), dim);
 }
 
 // Keyboard shortcuts overlay. Painted last so it sits on top of every
