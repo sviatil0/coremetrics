@@ -342,23 +342,38 @@ Free-function text-rendering facade over the font system. Not a class.
 ## System
 
 ### ProcessInfo (struct)
-Plain data record for one process row. Public fields: `int pid; std::string name; float cpuPct; float memPct;`.
+Plain data record for one process row. Public fields: `int pid; int parentPid; std::string name; float cpuPct; float memPct; unsigned long long diskReadKbPerSec; unsigned long long diskWriteKbPerSec;`.
+
+### MemBreakdown (struct)
+Memory split into four htop-style segments. All fields in kilobytes. `unsigned long long totalKb; activeKb; wiredKb; cachedKb; freeKb;`. Segments cover the total: any unaccounted bytes fold into `freeKb`.
+
+### DiskUsage (struct)
+Root volume capacity. `unsigned long long totalKb; freeKb;`. Both zero when the platform call fails.
 
 ### SystemMetrics
-Static facade exposing cross-platform system metrics (CPU / memory / GPU / process list). All methods are `static`; platform implementations live in `SystemMetrics_{linux,mac,win}.cpp`.
+Static facade exposing cross-platform system metrics (CPU / memory / GPU / disk / process list). All methods are `static`; platform implementations live in `SystemMetrics_{linux,mac,win}.cpp`.
 
 - `static float readCpuPercent()`: current total CPU utilization (%).
 - `static float readMemPercent()`: current memory utilization (%).
 - `static float readGpuPercent()`: current GPU utilization (%).
-- `static std::vector<ProcessInfo> topProcesses(std::size_t n = 20)`: returns up to `n` top processes by usage.
+- `static std::vector<float> readPerCoreCpu()`: per-logical-CPU utilization since the previous call. First call returns all zeros (no prior sample to diff). Empty vector on Windows (backend not implemented).
+- `static MemBreakdown readMemBreakdown()`: active / wired / cached / free memory segments. Zeroed on failure.
+- `static unsigned long long readUptimeSeconds()`: seconds since boot. Zero on failure.
+- `static std::vector<float> readLoadAverages()`: 1, 5, 15-minute load averages. Always three elements; `{0, 0, 0}` on Windows.
+- `static DiskUsage readDiskUsage()`: root-volume total and free capacity. Linux + macOS use `statvfs("/")`; Windows uses `GetDiskFreeSpaceExA("C:\\")`.
+- `static std::vector<ProcessInfo> topProcesses(std::size_t n = 20)`: returns up to `n` top processes by memory usage. Each `ProcessInfo` carries CPU% (delta-based), MEM%, parent PID, and disk-I/O throughput in KB/sec.
 
 ### ProcessUtils
 `ProcessUtils.hpp` exposes a sort-column enum and pure helpers used by every platform backend and by the in-app sort handler. Extracting the math out of the platform `topProcesses` bodies and the in-app `compareProcesses` wrapper makes them testable on any platform without `/proc` or a running window.
 
-- `enum SortColumn { SORT_PID = 0, SORT_NAME = 1, SORT_CPU = 2, SORT_MEM = 3 }`: column selector for sorting the process table.
+- `enum SortColumn { SORT_PID = 0, SORT_NAME = 1, SORT_CPU = 2, SORT_MEM = 3, SORT_DISK = 4 }`: column selector for sorting the process table.
 - `std::string formatPct(float value)`: formats a percentage float as a display string with one decimal place.
 - `float computeCpuPercentDelta(std::uint64_t procCurrent, std::uint64_t procPrevious, std::uint64_t denom)`: returns the per-process CPU% as `((procCurrent - procPrevious) / denom) * 100`, clamped to `[0, 100]`. Returns `0.0f` when `denom == 0` or when `procCurrent < procPrevious` (counter reset, pid reuse). Used by the macOS, Linux, and Windows backends.
-- `bool compareProcessByColumn(const ProcessInfo &a, const ProcessInfo &b, SortColumn column, bool ascending)`: pure comparator for the Processes table. Numerical compare on PID / CPU% / MEM%, lexicographic on NAME. `ascending = true` puts smaller values first.
+- `std::uint64_t computeIoKbPerSec(std::uint64_t prev, std::uint64_t curr, double elapsedSec)`: returns `((curr - prev) / 1024) / elapsedSec` in KB/sec. Returns 0 when `elapsedSec <= 0` or when `curr < prev` (counter reset).
+- `bool processNameMatchesFilter(const std::string &name, const std::string &needle)`: case-insensitive substring match. Empty needle always matches; empty name with non-empty needle never matches.
+- `std::string formatUptimeString(unsigned long long seconds)`: formats seconds as `Up Xd Yh Zm` / `Up Yh Zm` / `Up Zm`. Returns `Up --` for 0.
+- `std::string formatDiskIo(unsigned long long readKbPerSec, unsigned long long writeKbPerSec)`: formats `read + write` as `X.X MB/s` for >= 1 MB/s, `XXX KB/s` for 1..1023, empty string for 0.
+- `bool compareProcessByColumn(const ProcessInfo &a, const ProcessInfo &b, SortColumn column, bool ascending)`: pure comparator for the Processes table. Numerical compare on PID / CPU% / MEM% / DISK (read + write), lexicographic on NAME. `ascending = true` puts smaller values first.
 
 ### ProcParsers
 `ProcParsers.hpp` exposes platform-neutral string parsers for the three `/proc` files the Linux backend reads. Each takes file contents as a `std::string` and writes the result through an out-parameter so the same parser can be exercised with synthetic fixtures on any OS.

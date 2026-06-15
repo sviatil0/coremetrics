@@ -290,16 +290,11 @@ static void renderUptimeAndLoad(Screen &dest)
     // Dim white for the labels, accent green so it reads as a status row.
     const vec3 dimColor(0.55f, 0.55f, 0.55f);
     Font::drawText(dest, formatUptime(g_uptimeSeconds), ivec2(24, 44), dimColor);
-    Font::drawText(dest, formatLoadAverages(), ivec2(220, 56), dimColor);
-}
-
-static std::string formatGb(unsigned long long kb)
-{
-    // Two-digit precision: 234GB, 1.4TB-equivalent values render as 1457GB
-    // (we don't switch units at 1024 because the surrounding text is in
-    // GB, and mixed-unit readouts are harder to compare at a glance).
-    unsigned long long gb = kb / (1024ULL * 1024ULL);
-    return std::to_string(gb);
+    // Uptime + Load + Disk all share the y=44 baseline so the status
+    // row reads as a single line instead of a staircase. The earlier
+    // y=56 placement for Load predated the DISK strip and left Load
+    // ~12 px below Up, which was visible as a misaligned middle field.
+    Font::drawText(dest, formatLoadAverages(), ivec2(220, 44), dimColor);
 }
 
 static void renderDiskUsage(Screen &dest)
@@ -311,16 +306,14 @@ static void renderDiskUsage(Screen &dest)
     unsigned long long usedKb = (g_diskUsage.totalKb > g_diskUsage.freeKb)
                                     ? g_diskUsage.totalKb - g_diskUsage.freeKb
                                     : 0;
-    float pct = 100.0f * static_cast<float>(usedKb) / static_cast<float>(g_diskUsage.totalKb);
-    if (pct < 0.0f) pct = 0.0f;
-    if (pct > 100.0f) pct = 100.0f;
+    float pct = computeDiskUsedPct(g_diskUsage.totalKb, g_diskUsage.freeKb);
 
     vec3 color(0.55f, 0.55f, 0.55f);
     if (pct >= 80.0f) color = vec3(0.95f, 0.35f, 0.35f);
     else if (pct >= 60.0f) color = vec3(0.95f, 0.82f, 0.40f);
 
-    std::string text = "DISK " + formatGb(usedKb) + " / "
-                       + formatGb(g_diskUsage.totalKb) + " GB ("
+    std::string text = "DISK " + formatGbString(usedKb) + " / "
+                       + formatGbString(g_diskUsage.totalKb) + " GB ("
                        + formatPct(pct) + "%)";
     // Right side of the status row at y=44, mirroring the Up + Load
     // string on the left. x=560 leaves room for a long string ("DISK

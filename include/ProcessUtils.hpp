@@ -61,4 +61,15 @@ bool processNameMatchesFilter(const std::string &name,
 // known-unavailable state instead of "Up 0m".
 std::string formatUptimeString(unsigned long long seconds);
 
+// Format a kilobyte count as the integer GB component (e.g. 1048576 KB
+// yields "1"). Sub-GB values truncate to "0" rather than switching to
+// MB, because the surrounding string already says "GB".
+std::string formatGbString(unsigned long long kb);
+
+// Pure used-percentage math for the System tab disk readout. Returns
+// 0 when totalKb is 0 or when freeKb >= totalKb (bad OS data). Clamps
+// to [0, 100].
+float computeDiskUsedPct(unsigned long long totalKb,
+                         unsigned long long freeKb);
+
 #endif

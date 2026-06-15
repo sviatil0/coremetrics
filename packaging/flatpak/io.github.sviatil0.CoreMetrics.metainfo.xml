@@ -36,6 +36,21 @@
   </screenshots>
   <content_rating type="oars-1.1" />
   <releases>
+    <release version="0.2.4" date="2026-06-14">
+      <description>
+        <p>
+          Windows CI now gates merges (allow-failure flipped off) after
+          a full stabilization pass: SDL3_ROOT bypass for pkg-config
+          includes, -lpdh -lpsapi for the Windows backend, SDL3 DLL
+          copy next to bin/tests.exe, static C++ runtime, and the .exe
+          suffix invocation. README + API.md aligned with the v0.2.3
+          5-column Processes table and DISK status row. Load text on
+          the System status row aligned to the y=44 baseline that Up
+          and DISK already shared. Adds scripts/windows-arm64-smoke.ps1
+          for the manual Win11 ARM UTM live test.
+        </p>
+      </description>
+    </release>
     <release version="0.2.3" date="2026-06-13">
       <description>
         <p>
