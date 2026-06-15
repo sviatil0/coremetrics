@@ -22,6 +22,11 @@ static const mach_port_t MS_IO_DEFAULT_PORT = MACH_PORT_NULL;
 #include <sys/statvfs.h>
 #include <sys/time.h>
 #include <sys/types.h>
+#include <sys/socket.h>
+#include <net/if.h>
+#include <net/if_dl.h>
+#include <ifaddrs.h>
+#include <cstring>
 #include <unistd.h>
 #include <stdlib.h>
 #include <unordered_map>
@@ -153,6 +158,61 @@ unsigned long long SystemMetrics::readUptimeSeconds()
     auto now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
     long long diff = static_cast<long long>(now) - static_cast<long long>(bootTime.tv_sec);
     return diff > 0 ? static_cast<unsigned long long>(diff) : 0;
+}
+
+NetIo SystemMetrics::readNetIo()
+{
+    static uint64_t lastRx = 0;
+    static uint64_t lastTx = 0;
+    static uint64_t lastSampleNs = 0;
+
+    uint64_t curRx = 0;
+    uint64_t curTx = 0;
+    struct ifaddrs *ifa = nullptr;
+    if (getifaddrs(&ifa) != 0)
+    {
+        return NetIo{0, 0};
+    }
+    for (struct ifaddrs *p = ifa; p != nullptr; p = p->ifa_next)
+    {
+        if (p->ifa_addr == nullptr || p->ifa_addr->sa_family != AF_LINK)
+        {
+            continue;
+        }
+        // Skip loopback so localhost-only traffic does not inflate the
+        // visible rate.
+        if (p->ifa_name != nullptr && std::strcmp(p->ifa_name, "lo0") == 0)
+        {
+            continue;
+        }
+        struct if_data *d = reinterpret_cast<struct if_data *>(p->ifa_data);
+        if (d == nullptr) continue;
+        curRx += d->ifi_ibytes;
+        curTx += d->ifi_obytes;
+    }
+    freeifaddrs(ifa);
+
+    uint64_t nowNs = static_cast<uint64_t>(
+        std::chrono::duration_cast<std::chrono::nanoseconds>(
+            std::chrono::steady_clock::now().time_since_epoch()).count());
+    NetIo out{0, 0};
+    if (lastSampleNs != 0 && nowNs > lastSampleNs)
+    {
+        double elapsedSec = static_cast<double>(nowNs - lastSampleNs) / 1.0e9;
+        if (elapsedSec > 0.0)
+        {
+            uint64_t rxDelta = (curRx >= lastRx) ? curRx - lastRx : 0;
+            uint64_t txDelta = (curTx >= lastTx) ? curTx - lastTx : 0;
+            out.rxKbPerSec = static_cast<unsigned long long>(
+                (static_cast<double>(rxDelta) / 1024.0) / elapsedSec);
+            out.txKbPerSec = static_cast<unsigned long long>(
+                (static_cast<double>(txDelta) / 1024.0) / elapsedSec);
+        }
+    }
+    lastRx = curRx;
+    lastTx = curTx;
+    lastSampleNs = nowNs;
+    return out;
 }
 
 DiskUsage SystemMetrics::readDiskUsage()

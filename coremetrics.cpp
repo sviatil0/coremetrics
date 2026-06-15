@@ -5,6 +5,7 @@
 #include <fstream>
 #include <iostream>
 #include <memory>
+#include <sstream>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -43,19 +44,6 @@ constexpr float ALARM_THRESHOLD = 80.0f;
 static const std::string ALARM_SOUND_PATH = AssetPath::resolve("assets/click.wav");
 
 static const vec3 COLOR_ACCENT_GREEN(0.871f, 1.0f, 0.608f);
-static const vec3 COLOR_WHITE(1.0f, 1.0f, 1.0f);
-static const vec3 COLOR_FRAME(0.85f, 0.85f, 0.85f);
-
-static const vec3 COLOR_TAB_ACTIVE(0.10f, 0.10f, 0.10f);
-static const vec3 COLOR_MUTE_BTN(0.08f, 0.08f, 0.08f);
-static const vec3 COLOR_EXIT_BTN(0.18f, 0.05f, 0.05f);
-static const vec3 COLOR_TEXT_PRIMARY(1.0f, 1.0f, 1.0f);
-static const vec3 COLOR_TEXT_ACCENT(0.871f, 1.0f, 0.608f);
-static const vec3 COLOR_BAR_CPU_FILL(0.871f, 1.0f, 0.608f);
-static const vec3 COLOR_BAR_RAM_FILL(0.871f, 1.0f, 0.608f);
-static const vec3 COLOR_BAR_BG(0.12f, 0.12f, 0.12f);
-static const vec3 COLOR_ROW_TEXT(1.0f, 1.0f, 1.0f);
-static const vec3 COLOR_ROW_HEADER(0.871f, 1.0f, 0.608f);
 
 static Bar *g_cpuBar = nullptr;
 static Bar *g_ramBar = nullptr;
@@ -185,6 +173,8 @@ static DiskUsage g_diskUsage{0, 0};
 // scanning the per-process table.
 static unsigned long long g_aggregateDiskReadKbPerSec = 0;
 static unsigned long long g_aggregateDiskWriteKbPerSec = 0;
+// Aggregate network rx/tx sampled every poll. Loopback excluded.
+static NetIo g_netIo{0, 0};
 constexpr int MEMSEG_X0 = 84;
 constexpr int MEMSEG_X1 = 864;
 // Slim strip (164..172) so the breakdown reads as a continuation of
@@ -316,11 +306,6 @@ static void destroySparklines()
     g_gpuSparkline = nullptr;
 }
 
-static std::string formatUptime(unsigned long long secs)
-{
-    return formatUptimeString(secs);
-}
-
 static std::string formatLoadAverages()
 {
     if (g_loadAverages.size() < 3)
@@ -337,7 +322,7 @@ static void renderUptimeAndLoad(Screen &dest)
 {
     // Dim white for the labels, accent green so it reads as a status row.
     const vec3 dimColor(0.55f, 0.55f, 0.55f);
-    Font::drawText(dest, formatUptime(g_uptimeSeconds), ivec2(24, 44), dimColor);
+    Font::drawText(dest, formatUptimeString(g_uptimeSeconds), ivec2(24, 44), dimColor);
     // Uptime + Load + Disk all share the y=44 baseline so the status
     // row reads as a single line instead of a staircase. The earlier
     // y=56 placement for Load predated the DISK strip and left Load
@@ -357,6 +342,21 @@ static std::string formatRate(unsigned long long kbPerSec)
     return std::to_string(kbPerSec) + " KB/s";
 }
 
+static void renderNetIo(Screen &dest)
+{
+    if (g_netIo.rxKbPerSec == 0 && g_netIo.txKbPerSec == 0)
+    {
+        return;
+    }
+    const vec3 dim(0.55f, 0.55f, 0.55f);
+    std::string text = "NET R " + formatRate(g_netIo.rxKbPerSec)
+                       + "  T " + formatRate(g_netIo.txKbPerSec);
+    // Right-side counterpart to renderAggregateDiskIo at y=68, so the
+    // two read as one combined disk-and-net pressure strip rather than
+    // stacked rows.
+    Font::drawText(dest, text, ivec2(560, 68), dim);
+}
+
 static void renderAggregateDiskIo(Screen &dest)
 {
     // Sit just below the DISK strip on the status row at y=58. Same
@@ -370,7 +370,11 @@ static void renderAggregateDiskIo(Screen &dest)
     const vec3 dim(0.55f, 0.55f, 0.55f);
     std::string text = "I/O R " + formatRate(g_aggregateDiskReadKbPerSec)
                        + "  W " + formatRate(g_aggregateDiskWriteKbPerSec);
-    Font::drawText(dest, text, ivec2(560, 58), dim);
+    // Place the I/O strip just above the CPU bar (y=88) so it does
+    // not collide with the y=44 status row that already shows Up,
+    // Load, and DISK. y=68 leaves a 6 px gap from the y=44 baseline
+    // top + 16 px glyph height and a 14 px gap from the CPU bar top.
+    Font::drawText(dest, text, ivec2(24, 68), dim);
 }
 
 static void renderDiskUsage(Screen &dest)
@@ -613,6 +617,9 @@ static void pollMetrics()
     }
     g_aggregateDiskReadKbPerSec = aggReadKb;
     g_aggregateDiskWriteKbPerSec = aggWriteKb;
+    // Sample aggregate net I/O on the same cadence as the rest of the
+    // System tab data. First call returns zeros (no prior sample).
+    g_netIo = SystemMetrics::readNetIo();
     // Parallel array of indent depths produced when tree mode flattens
     // the parent/child graph; stays empty in flat mode. Same length as
     // procs after the sort+filter+truncate pass below.
@@ -905,6 +912,7 @@ int main(int argc, char **argv)
             renderUptimeAndLoad(shot);
             renderDiskUsage(shot);
             renderAggregateDiskIo(shot);
+            renderNetIo(shot);
             renderMemBreakdownStrip(shot);
             renderPerCoreStrip(shot);
             if (g_sparklinesEnabled)
@@ -1341,6 +1349,7 @@ int main(int argc, char **argv)
                 renderUptimeAndLoad(screen);
                 renderDiskUsage(screen);
                 renderAggregateDiskIo(screen);
+                renderNetIo(screen);
                 renderMemBreakdownStrip(screen);
                 renderPerCoreStrip(screen);
                 if (g_sparklinesEnabled)

@@ -218,9 +218,32 @@ void Screen::drawBox(const Tvec2<int> &a, const Tvec2<int> &b, const Tvec3<float
     int yMin = std::min(a.y, b.y);
     int yMax = std::max(a.y, b.y);
 
+    int numRows = yMax - yMin + 1;
+    int numCols = xMax - xMin + 1;
+    // Fast path: small boxes (1-row separators, thin borders, signal-
+    // menu cell strokes) cost more in thread-pool dispatch than in
+    // pixel fill. Skip the pool and run inline when the box area is
+    // smaller than a few hundred pixels. The cutoff is conservative;
+    // even 32 rows times 32 cols is still well under the wakeup +
+    // future::get round-trip cost on a cold thread.
+    // 4096-pixel threshold keeps per-core strip cells, mem-breakdown
+    // segments, and 5-column row cells on the inline path; ThreadPool
+    // dispatch round-trip dominates these small boxes. Per-row
+    // separator strokes (<= 4 rows) always skip the pool.
+    if (numRows <= 4 || numRows * numCols <= 4096)
+    {
+        for (int row = yMin; row <= yMax; ++row)
+        {
+            for (int col = xMin; col <= xMax; ++col)
+            {
+                drawPixel(ivec2(col, row), color);
+            }
+        }
+        return;
+    }
+
     ThreadPool& pool = ThreadPool::getInstance();
     int numThreads = static_cast<int>(pool.threadCount());
-    int numRows = yMax - yMin + 1;
     int rowsPerThread = std::max(1, numRows / numThreads);
 
     std::vector<std::future<void>> futures;

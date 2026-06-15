@@ -36,6 +36,32 @@
   </screenshots>
   <content_rating type="oars-1.1" />
   <releases>
+    <release version="0.2.9" date="2026-06-15">
+      <description>
+        <p>
+          Cleanup wave from two parallel review agents: 13 unused
+          COLOR_* constants and a one-liner formatUptime wrapper
+          dropped from coremetrics.cpp; explicit sstream include for
+          formatRate; Screen::drawBox area threshold bumped to 4096
+          pixels so per-core strip cells, mem-breakdown segments, and
+          5-column row cells stay on the inline path (ThreadPool
+          dispatch dominates small-box fills).
+        </p>
+      </description>
+    </release>
+    <release version="0.2.8" date="2026-06-15">
+      <description>
+        <p>
+          Network I/O backend (cross-platform readNetIo): getifaddrs on
+          mac, /proc/net/dev on linux, GetIfTable on windows; loopback
+          excluded. System tab gains an aggregate disk-I/O strip on the
+          left and an aggregate net-I/O strip on the right at y=68.
+          Screen::drawBox fast path for boxes &lt;= 1024 pixels (signal
+          menu borders, separators, small overlays) skips the
+          ThreadPool dispatch overhead.
+        </p>
+      </description>
+    </release>
     <release version="0.2.7" date="2026-06-15">
       <description>
         <p>
