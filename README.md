@@ -59,6 +59,9 @@ brew install coremetrics
 curl -L https://github.com/sviatil0/coremetrics/releases/latest/download/coremetrics_amd64.deb -o /tmp/coremetrics.deb
 sudo apt install /tmp/coremetrics.deb
 
+# Arch Linux (AUR)
+yay -S coremetrics-bin
+
 # Any platform (tarball, replace v0.2.15 with the latest release tag)
 curl -LO https://github.com/sviatil0/coremetrics/releases/download/v0.2.15/coremetrics-v0.2.15-macos-arm64.tar.gz
 tar xf coremetrics-v0.2.15-macos-arm64.tar.gz
