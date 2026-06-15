@@ -6,6 +6,13 @@ on:
   pull_request:
     branches: [main, dev]
 
+# Lock the workflow-wide GITHUB_TOKEN to read-only so a compromised
+# third-party action can't push commits, modify releases, or open
+# PRs from this job. The actionlint step only needs to read the
+# checked-out tree.
+permissions:
+  contents: read
+
 jobs:
   actionlint:
     runs-on: ubuntu-latest
@@ -14,6 +21,8 @@ jobs:
     # existing workflows. Fix those incrementally; for now don't gate PRs
     # on them so the lint feedback is advisory.
     continue-on-error: true
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - name: Run actionlint
