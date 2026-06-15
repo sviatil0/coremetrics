@@ -1,14 +1,14 @@
 # CoreMetrics: documentation map
 
-A guide to everything in this repo and the order to read it in. Start at the top and
-go as deep as you need.
+Four-layer architecture, three native metrics backends, 17 test suites: this page tells
+you which file to open for each, and in what order.
 
 ## 1. Start here
 
 | Read | What you get | Time |
 |---|---|---|
 | [README.md](README.md) | What CoreMetrics is, a screenshot, why it is interesting, install paths (Homebrew + apt + tarball), quickstart, architecture, and the live contribution badge. | 5 min |
-| [CONTRIBUTING.md](CONTRIBUTING.md) | Branch flow (`main ← dev ← feature`), Conventional Commits, PR conventions, sanitizers (`make asan` / `make ubsan`), and the test-wiring pattern. | 3 min |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Branch flow (`main <- dev <- feature`), Conventional Commits, PR conventions, sanitizers (`make asan` / `make ubsan`), and the test-wiring pattern. | 3 min |
 | [Final presentation (PDF)](docs/CoreMetrics-Final-Presentation.pdf) | The architecture, the cross-platform proof, and a demo, in slide form. | 5 min |
 | [API.md](API.md) | The full public API of the GUI library: every class and method, by category, with a table of contents. | reference |
 
