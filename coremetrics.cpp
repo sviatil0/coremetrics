@@ -30,6 +30,7 @@
 #include "AssetPath.hpp"
 #include "SignalUtils.hpp"
 #include "Exporter.hpp"
+#include "Settings.hpp"
 
 constexpr int RESX = 960;
 constexpr int RESY = 540;
@@ -913,6 +914,18 @@ int main(int argc, char **argv)
     // file and exit. Both run before SDL_Init so they need no display.
     std::string exportCsvPath;
     std::string exportJsonPath;
+
+    // Hydrate persisted preferences before argv parsing so any CLI
+    // flag the user supplies this run overrides the saved value.
+    // Settings::load is a no-op on a fresh install with no config file
+    // and leaves each global untouched on missing or malformed keys.
+    int loadedSortColumn = static_cast<int>(g_sortColumn);
+    Settings::load(g_pollIntervalMs,
+                   g_sparklinesEnabled,
+                   loadedSortColumn,
+                   g_sortAscending);
+    g_sortColumn = static_cast<SortColumn>(loadedSortColumn);
+
     for (int i = 1; i < argc; ++i)
     {
         if (std::string(argv[i]) == "--screenshot" && i + 1 < argc)
@@ -1630,5 +1643,13 @@ int main(int argc, char **argv)
     Font::shutdown();
     SDL_DestroyWindow(window);
     SDL_Quit();
+
+    // Clean exit only: persist the four runtime knobs so the next run
+    // remembers them. Failure is non-fatal; we just lose this snapshot.
+    Settings::save(g_pollIntervalMs,
+                   g_sparklinesEnabled,
+                   static_cast<int>(g_sortColumn),
+                   g_sortAscending);
+
     return 0;
 }
