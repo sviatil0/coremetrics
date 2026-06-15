@@ -1,5 +1,5 @@
 name: coremetrics
-version: "0.2.10"
+version: "0.2.11"
 summary: Cross-platform desktop system monitor (CPU / RAM / GPU / processes)
 description: |
   CoreMetrics is a small C++23 system monitor built directly on raw SDL3 pixel
