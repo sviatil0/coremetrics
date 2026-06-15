@@ -85,6 +85,14 @@ constexpr std::size_t SPARKLINE_CAPACITY = 64;
 static Sparkline *g_cpuSparkline = nullptr;
 static Sparkline *g_ramSparkline = nullptr;
 static Sparkline *g_gpuSparkline = nullptr;
+// Network throughput history: two polylines overlaid in the same rect
+// directly below the GPU strip. rx in accent green, tx in orange so a
+// reviewer can read incoming vs outgoing traffic at a glance without a
+// legend. y-range fixed at 0..2048 KB/s so the chart stays a stable
+// comparison surface across ticks (samples are clamped, not stretched).
+static Sparkline *g_netRxSparkline = nullptr;
+static Sparkline *g_netTxSparkline = nullptr;
+constexpr float NET_SPARKLINE_MAX_KBPS = 2048.0f;
 
 // Per-logical-CPU utilization for the small strip below the aggregate bars.
 // Refreshed every poll. Empty on Windows (backend not implemented yet) and
@@ -338,6 +346,17 @@ static void buildSparklines()
                                    0.0f, 100.0f, SPARKLINE_CAPACITY);
     g_gpuSparkline = new Sparkline(ivec2(24, 376), ivec2(864, 432), accent,
                                    0.0f, 100.0f, SPARKLINE_CAPACITY);
+    // NET strip sits in the gap between the GPU sparkline (ends at y=432)
+    // and the footer chrome (y=492). 40px tall instead of 56px so the
+    // label above (y=434) and the footer below both have breathing room.
+    // tx (orange) is constructed first so it renders behind the rx (green)
+    // line in the draw pass; incoming traffic reads as more important.
+    const vec3 netTx(0.95f, 0.65f, 0.30f);
+    const vec3 netRx(0.5f, 0.85f, 0.5f);
+    g_netTxSparkline = new Sparkline(ivec2(24, 444), ivec2(864, 484), netTx,
+                                     0.0f, NET_SPARKLINE_MAX_KBPS, SPARKLINE_CAPACITY);
+    g_netRxSparkline = new Sparkline(ivec2(24, 444), ivec2(864, 484), netRx,
+                                     0.0f, NET_SPARKLINE_MAX_KBPS, SPARKLINE_CAPACITY);
 }
 
 static void destroySparklines()
@@ -345,9 +364,13 @@ static void destroySparklines()
     delete g_cpuSparkline;
     delete g_ramSparkline;
     delete g_gpuSparkline;
+    delete g_netRxSparkline;
+    delete g_netTxSparkline;
     g_cpuSparkline = nullptr;
     g_ramSparkline = nullptr;
     g_gpuSparkline = nullptr;
+    g_netRxSparkline = nullptr;
+    g_netTxSparkline = nullptr;
 }
 
 static std::string formatLoadAverages()
@@ -603,6 +626,9 @@ static void renderSparklineLabels(Screen &dest)
     Font::drawText(dest, "CPU history", ivec2(24, 240), dim);
     Font::drawText(dest, "RAM history", ivec2(24, 298), dim);
     Font::drawText(dest, "GPU history", ivec2(24, 366), dim);
+    // NET history sits in the same column at the bottom of the sparkline
+    // stack, 10px above its strip (y=444..484) the way RAM/GPU labels do.
+    Font::drawText(dest, "NET history", ivec2(24, 434), dim);
 }
 
 static void pollMetrics()
@@ -724,6 +750,16 @@ static void pollMetrics()
     // Sample aggregate net I/O on the same cadence as the rest of the
     // System tab data. First call returns zeros (no prior sample).
     g_netIo = SystemMetrics::readNetIo();
+    // Feed the same sample into the rx/tx polylines so the NET history
+    // strip mirrors the live footer 'NET R/T' readout one tick later.
+    if (g_netRxSparkline != nullptr)
+    {
+        g_netRxSparkline->push(static_cast<float>(g_netIo.rxKbPerSec));
+    }
+    if (g_netTxSparkline != nullptr)
+    {
+        g_netTxSparkline->push(static_cast<float>(g_netIo.txKbPerSec));
+    }
     // Parallel array of indent depths produced when tree mode flattens
     // the parent/child graph; stays empty in flat mode. Same length as
     // procs after the sort+filter+truncate pass below.
@@ -1076,6 +1112,10 @@ int main(int argc, char **argv)
                 if (g_cpuSparkline != nullptr) g_cpuSparkline->draw(shot);
                 if (g_ramSparkline != nullptr) g_ramSparkline->draw(shot);
                 if (g_gpuSparkline != nullptr) g_gpuSparkline->draw(shot);
+                // tx (orange) first so the rx (green) line reads on top;
+                // incoming traffic is the headline number for most users.
+                if (g_netTxSparkline != nullptr) g_netTxSparkline->draw(shot);
+                if (g_netRxSparkline != nullptr) g_netRxSparkline->draw(shot);
                 renderSparklineLabels(shot);
             }
         }
@@ -1521,6 +1561,10 @@ int main(int argc, char **argv)
                     if (g_cpuSparkline != nullptr) g_cpuSparkline->draw(screen);
                     if (g_ramSparkline != nullptr) g_ramSparkline->draw(screen);
                     if (g_gpuSparkline != nullptr) g_gpuSparkline->draw(screen);
+                    // tx (orange) renders behind rx (green) so incoming
+                    // traffic stays the visually dominant line.
+                    if (g_netTxSparkline != nullptr) g_netTxSparkline->draw(screen);
+                    if (g_netRxSparkline != nullptr) g_netRxSparkline->draw(screen);
                     renderSparklineLabels(screen);
                 }
             }
