@@ -3,9 +3,12 @@
 #include <iomanip>
 #include <iostream>
 #include <random>
+#include <string>
 #include <vector>
 #include <SDL3/SDL.h>
 #include "Bar.hpp"
+#include "font.hpp"
+#include "Label.hpp"
 #include "screen.hpp"
 #include "Sparkline.hpp"
 
@@ -19,6 +22,16 @@
 // the Bar gradient/depth overlay from src/Bar.cpp. They report draws/sec
 // so a regression in the polish code shows up as a frame-budget cost
 // number rather than a vibe.
+//
+// The last three legs measure the text + pixel + label pipeline that the
+// new visual polish leans on. drawPixel is the rasterizer's per-cell rate
+// (clipping, color clamp, MapSurfaceRGBA, one 32-bit store) and acts as
+// the floor every higher-level draw rides on top of. drawText hits the
+// font.cpp text-surface cache: the warmup pre-fills the cache and the
+// timed loop measures the cached lookup + blit path (the actual
+// TTF_RenderText_Blended cost only happens once). Label::draw with bold
+// true exercises the fake-bold double-blit so any regression in the
+// percent-readout path shows up as a draws/sec drop here.
 
 namespace
 {
@@ -41,6 +54,35 @@ namespace
     constexpr int BAR_MAX_Y = 116;
     constexpr std::size_t BAR_DRAWS = 5000;
     constexpr std::size_t BAR_WARMUP = 100;
+
+    // drawPixel rate. PIXEL_COUNT scattered writes into the canvas, sized
+    // to keep the run inside ~1s on a release build while still pinning
+    // the loop above noise. A precomputed coord+color array means the
+    // timed section is pure rasterizer cost (clip + clamp + store), not
+    // RNG churn.
+    constexpr std::size_t PIXEL_COUNT = 5000000;
+    constexpr std::size_t PIXEL_WARMUP = 1000;
+
+    // drawText rate via Screen::drawText. The string is intentionally 30
+    // chars to mirror the longest readouts the app draws (e.g. process
+    // command tails); WARMUP just runs the same call once so the
+    // (text, color) entry lands in font.cpp's text-surface cache, then
+    // the timed loop measures the cached lookup + blit path.
+    constexpr char DRAW_TEXT_STRING[] = "CPU 100% RAM 100% GPU 100% OK!";
+    constexpr std::size_t DRAW_TEXT_DRAWS = 100000;
+    constexpr std::size_t DRAW_TEXT_WARMUP = 4;
+    constexpr int DRAW_TEXT_X = 16;
+    constexpr int DRAW_TEXT_Y = 16;
+
+    // Label::draw rate with bold true so the fake-bold double-blit path
+    // is the one being measured. Same caching story as drawText: the
+    // glyph surface is rendered once during warmup and every timed
+    // iteration is two cached blits + the Label dispatch overhead.
+    constexpr char LABEL_STRING[] = "CPU 100% RAM 100% GPU 100% OK!";
+    constexpr std::size_t LABEL_DRAWS = 100000;
+    constexpr std::size_t LABEL_WARMUP = 4;
+    constexpr int LABEL_X = 16;
+    constexpr int LABEL_Y = 40;
 
     struct LineResult
     {
@@ -177,6 +219,116 @@ namespace
         return r;
     }
 
+    // Single-pixel rasterizer rate. Coordinates are precomputed into a
+    // vector so the timed loop is pure Screen::drawPixel work: bounds
+    // check, color clamp, MapSurfaceRGBA, one 32-bit store. Color is held
+    // constant so the clamp can hoist; the only varying input is the
+    // pixel coordinate, which is what every higher-level draw ends up
+    // multiplying.
+    OpsResult benchDrawPixel()
+    {
+        Screen screen(CANVAS_W, CANVAS_H);
+
+        std::mt19937 rng(2024);
+        std::uniform_int_distribution<int> xDist(0, CANVAS_W - 1);
+        std::uniform_int_distribution<int> yDist(0, CANVAS_H - 1);
+
+        std::vector<ivec2> points;
+        points.reserve(PIXEL_COUNT);
+        for (std::size_t i = 0; i < PIXEL_COUNT; ++i)
+        {
+            points.emplace_back(xDist(rng), yDist(rng));
+        }
+        const vec3 color(0.85f, 0.85f, 0.95f);
+
+        for (std::size_t i = 0; i < PIXEL_WARMUP; ++i)
+        {
+            screen.drawPixel(points[i], color);
+        }
+        screen.clear();
+
+        auto t0 = std::chrono::steady_clock::now();
+        for (std::size_t i = 0; i < PIXEL_COUNT; ++i)
+        {
+            screen.drawPixel(points[i], color);
+        }
+        auto t1 = std::chrono::steady_clock::now();
+        double seconds = std::chrono::duration<double>(t1 - t0).count();
+
+        OpsResult r;
+        r.seconds = seconds;
+        r.opsPerSec = static_cast<double>(PIXEL_COUNT) / seconds;
+        return r;
+    }
+
+    // Screen::drawText rate on the cached path. font.cpp keys glyph
+    // surfaces on (text, RGB), so the first call renders + caches and
+    // every subsequent call with the same string + color is a hash
+    // lookup plus a blit. The warmup phase pre-populates that entry so
+    // the timed loop measures only the lookup + blit cost, which is the
+    // realistic per-frame number once the UI is settled.
+    OpsResult benchDrawText()
+    {
+        Screen screen(CANVAS_W, CANVAS_H);
+
+        const vec3 color(0.90f, 0.92f, 0.96f);
+        std::string text(DRAW_TEXT_STRING);
+        ivec2 pos(DRAW_TEXT_X, DRAW_TEXT_Y);
+
+        for (std::size_t i = 0; i < DRAW_TEXT_WARMUP; ++i)
+        {
+            screen.drawText(pos, color, text);
+        }
+        screen.clear();
+
+        auto t0 = std::chrono::steady_clock::now();
+        for (std::size_t i = 0; i < DRAW_TEXT_DRAWS; ++i)
+        {
+            screen.drawText(pos, color, text);
+        }
+        auto t1 = std::chrono::steady_clock::now();
+        double seconds = std::chrono::duration<double>(t1 - t0).count();
+
+        OpsResult r;
+        r.seconds = seconds;
+        r.opsPerSec = static_cast<double>(DRAW_TEXT_DRAWS) / seconds;
+        return r;
+    }
+
+    // Label::draw rate with bold true. Routes through Font::drawTextBold
+    // which blits the cached glyph surface twice (once at pos, once at
+    // pos + 1px on x) to fake a bold weight. Same warmup story so the
+    // timed loop hits the cache; what's being measured is the Label
+    // dispatch overhead plus the double-blit cost on top of one cache
+    // lookup per call.
+    OpsResult benchLabelDraw()
+    {
+        Screen screen(CANVAS_W, CANVAS_H);
+
+        Label label(LABEL_STRING, ivec2(LABEL_X, LABEL_Y),
+                    vec3(0.95f, 0.95f, 0.95f));
+        label.setBold(true);
+
+        for (std::size_t i = 0; i < LABEL_WARMUP; ++i)
+        {
+            label.draw(screen);
+        }
+        screen.clear();
+
+        auto t0 = std::chrono::steady_clock::now();
+        for (std::size_t i = 0; i < LABEL_DRAWS; ++i)
+        {
+            label.draw(screen);
+        }
+        auto t1 = std::chrono::steady_clock::now();
+        double seconds = std::chrono::duration<double>(t1 - t0).count();
+
+        OpsResult r;
+        r.seconds = seconds;
+        r.opsPerSec = static_cast<double>(LABEL_DRAWS) / seconds;
+        return r;
+    }
+
     void printLineRow(const char *label, const LineResult &r)
     {
         std::cout << "  "
@@ -222,6 +374,12 @@ int main()
     std::cout << "  Bar draws:        " << BAR_DRAWS
               << " (rect " << (BAR_MAX_X - BAR_MIN_X) << "x"
               << (BAR_MAX_Y - BAR_MIN_Y) << ")\n";
+    std::cout << "  drawPixel writes: " << PIXEL_COUNT
+              << " (warmup " << PIXEL_WARMUP << ")\n";
+    std::cout << "  drawText draws:   " << DRAW_TEXT_DRAWS
+              << " (string len " << (sizeof(DRAW_TEXT_STRING) - 1) << ")\n";
+    std::cout << "  Label draws:      " << LABEL_DRAWS
+              << " (bold, string len " << (sizeof(LABEL_STRING) - 1) << ")\n";
     std::cout << '\n';
 
     LineResult lineR = benchBresenham();
@@ -233,6 +391,16 @@ int main()
     OpsResult barR = benchBar();
     printOpsRow("Bar::draw (gradient + depth)", barR);
 
+    OpsResult pixelR = benchDrawPixel();
+    printOpsRow("Screen::drawPixel", pixelR);
+
+    OpsResult textR = benchDrawText();
+    printOpsRow("Screen::drawText (cached)", textR);
+
+    OpsResult labelR = benchLabelDraw();
+    printOpsRow("Label::draw (bold)", labelR);
+
+    Font::shutdown();
     SDL_Quit();
     return 0;
 }
