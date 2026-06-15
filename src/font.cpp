@@ -2,6 +2,8 @@
 #include "AssetPath.hpp"
 #include <SDL3_ttf/SDL_ttf.h>
 #include <iostream>
+#include <unordered_map>
+#include <string>
 
 constexpr const char *DEFAULT_FONT_PATH = "assets/font.ttf";
 // Roboto Regular at 18pt was perceptibly dim against the near-black UI
@@ -41,6 +43,13 @@ static TTF_Font *ensureFont()
     return g_font;
 }
 
+// Cache TTF render output keyed on (text, color). Same-string + same-color
+// requests are the common case for static chrome (CPU history, RAM history,
+// poll Xms, etc); each TTF_RenderText_Blended call is 50-200 microseconds,
+// so caching them turns the rendering of every static label into a hash
+// lookup plus a surface blit. Cleared by Font::shutdown().
+static std::unordered_map<std::string, SDL_Surface *> g_textSurfaceCache;
+
 void Font::drawText(Screen &screen, const std::string &text, ivec2 pos, vec3 color)
 {
     if (text.empty())
@@ -53,23 +62,51 @@ void Font::drawText(Screen &screen, const std::string &text, ivec2 pos, vec3 col
         return;
     }
 
-    SDL_Color sdlColor;
-    sdlColor.r = static_cast<Uint8>(color.x * 255.0f);
-    sdlColor.g = static_cast<Uint8>(color.y * 255.0f);
-    sdlColor.b = static_cast<Uint8>(color.z * 255.0f);
-    sdlColor.a = 255;
+    Uint8 r = static_cast<Uint8>(color.x * 255.0f);
+    Uint8 g = static_cast<Uint8>(color.y * 255.0f);
+    Uint8 b = static_cast<Uint8>(color.z * 255.0f);
+    // Cache key folds the text and 24-bit RGB into a single string so the
+    // hash lookup is cheap; alpha is always 255 for our usage.
+    std::string key;
+    key.reserve(text.size() + 4);
+    key.append(text);
+    key.push_back(static_cast<char>(r));
+    key.push_back(static_cast<char>(g));
+    key.push_back(static_cast<char>(b));
 
-    SDL_Surface *rendered = TTF_RenderText_Blended(font, text.c_str(), text.size(), sdlColor);
-    if (rendered == nullptr)
+    auto it = g_textSurfaceCache.find(key);
+    SDL_Surface *rendered = nullptr;
+    if (it != g_textSurfaceCache.end())
     {
-        return;
+        rendered = it->second;
+    }
+    else
+    {
+        SDL_Color sdlColor;
+        sdlColor.r = r;
+        sdlColor.g = g;
+        sdlColor.b = b;
+        sdlColor.a = 255;
+        rendered = TTF_RenderText_Blended(font, text.c_str(), text.size(), sdlColor);
+        if (rendered == nullptr)
+        {
+            return;
+        }
+        g_textSurfaceCache.emplace(std::move(key), rendered);
     }
     screen.blitSurface(rendered, pos);
-    SDL_DestroySurface(rendered);
 }
 
 void Font::shutdown()
 {
+    for (auto &kv : g_textSurfaceCache)
+    {
+        if (kv.second != nullptr)
+        {
+            SDL_DestroySurface(kv.second);
+        }
+    }
+    g_textSurfaceCache.clear();
     if (g_font != nullptr)
     {
         TTF_CloseFont(g_font);
