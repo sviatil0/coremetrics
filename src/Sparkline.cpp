@@ -22,6 +22,18 @@ void Sparkline::push(float value)
     {
         value = maxValue;
     }
+    // First sample fills the ring buffer with itself so the rendered
+    // polyline spans the full width from frame 1 instead of starting
+    // mid-strip and looking truncated.
+    if (samples.getSize() == 0)
+    {
+        std::size_t cap = samples.getCapacity();
+        for (std::size_t i = 0; i < cap; ++i)
+        {
+            samples.push(value);
+        }
+        return;
+    }
     samples.push(value);
 }
 

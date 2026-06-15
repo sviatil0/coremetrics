@@ -181,6 +181,60 @@ static void testComputeIoKbPerSecLargeDelta()
            computeIoKbPerSec(0, twoGib, 2.0) == 1024ULL * 1024ULL);
 }
 
+static void testClampPollIntervalMsValid()
+{
+    report("clampPollIntervalMs 500 passes through",
+           clampPollIntervalMs("500", 500) == 500);
+    report("clampPollIntervalMs 1500 passes through",
+           clampPollIntervalMs("1500", 500) == 1500);
+}
+
+static void testClampPollIntervalMsClampLow()
+{
+    report("clampPollIntervalMs 50 clamps to 100",
+           clampPollIntervalMs("50", 500) == 100);
+}
+
+static void testClampPollIntervalMsClampHigh()
+{
+    report("clampPollIntervalMs 99999999 clamps to 10000",
+           clampPollIntervalMs("99999999", 500) == 10000);
+}
+
+static void testClampPollIntervalMsInvalidInputs()
+{
+    // Negative input must NOT wrap to a huge unsigned and clamp to 10000;
+    // the agent flagged this as the main parse bug.
+    report("clampPollIntervalMs -1 falls back",
+           clampPollIntervalMs("-1", 500) == 500);
+    report("clampPollIntervalMs empty falls back",
+           clampPollIntervalMs("", 500) == 500);
+    report("clampPollIntervalMs null falls back",
+           clampPollIntervalMs(nullptr, 500) == 500);
+    report("clampPollIntervalMs garbage falls back",
+           clampPollIntervalMs("abc", 500) == 500);
+    report("clampPollIntervalMs zero falls back",
+           clampPollIntervalMs("0", 500) == 500);
+}
+
+static void testPointInRect()
+{
+    IVec2 minXY{820, 478};
+    IVec2 maxXY{944, 520};
+    report("pointInRect interior point is in",
+           pointInRect(IVec2{900, 500}, minXY, maxXY));
+    report("pointInRect top-left corner is in (inclusive)",
+           pointInRect(IVec2{820, 478}, minXY, maxXY));
+    report("pointInRect bottom-right corner is in (inclusive)",
+           pointInRect(IVec2{944, 520}, minXY, maxXY));
+    report("pointInRect one past right is out",
+           pointInRect(IVec2{945, 500}, minXY, maxXY) == false);
+    report("pointInRect one past bottom is out",
+           pointInRect(IVec2{900, 521}, minXY, maxXY) == false);
+    report("pointInRect one before left is out",
+           pointInRect(IVec2{819, 500}, minXY, maxXY) == false);
+}
+
 static void testFormatUptimeStringSubMinute()
 {
     // Pin the current behavior: any 1..59 seconds renders as 'Up 0m'.
@@ -378,6 +432,12 @@ void processUtilsTestSuite()
     testComputeIoKbPerSecLargeDelta();
     testFormatGbString();
     testComputeDiskUsedPct();
+    testClampPollIntervalMsValid();
+    testClampPollIntervalMsClampLow();
+    testClampPollIntervalMsClampHigh();
+    testClampPollIntervalMsInvalidInputs();
+    testPointInRect();
+
     testFormatUptimeStringSubMinute();
     testCompareUnknownColumnFallback();
 
