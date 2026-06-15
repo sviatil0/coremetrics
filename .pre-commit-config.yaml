@@ -1,0 +1,15 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-merge-conflict
+  - repo: local
+    hooks:
+      - id: no-em-dashes
+        name: Reject em-dashes in source and docs
+        entry: bash -c 'if grep -rl "—" --include="*.cpp" --include="*.hpp" --include="*.md" --include="*.yml" --exclude-dir=.git .; then echo "Em-dashes found above. Replace with -- or , or :"; exit 1; fi'
+        language: system
+        pass_filenames: false

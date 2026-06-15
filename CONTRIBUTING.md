@@ -59,6 +59,8 @@ main  <--- dev  <--- feat/<short-name>
 
 C++23, no new third-party dependencies beyond SDL3, SDL3_ttf, and SDL3_image. The existing style is Allman braces, header guards with `#ifndef __X_HPP__`, `camelCase` identifiers, named constants instead of magic numbers, no lambdas in the application code (lambdas inside `ThreadPool::submit` are the exception), and no em-dashes anywhere in code, docs, or commit messages.
 
+Optionally install pre-commit (`pip install pre-commit`) and run `pre-commit install` to get the project's style checks (no em-dashes, trailing whitespace, valid YAML) on every commit.
+
 ## Tests
 
 New code adds tests. Pattern for a new suite:
