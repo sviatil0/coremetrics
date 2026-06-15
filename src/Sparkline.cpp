@@ -1,4 +1,5 @@
 #include "Sparkline.hpp"
+#include "Thresholds.hpp"
 #include "font.hpp"
 #include <algorithm>
 
@@ -9,7 +10,8 @@ Sparkline::Sparkline(ivec2 minPos, ivec2 maxPos, vec3 color,
       color(color),
       minValue(minValue),
       maxValue(maxValue),
-      samples(capacity)
+      samples(capacity),
+      thresholdMode(false)
 {
 }
 
@@ -63,6 +65,16 @@ ivec2 Sparkline::getMaxPos() const
     return maxPos;
 }
 
+void Sparkline::setThresholdMode(bool enabled)
+{
+    thresholdMode = enabled;
+}
+
+bool Sparkline::getThresholdMode() const
+{
+    return thresholdMode;
+}
+
 void Sparkline::draw(Screen &screen) const
 {
     std::size_t n = samples.getSize();
@@ -111,7 +123,9 @@ void Sparkline::draw(Screen &screen) const
 
     // Dim fill color sits at 18% of the line color so the area under the
     // curve reads as a tinted region without overpowering the polyline or
-    // any UI sitting on top of the sparkline rect.
+    // any UI sitting on top of the sparkline rect. In threshold mode the
+    // fill is recomputed per segment from the segment's stroke color so
+    // tint and stroke stay in sync as the line passes 60% and 80%.
     vec3 fillColor(color.x * 0.18f, color.y * 0.18f, color.z * 0.18f);
 
     // 50% horizontal midline gives the polyline a reference plane so a
@@ -133,24 +147,51 @@ void Sparkline::draw(Screen &screen) const
         ivec2 b(plotX(i + 1, n), plotY(samples.at(i + 1)));
         ivec2 aBase(a.x, maxPos.y);
         ivec2 bBase(b.x, maxPos.y);
-        screen.drawTriangle(a, b, bBase, fillColor);
-        screen.drawTriangle(a, bBase, aBase, fillColor);
+        vec3 segFill = fillColor;
+        if (thresholdMode)
+        {
+            float peak = samples.at(i);
+            if (samples.at(i + 1) > peak)
+            {
+                peak = samples.at(i + 1);
+            }
+            float peakPct = peak / maxValue;
+            vec3 segStroke = Thresholds::colorForRatio(peakPct);
+            segFill = vec3(segStroke.x * 0.18f, segStroke.y * 0.18f, segStroke.z * 0.18f);
+        }
+        screen.drawTriangle(a, b, bBase, segFill);
+        screen.drawTriangle(a, bBase, aBase, segFill);
     }
 
     // Three parallel polylines (y-1, y, y+1) fake a 3px stroke without
     // pulling in a real wide-line rasterizer. The middle line is the
-    // exact data; the offsets are decorative thickness.
+    // exact data; the offsets are decorative thickness. In threshold mode
+    // each segment picks its color from Thresholds::colorForRatio using
+    // the segment's peak value, so the polyline shifts green -> yellow
+    // (>60%) -> red (>80%) the same way Bar fills and the per-core strip
+    // shift, giving the user one consistent pressure palette.
     for (std::size_t i = 0; i + 1 < n; ++i)
     {
         ivec2 a(plotX(i, n),     plotY(samples.at(i)));
         ivec2 b(plotX(i + 1, n), plotY(samples.at(i + 1)));
-        screen.drawLine(a, b, color);
+        vec3 segColor = color;
+        if (thresholdMode)
+        {
+            float peak = samples.at(i);
+            if (samples.at(i + 1) > peak)
+            {
+                peak = samples.at(i + 1);
+            }
+            float peakPct = peak / maxValue;
+            segColor = Thresholds::colorForRatio(peakPct);
+        }
+        screen.drawLine(a, b, segColor);
         ivec2 aUp(a.x, a.y - 1);
         ivec2 bUp(b.x, b.y - 1);
         ivec2 aDn(a.x, a.y + 1);
         ivec2 bDn(b.x, b.y + 1);
-        screen.drawLine(aUp, bUp, color);
-        screen.drawLine(aDn, bDn, color);
+        screen.drawLine(aUp, bUp, segColor);
+        screen.drawLine(aDn, bDn, segColor);
     }
 
     // Axis tick labels at the right edge anchor the rect to absolute
