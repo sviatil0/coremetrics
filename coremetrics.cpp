@@ -152,7 +152,11 @@ static void closeSignalMenu()
 }
 constexpr int PERCORE_Y0 = 218;
 constexpr int PERCORE_Y1 = 236;
-constexpr int PERCORE_X0 = 24;
+// Start the strip at x=84 so a 'cores' label fits at x=24, mirroring
+// the CPU / RAM / GPU labels above. The previous x=24 start used the
+// full row width but left the strip unlabeled, so a reviewer reading
+// fast saw three bars + an unexplained mosaic.
+constexpr int PERCORE_X0 = 84;
 constexpr int PERCORE_X1 = 936;
 constexpr int PERCORE_GAP = 4;
 
@@ -170,11 +174,13 @@ static std::vector<float> g_loadAverages;
 static DiskUsage g_diskUsage{0, 0};
 constexpr int MEMSEG_X0 = 84;
 constexpr int MEMSEG_X1 = 864;
-// Sit between RAM bar bottom (y=160) and GPU bar top (y=184). 14px tall
-// is enough to read the segment colors clearly without crowding the
-// neighbors.
+// Slim strip (164..172) so the breakdown reads as a continuation of
+// the RAM bar above, not a second RAM bar stacked beneath. The earlier
+// 14px height made the two bars feel like duplicate metrics; 8px keeps
+// the segment colors readable while letting the eye treat the strip
+// as a thin annotation rather than its own row.
 constexpr int MEMSEG_Y0 = 164;
-constexpr int MEMSEG_Y1 = 178;
+constexpr int MEMSEG_Y1 = 172;
 
 static ivec2 g_headerColMin[5];
 static ivec2 g_headerColMax[5];
@@ -361,6 +367,7 @@ static void renderMemBreakdownStrip(Screen &dest)
     {
         dest.drawBox(ivec2(x, MEMSEG_Y0), ivec2(MEMSEG_X1, MEMSEG_Y1), colFree);
     }
+
 }
 
 static void renderPerCoreStrip(Screen &dest)
@@ -369,6 +376,12 @@ static void renderPerCoreStrip(Screen &dest)
     {
         return;
     }
+    // Left-edge label matches the CPU / RAM / GPU column style. Text
+    // is rendered with its top-left anchor at (24, 218); the bundled
+    // 20px font puts the glyph bowl inside the 218..236 strip vertical
+    // band so the label aligns with the cell centers.
+    const vec3 labelColor(0.55f, 0.55f, 0.55f);
+    Font::drawText(dest, "cores", ivec2(24, 218), labelColor);
     const std::size_t cores = g_perCoreCpu.size();
     const int totalGap = PERCORE_GAP * static_cast<int>(cores - 1);
     const int slot = (PERCORE_X1 - PERCORE_X0 - totalGap) / static_cast<int>(cores);
