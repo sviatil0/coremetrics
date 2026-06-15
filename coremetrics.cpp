@@ -26,6 +26,7 @@
 #include "LayoutUtils.hpp"
 #include "ProcessUtils.hpp"
 #include "Sparkline.hpp"
+#include "Thresholds.hpp"
 #include "AssetPath.hpp"
 #include "SignalUtils.hpp"
 
@@ -424,8 +425,14 @@ static void renderDiskUsage(Screen &dest)
     float pct = computeDiskUsedPct(g_diskUsage.totalKb, g_diskUsage.freeKb);
 
     vec3 color(0.55f, 0.55f, 0.55f);
-    if (pct >= 80.0f) color = vec3(0.95f, 0.35f, 0.35f);
-    else if (pct >= 60.0f) color = vec3(0.95f, 0.82f, 0.40f);
+    if (pct >= Thresholds::RED_PCT)
+    {
+        color = Thresholds::colorRed();
+    }
+    else if (pct >= Thresholds::YELLOW_PCT)
+    {
+        color = Thresholds::colorYellow();
+    }
 
     std::string text = "DISK " + formatGbString(usedKb) + " / "
                        + formatGbString(g_diskUsage.totalKb) + " GB ("
@@ -501,9 +508,6 @@ static void renderPerCoreStrip(Screen &dest)
         return;
     }
     const vec3 bg(0.12f, 0.12f, 0.12f);
-    const vec3 fillLow(0.871f, 1.0f, 0.608f);   // accent green
-    const vec3 fillMid(0.95f, 0.82f, 0.40f);    // yellow at 60%+
-    const vec3 fillHigh(0.95f, 0.35f, 0.35f);   // red at 80%+
 
     for (std::size_t i = 0; i < cores; ++i)
     {
@@ -522,9 +526,7 @@ static void renderPerCoreStrip(Screen &dest)
         {
             continue;
         }
-        vec3 color = fillLow;
-        if (ratio > 0.8f) color = fillHigh;
-        else if (ratio > 0.6f) color = fillMid;
+        vec3 color = Thresholds::colorForRatio(ratio);
         dest.drawBox(ivec2(x0, PERCORE_Y0), ivec2(x0 + fillW, PERCORE_Y1), color);
     }
 }
@@ -574,40 +576,35 @@ static void pollMetrics()
     // readout palette: accent green idle, yellow at 60%+, red at 80%+.
     // Re-colors all three bars consistently so the System tab reads
     // 'pressure rising' across CPU / RAM / GPU at a glance.
-    auto loadColor = [](float pct) -> vec3 {
-        if (pct >= 80.0f) return vec3(0.95f, 0.35f, 0.35f);
-        if (pct >= 60.0f) return vec3(0.95f, 0.82f, 0.40f);
-        return vec3(0.871f, 1.0f, 0.608f);
-    };
     if (g_cpuBar != nullptr)
     {
         g_cpuBar->setValue(cpuPct);
-        g_cpuBar->setFillColor(loadColor(cpuPct));
+        g_cpuBar->setFillColor(Thresholds::colorForPct(cpuPct));
     }
     if (g_ramBar != nullptr)
     {
         g_ramBar->setValue(memPct);
-        g_ramBar->setFillColor(loadColor(memPct));
+        g_ramBar->setFillColor(Thresholds::colorForPct(memPct));
     }
     if (g_gpuBar != nullptr)
     {
         g_gpuBar->setValue(gpuPct);
-        g_gpuBar->setFillColor(loadColor(gpuPct));
+        g_gpuBar->setFillColor(Thresholds::colorForPct(gpuPct));
     }
     if (g_cpuReadout != nullptr)
     {
         g_cpuReadout->setText(formatPct(cpuPct) + "%");
-        g_cpuReadout->setColor(loadColor(cpuPct));
+        g_cpuReadout->setColor(Thresholds::colorForPct(cpuPct));
     }
     if (g_ramReadout != nullptr)
     {
         g_ramReadout->setText(formatPct(memPct) + "%");
-        g_ramReadout->setColor(loadColor(memPct));
+        g_ramReadout->setColor(Thresholds::colorForPct(memPct));
     }
     if (g_gpuReadout != nullptr)
     {
         g_gpuReadout->setText(formatPct(gpuPct) + "%");
-        g_gpuReadout->setColor(loadColor(gpuPct));
+        g_gpuReadout->setColor(Thresholds::colorForPct(gpuPct));
     }
 
     if (g_cpuSparkline != nullptr)

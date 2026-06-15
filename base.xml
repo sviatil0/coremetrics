@@ -162,7 +162,7 @@
         <label>
             <ivec2><x>148</x><y>492</y></ivec2>
             <vec3><x>0.5</x><y>0.5</y><z>0.5</z></vec3>
-            <text>v0.2.13</text>
+            <text>v0.2.14</text>
         </label>
         <label>
             <ivec2><x>240</x><y>492</y></ivec2>
