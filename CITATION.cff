@@ -1,0 +1,20 @@
+cff-version: 1.2.0
+title: CoreMetrics
+message: "If you use CoreMetrics in your research or coursework, please cite it as below."
+authors:
+  - family-names: Oleksiienko
+    given-names: Sviatoslav
+    email: soleksiienko1@gmail.com
+abstract: "Cross-platform desktop system metrics monitor (CPU, RAM, GPU, processes), built on a from-scratch C++23 GUI library over raw SDL3 surfaces. Three native metrics backends are selected at compile time."
+url: "https://github.com/sviatil0/coremetrics"
+repository-code: "https://github.com/sviatil0/coremetrics"
+license: LGPL-2.1-only
+version: 0.2.18
+date-released: 2026-06-15
+keywords:
+  - system-monitor
+  - cpp23
+  - sdl3
+  - cross-platform
+  - htop
+  - performance
