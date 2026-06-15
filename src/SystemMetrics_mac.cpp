@@ -447,6 +447,14 @@ std::vector<ProcessInfo> SystemMetrics::topProcesses(std::size_t n)
         return result;
     }
     int actualCount = actualBytes / static_cast<int>(sizeof(pid_t));
+    // Defensive clamp: proc_listpids should never report more bytes than
+    // the buffer it was given, but a race between the two calls (pid
+    // creation between sizing and reading) could theoretically push the
+    // count past the vector capacity. Clamping prevents an OOB index.
+    if (actualCount > static_cast<int>(pids.size()))
+    {
+        actualCount = static_cast<int>(pids.size());
+    }
 
     int mib[2] = {CTL_HW, HW_MEMSIZE};
     uint64_t memSize = 0;
@@ -511,16 +519,12 @@ std::vector<ProcessInfo> SystemMetrics::topProcesses(std::size_t n)
             auto prevIo = g_lastProcIo.find(pid);
             if (prevIo != g_lastProcIo.end())
             {
-                uint64_t readDelta = (io.readBytes >= prevIo->second.readBytes)
-                                         ? io.readBytes - prevIo->second.readBytes
-                                         : 0;
-                uint64_t writeDelta = (io.writeBytes >= prevIo->second.writeBytes)
-                                          ? io.writeBytes - prevIo->second.writeBytes
-                                          : 0;
-                readKbPerSec = static_cast<unsigned long long>(
-                    static_cast<double>(readDelta) / 1024.0 / ioElapsedSec);
-                writeKbPerSec = static_cast<unsigned long long>(
-                    static_cast<double>(writeDelta) / 1024.0 / ioElapsedSec);
+                readKbPerSec = computeIoKbPerSec(prevIo->second.readBytes,
+                                                 io.readBytes,
+                                                 ioElapsedSec);
+                writeKbPerSec = computeIoKbPerSec(prevIo->second.writeBytes,
+                                                  io.writeBytes,
+                                                  ioElapsedSec);
             }
         }
 

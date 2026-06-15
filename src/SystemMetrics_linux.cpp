@@ -529,16 +529,12 @@ std::vector<ProcessInfo> SystemMetrics::topProcesses(std::size_t n)
             auto prevIo = g_lastProcIo.find(pid);
             if (prevIo != g_lastProcIo.end())
             {
-                unsigned long long readDelta = (io.readBytes >= prevIo->second.readBytes)
-                                                   ? io.readBytes - prevIo->second.readBytes
-                                                   : 0;
-                unsigned long long writeDelta = (io.writeBytes >= prevIo->second.writeBytes)
-                                                    ? io.writeBytes - prevIo->second.writeBytes
-                                                    : 0;
-                readKbPerSec = static_cast<unsigned long long>(
-                    static_cast<double>(readDelta) / 1024.0 / ioElapsedSec);
-                writeKbPerSec = static_cast<unsigned long long>(
-                    static_cast<double>(writeDelta) / 1024.0 / ioElapsedSec);
+                readKbPerSec = computeIoKbPerSec(prevIo->second.readBytes,
+                                                 io.readBytes,
+                                                 ioElapsedSec);
+                writeKbPerSec = computeIoKbPerSec(prevIo->second.writeBytes,
+                                                  io.writeBytes,
+                                                  ioElapsedSec);
             }
         }
 
