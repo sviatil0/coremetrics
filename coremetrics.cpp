@@ -546,29 +546,44 @@ static void pollMetrics()
     float memPct = SystemMetrics::readMemPercent();
     float gpuPct = SystemMetrics::readGpuPercent();
 
+    // Threshold-based fill colors mirror the per-core strip + DISK
+    // readout palette: accent green idle, yellow at 60%+, red at 80%+.
+    // Re-colors all three bars consistently so the System tab reads
+    // 'pressure rising' across CPU / RAM / GPU at a glance.
+    auto loadColor = [](float pct) -> vec3 {
+        if (pct >= 80.0f) return vec3(0.95f, 0.35f, 0.35f);
+        if (pct >= 60.0f) return vec3(0.95f, 0.82f, 0.40f);
+        return vec3(0.871f, 1.0f, 0.608f);
+    };
     if (g_cpuBar != nullptr)
     {
         g_cpuBar->setValue(cpuPct);
+        g_cpuBar->setFillColor(loadColor(cpuPct));
     }
     if (g_ramBar != nullptr)
     {
         g_ramBar->setValue(memPct);
+        g_ramBar->setFillColor(loadColor(memPct));
     }
     if (g_gpuBar != nullptr)
     {
         g_gpuBar->setValue(gpuPct);
+        g_gpuBar->setFillColor(loadColor(gpuPct));
     }
     if (g_cpuReadout != nullptr)
     {
         g_cpuReadout->setText(formatPct(cpuPct) + "%");
+        g_cpuReadout->setColor(loadColor(cpuPct));
     }
     if (g_ramReadout != nullptr)
     {
         g_ramReadout->setText(formatPct(memPct) + "%");
+        g_ramReadout->setColor(loadColor(memPct));
     }
     if (g_gpuReadout != nullptr)
     {
         g_gpuReadout->setText(formatPct(gpuPct) + "%");
+        g_gpuReadout->setColor(loadColor(gpuPct));
     }
 
     if (g_cpuSparkline != nullptr)

@@ -23,6 +23,11 @@ void Bar::setValue(float v)
     }
 }
 
+void Bar::setFillColor(vec3 color)
+{
+    fillColor = color;
+}
+
 float Bar::getValue() const
 {
     return value;
