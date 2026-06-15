@@ -10,6 +10,7 @@
 #include <pdh.h>
 #include <pdhmsg.h>
 #include <iphlpapi.h>
+#include <netioapi.h>
 #include <map>
 #include <vector>
 
