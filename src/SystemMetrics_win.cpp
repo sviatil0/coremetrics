@@ -192,12 +192,118 @@ MemBreakdown SystemMetrics::readMemBreakdown()
 
 std::vector<float> SystemMetrics::readPerCoreCpu()
 {
-    // Windows per-core CPU is available via NtQuerySystemInformation +
-    // SystemProcessorPerformanceInformation but pulls in ntdll headers that
-    // are not always present in the toolchain we ship in CI. Returning an
-    // empty vector keeps the UI silent on Windows until that backend lands;
-    // the aggregate CPU bar and process table still work.
-    return std::vector<float>();
+    // PDH exposes a wildcard counter path that expands to one instance per
+    // logical core: "\Processor(*)\% Processor Time". The "_Total" instance
+    // is included by PDH and must be filtered out so the UI strip matches
+    // the mac (host_processor_info) and linux (/proc/stat cpuN) backends,
+    // which only emit physical core entries.
+    //
+    // PDH rate counters need two collects to compute a delta, so the first
+    // call after init returns empty. Subsequent calls return one float per
+    // core, clamped to [0, 100].
+    static PDH_HQUERY query = nullptr;
+    static PDH_HCOUNTER counter = nullptr;
+    static bool initialized = false;
+
+    if (!initialized)
+    {
+        if (PdhOpenQuery(NULL, 0, &query) != ERROR_SUCCESS)
+        {
+            query = nullptr;
+            return std::vector<float>();
+        }
+
+        if (PdhAddEnglishCounter(query,
+            "\\Processor(*)\\% Processor Time",
+            0,
+            &counter) != ERROR_SUCCESS)
+        {
+            // Mirror the GPU init: close the query before bailing so a
+            // failed AddCounter does not leak the open handle on every
+            // subsequent poll (audit-wave-5 finding).
+            PdhCloseQuery(query);
+            query = nullptr;
+            counter = nullptr;
+            return std::vector<float>();
+        }
+
+        // Prime the counter; rate counters need a prior sample to diff
+        // against. The next call is the first one that can yield data.
+        PdhCollectQueryData(query);
+
+        initialized = true;
+        return std::vector<float>();
+    }
+
+    if (PdhCollectQueryData(query) != ERROR_SUCCESS)
+    {
+        // Defensive reset: if a transient PDH error trips a collect (e.g.
+        // perf counter subsystem hiccup), tear the query down so the next
+        // call rebuilds it from scratch instead of polling a dead handle
+        // forever. Matches the audit-wave-5 expectation for PDH paths.
+        PdhCloseQuery(query);
+        query = nullptr;
+        counter = nullptr;
+        initialized = false;
+        return std::vector<float>();
+    }
+
+    DWORD bufferSize = 0;
+    DWORD itemCount = 0;
+
+    // Two-pass PDH read: first call asks for required sizes (returns
+    // PDH_MORE_DATA), second call fills the buffer. Guard against the
+    // "no data this round" case where bufferSize / itemCount are zero;
+    // allocating a zero-length vector and writing through .data() is UB.
+    PDH_STATUS probeStatus = PdhGetFormattedCounterArray(
+        counter,
+        PDH_FMT_DOUBLE,
+        &bufferSize,
+        &itemCount,
+        nullptr
+    );
+    if (probeStatus != PDH_MORE_DATA || bufferSize == 0 || itemCount == 0)
+    {
+        return std::vector<float>();
+    }
+
+    std::vector<BYTE> buffer(bufferSize);
+    auto items = reinterpret_cast<PDH_FMT_COUNTERVALUE_ITEM*>(buffer.data());
+
+    if (PdhGetFormattedCounterArray(
+            counter,
+            PDH_FMT_DOUBLE,
+            &bufferSize,
+            &itemCount,
+            items) != ERROR_SUCCESS)
+    {
+        return std::vector<float>();
+    }
+
+    std::vector<float> out;
+    out.reserve(itemCount);
+    for (DWORD i = 0; i < itemCount; ++i)
+    {
+        // PDH emits a synthetic "_Total" instance alongside per-core ones.
+        // Skip it so the strip count matches the logical-core count the
+        // other backends report.
+        const char *name = items[i].szName;
+        if (name != nullptr && std::string(name) == "_Total")
+        {
+            continue;
+        }
+        double v = items[i].FmtValue.doubleValue;
+        if (v < 0.0)
+        {
+            v = 0.0;
+        }
+        if (v > 100.0)
+        {
+            v = 100.0;
+        }
+        out.push_back(static_cast<float>(v));
+    }
+    return out;
 }
 
 float SystemMetrics::readGpuPercent()
