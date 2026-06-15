@@ -4,6 +4,12 @@
 #include "ProcessUtils.hpp"
 #include <algorithm>
 #define WIN32_LEAN_AND_MEAN
+// GetIfTable2 / MIB_IF_TABLE2 are exposed only when _WIN32_WINNT is at
+// least Vista (0x0600). Bump to Win7 (0x0601) so we get the newer
+// 64-bit-counter interface table before windows.h is pulled in.
+#ifndef _WIN32_WINNT
+#define _WIN32_WINNT 0x0601
+#endif
 #include <windows.h>
 #include <psapi.h>
 #include <tlhelp32.h>
