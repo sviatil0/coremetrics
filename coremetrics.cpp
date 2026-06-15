@@ -5,6 +5,7 @@
 #include <fstream>
 #include <iostream>
 #include <memory>
+#include <sstream>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -43,19 +44,6 @@ constexpr float ALARM_THRESHOLD = 80.0f;
 static const std::string ALARM_SOUND_PATH = AssetPath::resolve("assets/click.wav");
 
 static const vec3 COLOR_ACCENT_GREEN(0.871f, 1.0f, 0.608f);
-static const vec3 COLOR_WHITE(1.0f, 1.0f, 1.0f);
-static const vec3 COLOR_FRAME(0.85f, 0.85f, 0.85f);
-
-static const vec3 COLOR_TAB_ACTIVE(0.10f, 0.10f, 0.10f);
-static const vec3 COLOR_MUTE_BTN(0.08f, 0.08f, 0.08f);
-static const vec3 COLOR_EXIT_BTN(0.18f, 0.05f, 0.05f);
-static const vec3 COLOR_TEXT_PRIMARY(1.0f, 1.0f, 1.0f);
-static const vec3 COLOR_TEXT_ACCENT(0.871f, 1.0f, 0.608f);
-static const vec3 COLOR_BAR_CPU_FILL(0.871f, 1.0f, 0.608f);
-static const vec3 COLOR_BAR_RAM_FILL(0.871f, 1.0f, 0.608f);
-static const vec3 COLOR_BAR_BG(0.12f, 0.12f, 0.12f);
-static const vec3 COLOR_ROW_TEXT(1.0f, 1.0f, 1.0f);
-static const vec3 COLOR_ROW_HEADER(0.871f, 1.0f, 0.608f);
 
 static Bar *g_cpuBar = nullptr;
 static Bar *g_ramBar = nullptr;
@@ -318,11 +306,6 @@ static void destroySparklines()
     g_gpuSparkline = nullptr;
 }
 
-static std::string formatUptime(unsigned long long secs)
-{
-    return formatUptimeString(secs);
-}
-
 static std::string formatLoadAverages()
 {
     if (g_loadAverages.size() < 3)
@@ -339,7 +322,7 @@ static void renderUptimeAndLoad(Screen &dest)
 {
     // Dim white for the labels, accent green so it reads as a status row.
     const vec3 dimColor(0.55f, 0.55f, 0.55f);
-    Font::drawText(dest, formatUptime(g_uptimeSeconds), ivec2(24, 44), dimColor);
+    Font::drawText(dest, formatUptimeString(g_uptimeSeconds), ivec2(24, 44), dimColor);
     // Uptime + Load + Disk all share the y=44 baseline so the status
     // row reads as a single line instead of a staircase. The earlier
     // y=56 placement for Load predated the DISK strip and left Load
