@@ -23,6 +23,7 @@ public:
         float minVal = 0.0f, float maxVal = 100.0f, std::string metricName = "");
 
     void setValue(float value);
+    void setFillColor(vec3 color);
     float getValue() const;
     const std::string& getMetricName() const;
     ivec2 getMinPos() const;
