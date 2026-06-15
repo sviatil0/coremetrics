@@ -36,6 +36,17 @@
   </screenshots>
   <content_rating type="oars-1.1" />
   <releases>
+    <release version="0.2.5" date="2026-06-14">
+      <description>
+        <p>
+          System tab decluttered: memory breakdown strip slimmed so it
+          reads as a continuation of the RAM bar rather than a second
+          RAM bar stacked beneath it; per-core CPU strip gains a dim
+          'cores' label at the left edge in the same style as the
+          CPU / RAM / GPU rows.
+        </p>
+      </description>
+    </release>
     <release version="0.2.4" date="2026-06-14">
       <description>
         <p>
