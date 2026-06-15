@@ -97,29 +97,25 @@ NetIo SystemMetrics::readNetIo()
     static ULONGLONG lastTx = 0;
     static ULONGLONG lastTickMs = 0;
 
-    DWORD size = 0;
-    GetIfTable(nullptr, &size, FALSE);
-    if (size == 0)
-    {
-        return NetIo{0, 0};
-    }
-    std::vector<BYTE> buf(size);
-    PMIB_IFTABLE table = reinterpret_cast<PMIB_IFTABLE>(buf.data());
-    if (GetIfTable(table, &size, FALSE) != NO_ERROR)
+    // GetIfTable2 exposes 64-bit ULONG64 counters per interface, so we
+    // do not wrap every 34 seconds on a gigabit link the way the
+    // legacy DWORD-based MIB_IFROW/dwInOctets pair does.
+    PMIB_IF_TABLE2 table = nullptr;
+    if (GetIfTable2(&table) != NO_ERROR || table == nullptr)
     {
         return NetIo{0, 0};
     }
 
     ULONGLONG curRx = 0;
     ULONGLONG curTx = 0;
-    for (DWORD i = 0; i < table->dwNumEntries; ++i)
+    for (ULONG i = 0; i < table->NumEntries; ++i)
     {
-        const MIB_IFROW &row = table->table[i];
-        // Skip loopback (IF_TYPE_SOFTWARE_LOOPBACK == 24).
-        if (row.dwType == IF_TYPE_SOFTWARE_LOOPBACK) continue;
-        curRx += row.dwInOctets;
-        curTx += row.dwOutOctets;
+        const MIB_IF_ROW2 &row = table->Table[i];
+        if (row.Type == IF_TYPE_SOFTWARE_LOOPBACK) continue;
+        curRx += row.InOctets;
+        curTx += row.OutOctets;
     }
+    FreeMibTable(table);
 
     ULONGLONG nowMs = GetTickCount64();
     NetIo out{0, 0};
