@@ -50,16 +50,16 @@ static TTF_Font *ensureFont()
 // lookup plus a surface blit. Cleared by Font::shutdown().
 static std::unordered_map<std::string, SDL_Surface *> g_textSurfaceCache;
 
-void Font::drawText(Screen &screen, const std::string &text, ivec2 pos, vec3 color)
+// Resolve a cached TTF_RenderText_Blended surface for (text, color), rendering
+// and caching on miss. Returns nullptr if the font isn't ready or the render
+// fails. Shared by drawText and drawTextBold so the bold path reuses the
+// exact same glyph surface and just blits it twice.
+static SDL_Surface *getOrRenderSurface(const std::string &text, vec3 color)
 {
-    if (text.empty())
-    {
-        return;
-    }
     TTF_Font *font = ensureFont();
     if (font == nullptr)
     {
-        return;
+        return nullptr;
     }
 
     Uint8 r = static_cast<Uint8>(color.x * 255.0f);
@@ -75,26 +75,58 @@ void Font::drawText(Screen &screen, const std::string &text, ivec2 pos, vec3 col
     key.push_back(static_cast<char>(b));
 
     auto it = g_textSurfaceCache.find(key);
-    SDL_Surface *rendered = nullptr;
     if (it != g_textSurfaceCache.end())
     {
-        rendered = it->second;
+        return it->second;
     }
-    else
+
+    SDL_Color sdlColor;
+    sdlColor.r = r;
+    sdlColor.g = g;
+    sdlColor.b = b;
+    sdlColor.a = 255;
+    SDL_Surface *rendered = TTF_RenderText_Blended(font, text.c_str(), text.size(), sdlColor);
+    if (rendered == nullptr)
     {
-        SDL_Color sdlColor;
-        sdlColor.r = r;
-        sdlColor.g = g;
-        sdlColor.b = b;
-        sdlColor.a = 255;
-        rendered = TTF_RenderText_Blended(font, text.c_str(), text.size(), sdlColor);
-        if (rendered == nullptr)
-        {
-            return;
-        }
-        g_textSurfaceCache.emplace(std::move(key), rendered);
+        return nullptr;
+    }
+    g_textSurfaceCache.emplace(std::move(key), rendered);
+    return rendered;
+}
+
+void Font::drawText(Screen &screen, const std::string &text, ivec2 pos, vec3 color)
+{
+    if (text.empty())
+    {
+        return;
+    }
+    SDL_Surface *rendered = getOrRenderSurface(text, color);
+    if (rendered == nullptr)
+    {
+        return;
     }
     screen.blitSurface(rendered, pos);
+}
+
+void Font::drawTextBold(Screen &screen, const std::string &text, ivec2 pos, vec3 color)
+{
+    if (text.empty())
+    {
+        return;
+    }
+    // Fake bold by blitting the cached glyph surface twice, once at the
+    // requested position and once shifted by 1px on x. The extra column of
+    // opaque pixels thickens every vertical stem without needing a bold TTF.
+    // We avoid TTF_SetFontStyle(TTF_STYLE_BOLD) here because flipping the
+    // style mutates the shared TTF_Font handle and would also poison every
+    // cached regular-weight surface drawn after the call.
+    SDL_Surface *rendered = getOrRenderSurface(text, color);
+    if (rendered == nullptr)
+    {
+        return;
+    }
+    screen.blitSurface(rendered, pos);
+    screen.blitSurface(rendered, ivec2(pos.x + 1, pos.y));
 }
 
 void Font::shutdown()
