@@ -168,6 +168,69 @@ unsigned long long SystemMetrics::readUptimeSeconds()
     return secs > 0.0 ? static_cast<unsigned long long>(secs) : 0;
 }
 
+NetIo SystemMetrics::readNetIo()
+{
+    static unsigned long long lastRx = 0;
+    static unsigned long long lastTx = 0;
+    static std::chrono::steady_clock::time_point lastSampleTp;
+
+    std::ifstream file("/proc/net/dev");
+    if (!file.is_open())
+    {
+        return NetIo{0, 0};
+    }
+    std::string line;
+    // Skip the two header lines.
+    std::getline(file, line);
+    std::getline(file, line);
+
+    unsigned long long curRx = 0;
+    unsigned long long curTx = 0;
+    while (std::getline(file, line))
+    {
+        std::size_t colon = line.find(':');
+        if (colon == std::string::npos) continue;
+        std::string iface = line.substr(0, colon);
+        // strip leading whitespace
+        std::size_t s = iface.find_first_not_of(" \t");
+        if (s != std::string::npos) iface = iface.substr(s);
+        // Skip loopback so localhost traffic does not inflate the rate.
+        if (iface == "lo") continue;
+        std::istringstream iss(line.substr(colon + 1));
+        unsigned long long rxBytes = 0;
+        // Fields 1..8 are receive; we want field 1 (bytes).
+        iss >> rxBytes;
+        // Skip the next 7 receive fields.
+        unsigned long long tmp = 0;
+        for (int i = 0; i < 7; ++i) iss >> tmp;
+        // Field 9 is transmit bytes.
+        unsigned long long txBytes = 0;
+        iss >> txBytes;
+        curRx += rxBytes;
+        curTx += txBytes;
+    }
+
+    auto nowTp = std::chrono::steady_clock::now();
+    NetIo out{0, 0};
+    if (lastSampleTp.time_since_epoch().count() != 0)
+    {
+        double elapsedSec = std::chrono::duration<double>(nowTp - lastSampleTp).count();
+        if (elapsedSec > 0.0)
+        {
+            unsigned long long rxDelta = (curRx >= lastRx) ? curRx - lastRx : 0;
+            unsigned long long txDelta = (curTx >= lastTx) ? curTx - lastTx : 0;
+            out.rxKbPerSec = static_cast<unsigned long long>(
+                (static_cast<double>(rxDelta) / 1024.0) / elapsedSec);
+            out.txKbPerSec = static_cast<unsigned long long>(
+                (static_cast<double>(txDelta) / 1024.0) / elapsedSec);
+        }
+    }
+    lastRx = curRx;
+    lastTx = curTx;
+    lastSampleTp = nowTp;
+    return out;
+}
+
 DiskUsage SystemMetrics::readDiskUsage()
 {
     DiskUsage out{0, 0};

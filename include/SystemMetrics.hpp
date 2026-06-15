@@ -22,6 +22,16 @@ struct ProcessInfo
     unsigned long long diskWriteKbPerSec = 0;
 };
 
+// Aggregate network I/O throughput summed across every active
+// interface. Both fields are kilobytes per second sampled between
+// successive readNetIo() calls. Zero on the first call (no prior
+// sample to diff) and on platforms where the call fails.
+struct NetIo
+{
+    unsigned long long rxKbPerSec;
+    unsigned long long txKbPerSec;
+};
+
 // Disk usage for the root volume. totalKb is the total capacity; freeKb
 // is the user-visible free space (after reserved blocks). Zero on both
 // fields when the platform call fails so the UI can decide whether to
@@ -76,6 +86,12 @@ public:
     // Root volume capacity. Returns zeroed totals on platforms where the
     // call fails (in which case the UI hides the strip).
     static DiskUsage readDiskUsage();
+    // Aggregate network rx + tx rate in KB/sec since the previous call.
+    // First call returns zeros (no prior sample to diff). Backends sum
+    // every interface returned by the platform call; the loopback
+    // interface is excluded so localhost traffic does not inflate the
+    // visible rate.
+    static NetIo readNetIo();
     static std::vector<ProcessInfo> topProcesses(std::size_t n = 20);
 };
 

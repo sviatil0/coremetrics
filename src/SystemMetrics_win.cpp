@@ -9,6 +9,7 @@
 #include <tlhelp32.h>
 #include <pdh.h>
 #include <pdhmsg.h>
+#include <iphlpapi.h>
 #include <map>
 #include <vector>
 
@@ -88,6 +89,57 @@ std::vector<float> SystemMetrics::readLoadAverages()
     // PDH and emulate the 1/5/15 EMA the way procps does. Out of scope
     // for now; return zeros so the UI string just shows '--'.
     return std::vector<float>{0.0f, 0.0f, 0.0f};
+}
+
+NetIo SystemMetrics::readNetIo()
+{
+    static ULONGLONG lastRx = 0;
+    static ULONGLONG lastTx = 0;
+    static ULONGLONG lastTickMs = 0;
+
+    DWORD size = 0;
+    GetIfTable(nullptr, &size, FALSE);
+    if (size == 0)
+    {
+        return NetIo{0, 0};
+    }
+    std::vector<BYTE> buf(size);
+    PMIB_IFTABLE table = reinterpret_cast<PMIB_IFTABLE>(buf.data());
+    if (GetIfTable(table, &size, FALSE) != NO_ERROR)
+    {
+        return NetIo{0, 0};
+    }
+
+    ULONGLONG curRx = 0;
+    ULONGLONG curTx = 0;
+    for (DWORD i = 0; i < table->dwNumEntries; ++i)
+    {
+        const MIB_IFROW &row = table->table[i];
+        // Skip loopback (IF_TYPE_SOFTWARE_LOOPBACK == 24).
+        if (row.dwType == IF_TYPE_SOFTWARE_LOOPBACK) continue;
+        curRx += row.dwInOctets;
+        curTx += row.dwOutOctets;
+    }
+
+    ULONGLONG nowMs = GetTickCount64();
+    NetIo out{0, 0};
+    if (lastTickMs != 0 && nowMs > lastTickMs)
+    {
+        double elapsedSec = static_cast<double>(nowMs - lastTickMs) / 1000.0;
+        if (elapsedSec > 0.0)
+        {
+            ULONGLONG rxDelta = (curRx >= lastRx) ? curRx - lastRx : 0;
+            ULONGLONG txDelta = (curTx >= lastTx) ? curTx - lastTx : 0;
+            out.rxKbPerSec = static_cast<unsigned long long>(
+                (static_cast<double>(rxDelta) / 1024.0) / elapsedSec);
+            out.txKbPerSec = static_cast<unsigned long long>(
+                (static_cast<double>(txDelta) / 1024.0) / elapsedSec);
+        }
+    }
+    lastRx = curRx;
+    lastTx = curTx;
+    lastTickMs = nowMs;
+    return out;
 }
 
 DiskUsage SystemMetrics::readDiskUsage()
