@@ -14,7 +14,7 @@ coremetrics
   └─ libc / libc++
 ```
 
-Everything else — the rasterizer, the layout engine, the widget hierarchy, the events, the cross-platform metrics backends, the moonshot sparkline widget, the asset-path resolver — is in this repository, in plain C++23, with no third-party code generation.
+Everything else (the rasterizer, the layout engine, the widget hierarchy, the events, the cross-platform metrics backends, the moonshot sparkline widget, the asset-path resolver) is in this repository, in plain C++23, with no third-party code generation.
 
 Why this matters:
 
@@ -51,7 +51,7 @@ src/SystemMetrics_mac.cpp        Mach + IOKit + libproc   (macOS)
 src/SystemMetrics_win.cpp        PDH + Toolhelp           (Windows)
 ```
 
-There is no abstraction layer between them and the UI. `coremetrics.cpp` calls `SystemMetrics::readCpuPercent()` and gets a `float` — the call site does not care which backend is linked. The platform split is invisible above the header.
+There is no abstraction layer between them and the UI. `coremetrics.cpp` calls `SystemMetrics::readCpuPercent()` and gets a `float`; the call site does not care which backend is linked. The platform split is invisible above the header.
 
 That is rare. Most cross-platform system monitors either:
 
@@ -67,7 +67,7 @@ The Bresenham line rasterizer in `src/screen.cpp` is small, fast, and provably c
 What that buys:
 
 - **The moonshot sparkline widget is trivial to add.** A new `Sparkline` widget needed exactly two things: a `RingBuffer<float>` of recent samples and a loop that calls `Screen::drawLine` between adjacent samples. Total: 105 lines in `src/Sparkline.cpp`, 64 lines in `include/RingBuffer.hpp`. No new dependencies, no theme integration, no styling system; the chart inherits the application's color palette because the application owns the renderer.
-- **The same rasterizer powers everything.** Bars, the moonshot sparkline polylines, dividers under the tab bar and the Processes header, the green accent stripe in the footer — all of them are `drawBox` and `drawLine` calls. There is no separate "charts" layer that needs to be aligned with the "widgets" layer.
+- **The same rasterizer powers everything.** Bars, the moonshot sparkline polylines, dividers under the tab bar and the Processes header, the green accent stripe in the footer: all of them are `drawBox` and `drawLine` calls. There is no separate "charts" layer that needs to be aligned with the "widgets" layer.
 - **Performance is predictable.** When the Processes tab refreshes, the work is `O(rows × columns × glyph blits)`. There is no virtual DOM diff, no style cascade, no layout pass that walks an opaque object graph. The 500 ms poll loop is comfortably within budget on a single thread.
 
 ## What this unlocks at submission time

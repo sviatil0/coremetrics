@@ -95,8 +95,8 @@ Software framebuffer over a raw SDL3 surface; the from-scratch 2D rasterizer (pi
 - `void blitTo(SDL_Surface *target)`: blits this screen onto a target SDL surface (e.g. the window).
 - `void blitSurface(SDL_Surface *src, const Tvec2<int> &pos)`: blits a source surface onto this screen at `pos`.
 - `void drawPixel(const Tvec2<int> &pos, const Tvec3<float> &color)`: sets a single pixel.
-- `void drawLine(const Tvec2<int> &a, const Tvec2<int> &b, const Tvec3<float> &color)`: draws a line (float color, 0–1 channels).
-- `void drawLine(const Tvec2<int> &a, const Tvec2<int> &b, const Tvec3<int> &color)`: overload taking an integer (0–255) color.
+- `void drawLine(const Tvec2<int> &a, const Tvec2<int> &b, const Tvec3<float> &color)`: draws a line (float color, 0..1 channels).
+- `void drawLine(const Tvec2<int> &a, const Tvec2<int> &b, const Tvec3<int> &color)`: overload taking an integer (0..255) color.
 - `void drawBox(const Tvec2<int> &a, const Tvec2<int> &b, const Tvec3<float> &color)`: draws a box between two corners.
 - `void drawTriangle(const Tvec2<int> &v1, const Tvec2<int> &v2, const Tvec2<int> &v3, const Tvec3<float> &color)`: rasterizes a triangle.
 - `void drawText(const Tvec2<int> &pos, const Tvec3<float> &color, std::string text)` renders text via SDL_RenderDebugText (SDL3 built-in debug font). The bundled TTF is used by Font::drawText, which Label calls.

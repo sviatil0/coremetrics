@@ -6,7 +6,7 @@
 
 **Real-time cross-platform system monitor (CPU / RAM / GPU / processes), built on a from-scratch C++23 GUI library over raw SDL3 surfaces.**
 
-> Solo-led on a 4-person team (the contribution badge above is computed live by a CI job that runs `git blame -w -C -M` on every push to `main`): a from-scratch widget toolkit on raw SDL3 pixel surfaces plus three native metrics backends (`/proc`, mach + IOKit, PDH + Toolhelp) selected at compile time. 17 test suites, CI gated on Linux, macOS, and Windows.
+> A from-scratch widget toolkit on raw SDL3 pixel surfaces plus three native metrics backends (`/proc`, mach + IOKit, PDH + Toolhelp) selected at compile time. 17 test suites, CI gated on Linux, macOS, and Windows. Solo-led on a 4-person team; the contribution badge above is computed live by a CI job that runs `git blame -w -C -M` on every push to `main`.
 
 [![C++23](https://img.shields.io/badge/C%2B%2B-23-00599C?logo=cplusplus&logoColor=white)](https://en.cppreference.com/w/cpp/23)
 [![SDL3](https://img.shields.io/badge/SDL-3-1a1a1a)](https://www.libsdl.org/)
@@ -42,7 +42,7 @@ CoreMetrics is two things in one repo: a small **GUI toolkit written directly on
 - **Event-driven, no scene rebuilds.** Clicks trickle top-down through the layout tree; tab switches drain as paired show/hide events in a single pass; metrics mutate widgets in place every 500 ms.
 - **Modern C++ on purpose.** A `Cloneable<Derived>` CRTP mixin gives every widget a covariant `clone()` for free; ownership flows through `unique_ptr`; the layout tree is a generic `Tree<T>`.
 - **Parallel fills.** Wide `drawBox` / `drawTriangle` operations partition pixel rows across a `ThreadPool` and join on `std::future`s per frame (a teammate's work; see the contribution table).
-- **17 test suites** and a Linux + macOS GitHub Actions matrix, plus a non-blocking AddressSanitizer + UndefinedBehaviorSanitizer leg (`make asan`, `make ubsan`).
+- **17 test suites** and a Linux + macOS + Windows GitHub Actions matrix, plus a non-blocking AddressSanitizer + UndefinedBehaviorSanitizer leg (`make asan`, `make ubsan`).
 
 > This is a 4-person team project, and I was the lead and primary author. The "Stefan's code" badge at the top is computed by a CI job that runs `git blame -w -C -M` across `src/`, `include/`, `bench/`, and `coremetrics.cpp` on every push to `main`, so the percentage is always current and never hand-typed. See [Team and my contribution](#team-and-my-contribution) for the per-file breakdown, and `scripts/compute-contributions.sh` for the exact logic.
 
@@ -53,17 +53,16 @@ No build toolchain required.
 ```bash
 # macOS (Homebrew, Apple Silicon)
 brew tap sviatil0/coremetrics
-brew trust sviatil0/coremetrics   # one-time: Homebrew requires explicit trust for third-party taps
 brew install coremetrics
 
 # Debian / Ubuntu (installs from the local .deb; no apt repository is configured yet)
 curl -L https://github.com/sviatil0/coremetrics/releases/latest/download/coremetrics_amd64.deb -o /tmp/coremetrics.deb
 sudo apt install /tmp/coremetrics.deb
 
-# Any platform (tarball)
-curl -LO https://github.com/sviatil0/coremetrics/releases/latest/download/coremetrics-<version>-<platform>.tar.gz
-tar xf coremetrics-<version>-<platform>.tar.gz
-cd coremetrics-<version>-<platform>
+# Any platform (tarball, replace v0.2.15 with the latest release tag)
+curl -LO https://github.com/sviatil0/coremetrics/releases/download/v0.2.15/coremetrics-v0.2.15-macos-arm64.tar.gz
+tar xf coremetrics-v0.2.15-macos-arm64.tar.gz
+cd coremetrics-v0.2.15-macos-arm64
 ./coremetrics
 ```
 
@@ -128,9 +127,9 @@ The system is four layers. SDL3 hands us a window and a raw pixel surface; `Scre
 
 A reviewer with 5 minutes can hit the high points in this order:
 
-1. [`coremetrics.cpp`](coremetrics.cpp) — the 500 ms poll loop + render pass. Search for `pollMetrics` and `renderUptimeAndLoad` to see how data flows from `SystemMetrics` to widgets in a single pass.
-2. [`src/screen.cpp`](src/screen.cpp) — the rasterizer. `drawPixel`, Bresenham line, parallel `drawBox` / `drawTriangle` fills through `ThreadPool`.
-3. [`src/SystemMetrics_mac.cpp`](src/SystemMetrics_mac.cpp) (or `_linux.cpp` / `_win.cpp`) — one of the three native metrics backends. Same public surface, three independent implementations selected at compile time.
+1. [`coremetrics.cpp`](coremetrics.cpp): the 500 ms poll loop + render pass. Search for `pollMetrics` and `renderUptimeAndLoad` to see how data flows from `SystemMetrics` to widgets in a single pass.
+2. [`src/screen.cpp`](src/screen.cpp): the rasterizer. `drawPixel`, Bresenham line, parallel `drawBox` / `drawTriangle` fills through `ThreadPool`.
+3. [`src/SystemMetrics_mac.cpp`](src/SystemMetrics_mac.cpp) (or `_linux.cpp` / `_win.cpp`): one of the three native metrics backends. Same public surface, three independent implementations selected at compile time.
 
 ```mermaid
 flowchart TD
@@ -355,7 +354,7 @@ The math core is the most reused surface; the full per-class reference is folded
 
 A 4-person Notre Dame CSE 40232 software-engineering project (SP26 Team 04), three months, a PR-template + required-review workflow with per-developer branches. I was the lead and primary author: **81.6% of the source by line** (git-blame verified, recomputed on every push to `main`).
 
-_The block below is regenerated by [`scripts/compute-contributions.sh`](scripts/compute-contributions.sh) on every push to `main` via the `Contribution badge` workflow. Don't edit between the markers — your edit will be overwritten._
+_The block below is regenerated by [`scripts/compute-contributions.sh`](scripts/compute-contributions.sh) on every push to `main` via the `Contribution badge` workflow. Don't edit between the markers: your edit will be overwritten._
 
 ### Lines of code by author
 
@@ -400,7 +399,7 @@ Code review caught real bugs before merge (for example a strict-weak-ordering cr
 
 ## Contributing
 
-Coding standards (Allman braces, `#ifndef` guards, no lambdas, no exceptions, camelCase, no magic numbers) and the PR/review process are documented in the collapsible below; fill out [`PULL_REQUEST_TEMPLATE.md`](PULL_REQUEST_TEMPLATE.md) for every PR.
+Coding standards (Allman braces, `#ifndef` guards, no lambdas except inside `ThreadPool::submit`, no exceptions, camelCase, no magic numbers) and the PR/review process are documented in the collapsible below; fill out [`PULL_REQUEST_TEMPLATE.md`](PULL_REQUEST_TEMPLATE.md) for every PR.
 
 <details>
 <summary>Coding standards and team process</summary>
