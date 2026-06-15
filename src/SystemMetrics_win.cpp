@@ -500,16 +500,18 @@ std::vector<ProcessInfo> SystemMetrics::topProcesses(std::size_t n)
                     auto prevIo = g_lastProcIo.find(entry.th32ProcessID);
                     if (prevIo != g_lastProcIo.end())
                     {
-                        ULONGLONG readDelta = (io.readBytes >= prevIo->second.readBytes)
-                                                  ? io.readBytes - prevIo->second.readBytes
-                                                  : 0;
-                        ULONGLONG writeDelta = (io.writeBytes >= prevIo->second.writeBytes)
-                                                   ? io.writeBytes - prevIo->second.writeBytes
-                                                   : 0;
-                        info.diskReadKbPerSec = static_cast<unsigned long long>(
-                            static_cast<double>(readDelta) / 1024.0 / ioElapsedSec);
-                        info.diskWriteKbPerSec = static_cast<unsigned long long>(
-                            static_cast<double>(writeDelta) / 1024.0 / ioElapsedSec);
+                        // Route through the canonical helper so wrap/backward
+                        // clamps and the KB/sec math match the mac and linux
+                        // backends bit-for-bit and stay covered by the
+                        // ProcessUtils unit tests.
+                        info.diskReadKbPerSec = computeIoKbPerSec(
+                            static_cast<std::uint64_t>(prevIo->second.readBytes),
+                            static_cast<std::uint64_t>(io.readBytes),
+                            ioElapsedSec);
+                        info.diskWriteKbPerSec = computeIoKbPerSec(
+                            static_cast<std::uint64_t>(prevIo->second.writeBytes),
+                            static_cast<std::uint64_t>(io.writeBytes),
+                            ioElapsedSec);
                     }
                 }
             }
