@@ -1,0 +1,10 @@
+{
+  "name": "CoreMetrics",
+  "build": { "dockerfile": "Dockerfile" },
+  "customizations": {
+    "vscode": {
+      "extensions": ["ms-vscode.cpptools", "ms-vscode.makefile-tools"]
+    }
+  },
+  "postCreateCommand": "make bin/tests && ./bin/tests"
+}
