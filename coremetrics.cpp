@@ -202,6 +202,23 @@ static bool compareProcesses(const ProcessInfo &a, const ProcessInfo &b)
     return compareProcessByColumn(a, b, g_sortColumn, g_sortAscending);
 }
 
+// Repaint the Processes-tab header row so the active sort column carries
+// a trailing direction glyph (' ^' ascending, ' v' descending) and the
+// other four columns stay clean. Called on initial scene build and on
+// every header click so the indicator is sticky across polls, not only
+// visible immediately after the user clicked.
+static void updateHeaderSortGlyph()
+{
+    if (g_headerRow == nullptr)
+    {
+        return;
+    }
+    const char *arrow = g_sortAscending ? " ^" : " v";
+    std::vector<std::string> hdr = {"PID", "NAME", "CPU%", "MEM%", "DISK I/O"};
+    hdr[static_cast<int>(g_sortColumn)] += arrow;
+    g_headerRow->setCells(hdr);
+}
+
 static void buildScene()
 {
     LayoutManager &manager = LayoutManager::getInstance();
@@ -254,6 +271,10 @@ static void cacheElementPointers()
     if (!g_processRows.empty())
     {
         g_headerRow = g_processRows.front();
+        // Seed the header with the current sort glyph so the indicator is
+        // visible from the first frame, not only after the user clicks a
+        // header. Keeps the screenshot/headless renders honest too.
+        updateHeaderSortGlyph();
     }
 
     // Find the footer 'POLL_PLACEHOLDER' label so the displayed poll
@@ -1169,13 +1190,7 @@ int main(int argc, char **argv)
                                 g_sortColumn = clicked;
                                 g_sortAscending = false;
                             }
-                            if (g_headerRow != nullptr)
-                            {
-                                const char *arrow = g_sortAscending ? " ^" : " v";
-                                std::vector<std::string> hdr = {"PID", "NAME", "CPU%", "MEM%", "DISK I/O"};
-                                hdr[clicked] += arrow;
-                                g_headerRow->setCells(hdr);
-                            }
+                            updateHeaderSortGlyph();
                             headerHit = true;
                             break;
                         }
@@ -1402,6 +1417,20 @@ int main(int argc, char **argv)
         }
 
         screen.clear();
+        // Selected-row background. Painted BEFORE the layout render so the
+        // row's text (drawn by the Row widget during LayoutManager render)
+        // sits on top of the highlight box rather than under it. Renders
+        // only on the Processes tab and only when a selection exists.
+        if (processesTabActive() && g_selectedPid >= 0
+            && g_selectedRowIndex >= 0
+            && g_selectedRowIndex < PROCESSES_VISIBLE_ROWS)
+        {
+            int rowY = PROCESSES_FIRST_ROW_Y + g_selectedRowIndex * PROCESS_ROW_HEIGHT;
+            const vec3 selectionBg(0.18f, 0.18f, 0.18f);
+            screen.drawBox(ivec2(PROCESSES_ROW_X0, rowY),
+                           ivec2(PROCESSES_ROW_X1, rowY + PROCESS_ROW_HEIGHT),
+                           selectionBg);
+        }
         LayoutManager::getInstance().render(screen, ivec2(0, 0), ivec2(RESX - 1, RESY - 1));
         {
             // Per-core strip and sparklines only paint while the System tab
