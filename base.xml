@@ -138,13 +138,13 @@
     </layout>
 
         <button>
-            <ivec2><x>880</x><y>484</y></ivec2>
-            <ivec2><x>944</x><y>516</y></ivec2>
-            <vec3><x>0.18</x><y>0.05</y><z>0.05</z></vec3>
+            <ivec2><x>832</x><y>480</y></ivec2>
+            <ivec2><x>944</x><y>520</y></ivec2>
+            <vec3><x>0.16</x><y>0.16</y><z>0.16</z></vec3>
         </button>
         <label>
-            <ivec2><x>896</x><y>492</y></ivec2>
-            <vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3>
+            <ivec2><x>873</x><y>494</y></ivec2>
+            <vec3><x>0.95</x><y>0.55</y><z>0.55</z></vec3>
             <text>EXIT</text>
         </label>
 
