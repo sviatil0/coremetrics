@@ -42,11 +42,28 @@ namespace
     // and double any embedded double-quote. The aggregate / pid / rate
     // fields are numeric so they never go through this path; only the
     // process name field does.
+    //
+    // Defends against CSV formula injection (OWASP / CWE-1236): if the
+    // raw name begins with a character a spreadsheet would interpret as
+    // a formula trigger (`=`, `+`, `-`, `@`, tab, carriage return) the
+    // function emits a leading single quote inside the quoted field so
+    // Excel / Numbers / LibreOffice render the cell as literal text
+    // instead of evaluating it. A maliciously named process such as
+    // `=cmd|'/c calc'!A0` cannot pivot through a downstream CSV viewer.
     std::string csvQuote(const std::string &in)
     {
         std::string out;
-        out.reserve(in.size() + 2);
+        out.reserve(in.size() + 3);
         out.push_back('"');
+        if (!in.empty())
+        {
+            char first = in.front();
+            if (first == '=' || first == '+' || first == '-'
+                || first == '@' || first == '\t' || first == '\r')
+            {
+                out.push_back('\'');
+            }
+        }
         for (char c : in)
         {
             if (c == '"')
