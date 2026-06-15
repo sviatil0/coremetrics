@@ -18,6 +18,7 @@
 [![Homebrew tap](https://img.shields.io/badge/Homebrew-sviatil0%2Fcoremetrics-orange?logo=homebrew&logoColor=white)](https://github.com/sviatil0/homebrew-coremetrics)
 [![Debian .deb](https://img.shields.io/badge/Debian-.deb-A81D33?logo=debian&logoColor=white)](https://github.com/sviatil0/coremetrics/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/sviatil0/coremetrics/total?label=downloads)](https://github.com/sviatil0/coremetrics/releases)
+[![GitHub Sponsors](https://img.shields.io/github/sponsors/sviatil0?label=sponsor&logo=github)](https://github.com/sponsors/sviatil0)
 
 </div>
 
