@@ -6,9 +6,11 @@
 
 **Real-time cross-platform system monitor (CPU / RAM / GPU / processes), built on a from-scratch C++23 GUI library over raw SDL3 surfaces.**
 
+> Solo-led on a 4-person team (the contribution badge above is computed live by a CI job that runs `git blame -w -C -M` on every push to `main`): a from-scratch widget toolkit on raw SDL3 pixel surfaces plus three native metrics backends (`/proc`, mach + IOKit, PDH + Toolhelp) selected at compile time. 17 test suites, CI gated on Linux, macOS, and Windows.
+
 [![C++23](https://img.shields.io/badge/C%2B%2B-23-00599C?logo=cplusplus&logoColor=white)](https://en.cppreference.com/w/cpp/23)
 [![SDL3](https://img.shields.io/badge/SDL-3-1a1a1a)](https://www.libsdl.org/)
-[![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Linux-informational)](#architecture)
+[![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Linux%20%7C%20Windows-informational)](#architecture)
 [![License: LGPL-2.1](https://img.shields.io/badge/License-LGPL--2.1-blue.svg)](LICENSE)
 [![C/C++ CI](https://github.com/sviatil0/coremetrics/actions/workflows/c-cpp.yml/badge.svg?branch=main)](https://github.com/sviatil0/coremetrics/actions/workflows/c-cpp.yml)
 [![Stefan's code](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fsviatil0%2Fcoremetrics%2Fmain%2F.github%2Fbadges%2Fcontribution.json)](#team-and-my-contribution)
@@ -121,6 +123,14 @@ Optional GPU-stress tooling: `glmark2` or `stress-ng --gpu` on Linux; on macOS t
 ## Architecture
 
 The system is four layers. SDL3 hands us a window and a raw pixel surface; `Screen` turns that surface into drawing primitives; the `GUIElement` / `Layout` tree composes those primitives into a UI; and `EventManager` routes input back down the tree.
+
+### Where to start reading
+
+A reviewer with 5 minutes can hit the high points in this order:
+
+1. [`coremetrics.cpp`](coremetrics.cpp) — the 500 ms poll loop + render pass. Search for `pollMetrics` and `renderUptimeAndLoad` to see how data flows from `SystemMetrics` to widgets in a single pass.
+2. [`src/screen.cpp`](src/screen.cpp) — the rasterizer. `drawPixel`, Bresenham line, parallel `drawBox` / `drawTriangle` fills through `ThreadPool`.
+3. [`src/SystemMetrics_mac.cpp`](src/SystemMetrics_mac.cpp) (or `_linux.cpp` / `_win.cpp`) — one of the three native metrics backends. Same public surface, three independent implementations selected at compile time.
 
 ```mermaid
 flowchart TD
