@@ -1,4 +1,5 @@
 #include "Sparkline.hpp"
+#include "font.hpp"
 #include <algorithm>
 
 Sparkline::Sparkline(ivec2 minPos, ivec2 maxPos, vec3 color,
@@ -113,6 +114,16 @@ void Sparkline::draw(Screen &screen) const
     // any UI sitting on top of the sparkline rect.
     vec3 fillColor(color.x * 0.18f, color.y * 0.18f, color.z * 0.18f);
 
+    // 50% horizontal midline gives the polyline a reference plane so a
+    // reviewer can tell a peak at 100% apart from one at 30% without
+    // squinting at the rect bounds. Drawn under the fill so the data
+    // overlays it cleanly.
+    int midY = (minPos.y + maxPos.y) / 2;
+    vec3 midlineColor(0.18f, 0.18f, 0.18f);
+    ivec2 midA(minPos.x, midY);
+    ivec2 midB(maxPos.x, midY);
+    screen.drawLine(midA, midB, midlineColor);
+
     // Two-pass render: first the fill region (triangles down to the
     // baseline), then the stroke. Doing fill first means the stroke
     // overdraws the fill's top edge so the line stays crisp.
@@ -141,4 +152,14 @@ void Sparkline::draw(Screen &screen) const
         screen.drawLine(aUp, bUp, color);
         screen.drawLine(aDn, bDn, color);
     }
+
+    // Axis tick labels at the right edge anchor the rect to absolute
+    // values (0..100). Typical sparkline rects are (24,*)..(864,*) inside
+    // a 960px window, leaving ~96px of room past maxPos.x, so the labels
+    // fit comfortably outside the data area.
+    vec3 labelColor(0.30f, 0.30f, 0.30f);
+    ivec2 hiPos(maxPos.x + 4, minPos.y - 6);
+    ivec2 loPos(maxPos.x + 4, maxPos.y - 14);
+    Font::drawText(screen, "100", hiPos, labelColor);
+    Font::drawText(screen, "0", loPos, labelColor);
 }
