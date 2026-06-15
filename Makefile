@@ -41,7 +41,7 @@ OBJECTS = $(SOURCES:$(SRCDIR)/%.cpp=$(OBJDIR)/%.o)
 TEST_OBJECTS = $(TEST_SOURCES:$(TESTDIR)/%.cpp=$(OBJDIR)/%.o)
 BENCH_OBJECTS = $(BENCH_SOURCES:$(BENCHDIR)/%.cpp=$(OBJDIR)/%.o)
 
-.PHONY: all demo test bench coremetrics directories clean asan ubsan install-man
+.PHONY: all demo test bench coremetrics directories clean asan ubsan coverage install-man
 
 # Rebuild the test suite under AddressSanitizer or UndefinedBehaviorSanitizer.
 # These re-invoke `make test` with extra flags appended via EXTRA_CXXFLAGS /
@@ -60,6 +60,24 @@ asan:
 ubsan:
 	$(MAKE) clean
 	$(MAKE) test EXTRA_CXXFLAGS="$(UBSAN_FLAGS)" EXTRA_LDFLAGS="$(UBSAN_FLAGS)"
+
+# Rebuild bin/tests with gcov instrumentation (--coverage implies -fprofile-arcs
+# -ftest-coverage on the compile side and links libgcov on the link side),
+# run the test suite to produce .gcda files alongside the .gcno files in
+# obj/, then capture them into coverage.lcov. --no-external trims out
+# system headers so the report only covers this repo. lcov is optional
+# locally: if it isn't installed we still emit instrumented coverage data
+# in obj/ and exit 0, leaving the lcov capture to CI where lcov is present.
+COVERAGE_FLAGS = --coverage -O0 -g
+
+coverage:
+	$(MAKE) clean
+	$(MAKE) test EXTRA_CXXFLAGS="$(COVERAGE_FLAGS)" EXTRA_LDFLAGS="$(COVERAGE_FLAGS)"
+	@if command -v lcov >/dev/null 2>&1; then \
+		lcov --capture --directory $(OBJDIR) --output-file coverage.lcov --no-external; \
+	else \
+		echo "lcov not installed; skipping report capture (install with 'brew install lcov' or 'apt-get install lcov')"; \
+	fi
 
 all: coremetrics
 
