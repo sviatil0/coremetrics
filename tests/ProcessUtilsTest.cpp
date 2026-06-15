@@ -1,5 +1,7 @@
 #include <cmath>
 #include <iostream>
+#include <limits>
+#include <string>
 #include "ProcessUtilsTest.hpp"
 #include "ProcessUtils.hpp"
 
@@ -400,6 +402,151 @@ static void testFormatUptimeStringExactlyOneMinute()
            formatUptimeString(60) == "Up 1m");
 }
 
+static void testFormatPctNegative()
+{
+    // Negative percentages can show up briefly when a delta is computed
+    // against a stale baseline; the formatter must not crash and must
+    // preserve the minus sign + one decimal.
+    report("formatPct -5.25 yields '-5.2' or '-5.3'",
+           formatPct(-5.25f) == "-5.2" || formatPct(-5.25f) == "-5.3");
+    report("formatPct -0.0 yields '-0.0' or '0.0'",
+           formatPct(-0.0f) == "-0.0" || formatPct(-0.0f) == "0.0");
+    report("formatPct -100 yields '-100.0'",
+           formatPct(-100.0f) == "-100.0");
+}
+
+static void testFormatPctNonFinite()
+{
+    // libc renders NaN as "nan" and Inf as "inf" (sign preserved). We do
+    // not pin the exact spelling because Windows MSVC emits "nan(ind)"
+    // and old glibc emits "-nan"; the contract is: do not crash and the
+    // result contains either 'n'/'N' for NaN or 'i'/'I' for Inf.
+    std::string nanStr = formatPct(std::nanf(""));
+    bool nanOk = !nanStr.empty()
+              && (nanStr.find('n') != std::string::npos
+                  || nanStr.find('N') != std::string::npos);
+    report("formatPct(NaN) produces a NaN-like token", nanOk);
+
+    std::string infStr = formatPct(std::numeric_limits<float>::infinity());
+    bool infOk = !infStr.empty()
+              && (infStr.find('i') != std::string::npos
+                  || infStr.find('I') != std::string::npos);
+    report("formatPct(+Inf) produces an Inf-like token", infOk);
+
+    std::string negInfStr = formatPct(-std::numeric_limits<float>::infinity());
+    bool negInfOk = !negInfStr.empty()
+                 && negInfStr[0] == '-'
+                 && (negInfStr.find('i') != std::string::npos
+                     || negInfStr.find('I') != std::string::npos);
+    report("formatPct(-Inf) keeps the minus sign", negInfOk);
+}
+
+static void testCompareByDiskAscendingTie()
+{
+    // Equal disk totals must yield `false` for both orderings (strict-weak
+    // order requirement of std::sort: !(a<b) && !(b<a) -> equivalent).
+    ProcessInfo first = makeIo(1, 100, 200);
+    ProcessInfo second = makeIo(2, 200, 100);
+    report("compareProcessByColumn DISK asc tie returns false",
+           compareProcessByColumn(first, second, SORT_DISK, true) == false);
+    report("compareProcessByColumn DISK asc tie returns false (swapped)",
+           compareProcessByColumn(second, first, SORT_DISK, true) == false);
+    report("compareProcessByColumn DISK desc tie returns false",
+           compareProcessByColumn(first, second, SORT_DISK, false) == false);
+}
+
+static void testCompareByDiskAscendingOrders()
+{
+    // Mirror of testCompareByDisk but exercising the ascending branch
+    // explicitly with non-tied totals.
+    ProcessInfo quiet = makeIo(1, 0, 100);
+    ProcessInfo loud = makeIo(2, 5000, 5000);
+    report("compareProcessByColumn DISK asc puts smaller total first",
+           compareProcessByColumn(quiet, loud, SORT_DISK, true));
+    report("compareProcessByColumn DISK asc rejects larger first",
+           compareProcessByColumn(loud, quiet, SORT_DISK, true) == false);
+}
+
+static void testProcessNameMatchesFilterUnicodeBytes()
+{
+    // The matcher does a byte-wise lower + substring search. UTF-8 bytes
+    // above 0x7F are passed through untouched, so identical UTF-8 names
+    // still match, and an ASCII substring of a UTF-8 name still matches.
+    report("filter matches identical UTF-8 name (cafe with accent)",
+           processNameMatchesFilter("caf\xc3\xa9", "caf\xc3\xa9") == true);
+    report("filter matches ASCII substring inside UTF-8 name",
+           processNameMatchesFilter("caf\xc3\xa9-server", "server") == true);
+    report("filter is case-insensitive on ASCII prefix of UTF-8 name",
+           processNameMatchesFilter("Caf\xc3\xa9-Server", "caf") == true);
+}
+
+static void testProcessNameMatchesFilterBothEmpty()
+{
+    // Already covered indirectly, but pin it explicitly: two empties are
+    // a match (empty needle is "match anything", including empty name).
+    report("filter both empty is a match",
+           processNameMatchesFilter("", "") == true);
+}
+
+static void testProcessNameMatchesFilterNeedleLongerThanName()
+{
+    // Non-empty name shorter than the needle never matches; this guards
+    // against any accidental find()-on-reversed-args refactor.
+    report("filter needle longer than name does not match",
+           processNameMatchesFilter("ab", "abcdef") == false);
+}
+
+static void testProcessNameMatchesFilterUnicodeNoMatch()
+{
+    // Two distinct UTF-8 names share no ASCII or byte overlap: the matcher
+    // must say "no match" rather than coincidentally hit on shared
+    // continuation bytes.
+    report("filter UTF-8 name vs unrelated UTF-8 needle does not match",
+           processNameMatchesFilter("\xe4\xb8\xad\xe6\x96\x87", "caf\xc3\xa9") == false);
+    report("filter empty needle against UTF-8 name still matches",
+           processNameMatchesFilter("\xe4\xb8\xad\xe6\x96\x87", "") == true);
+}
+
+static void testComputeIoKbPerSecWrapByOne()
+{
+    // Cumulative counter rolled back by 1 (very common on Windows when a
+    // PID is reused). Underflow would produce ~uint64 max -> huge KB/s.
+    report("computeIoKbPerSec curr=prev-1 returns 0",
+           computeIoKbPerSec(1000, 999, 1.0) == 0);
+}
+
+static void testComputeIoKbPerSecWrapFromMaxUint()
+{
+    // Extreme wrap: previous was near uint64 max, current is 0.
+    // computeIoKbPerSec must return 0 rather than a colossal delta.
+    std::uint64_t nearMax = std::numeric_limits<std::uint64_t>::max() - 1ULL;
+    report("computeIoKbPerSec wrap from near-max to 0 returns 0",
+           computeIoKbPerSec(nearMax, 0, 1.0) == 0);
+}
+
+static void testClampPollIntervalMsExactLowerBoundary()
+{
+    // 100 is the minimum allowed value (inclusive). Off-by-one here would
+    // surface as a UX bug where the documented minimum gets bumped.
+    report("clampPollIntervalMs exactly 100 passes through",
+           clampPollIntervalMs("100", 500) == 100);
+    report("clampPollIntervalMs 99 clamps up to 100",
+           clampPollIntervalMs("99", 500) == 100);
+    report("clampPollIntervalMs 101 passes through",
+           clampPollIntervalMs("101", 500) == 101);
+}
+
+static void testClampPollIntervalMsExactUpperBoundary()
+{
+    // 10000 is the maximum allowed value (inclusive).
+    report("clampPollIntervalMs exactly 10000 passes through",
+           clampPollIntervalMs("10000", 500) == 10000);
+    report("clampPollIntervalMs 9999 passes through",
+           clampPollIntervalMs("9999", 500) == 9999);
+    report("clampPollIntervalMs 10001 clamps down to 10000",
+           clampPollIntervalMs("10001", 500) == 10000);
+}
+
 void processUtilsTestSuite()
 {
     std::cout << "=============================================" << '\n';
@@ -458,6 +605,19 @@ void processUtilsTestSuite()
     testFormatUptimeStringDaysHoursMinutes();
     testFormatUptimeStringExactlyOneHour();
     testFormatUptimeStringExactlyOneMinute();
+
+    testFormatPctNegative();
+    testFormatPctNonFinite();
+    testCompareByDiskAscendingTie();
+    testCompareByDiskAscendingOrders();
+    testProcessNameMatchesFilterUnicodeBytes();
+    testProcessNameMatchesFilterUnicodeNoMatch();
+    testProcessNameMatchesFilterBothEmpty();
+    testProcessNameMatchesFilterNeedleLongerThanName();
+    testComputeIoKbPerSecWrapByOne();
+    testComputeIoKbPerSecWrapFromMaxUint();
+    testClampPollIntervalMsExactLowerBoundary();
+    testClampPollIntervalMsExactUpperBoundary();
 
     std::cout << '\n';
     std::cout << "  Failures: " << g_failures << '\n';
