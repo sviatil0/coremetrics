@@ -18,7 +18,7 @@
 #include "SignalUtilsTest.hpp"
 #include "CloneableTest.hpp"
 #include "SettingsTest.hpp"
-#include "SliderTest.hpp"
+#include "ProgressRingTest.hpp"
 
 int main(int argc, char **argv)
 {
@@ -46,7 +46,7 @@ int main(int argc, char **argv)
 	signalUtilsTestSuite();
 	cloneableTestSuite();
 	settingsTestSuite();
-	sliderTestSuite();
+	progressRingTestSuite();
 
 	SDL_Quit();
 
