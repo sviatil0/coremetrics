@@ -189,6 +189,28 @@ jobs:
           echo "$f $(stat -c%s "$f") bytes"
         done
 
+    - name: CLI --top smoke (Linux)
+      if: runner.os == 'Linux'
+      env:
+        SDL_VIDEO_DRIVER: dummy
+      run: sh scripts/test-cli-top.sh bin/coremetrics
+
+    - name: CLI --top smoke (macOS)
+      if: runner.os == 'macOS'
+      env:
+        SDL_VIDEO_DRIVER: dummy
+      run: sh scripts/test-cli-top.sh bin/coremetrics
+
+    - name: CLI --top smoke (Windows)
+      if: runner.os == 'Windows'
+      shell: bash
+      env:
+        SDL_VIDEO_DRIVER: dummy
+      run: |
+        EXE=bin/coremetrics.exe
+        [ -f "$EXE" ] || EXE=bin/coremetrics
+        sh scripts/test-cli-top.sh "$EXE"
+
     - name: Upload smoke screenshots
       if: always()
       uses: actions/upload-artifact@v4
