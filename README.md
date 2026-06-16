@@ -6,7 +6,7 @@
 
 **Real-time cross-platform system monitor (CPU / RAM / GPU / processes), built on a from-scratch C++23 GUI library over raw SDL3 surfaces.**
 
-> A from-scratch widget toolkit on raw SDL3 pixel surfaces plus three native metrics backends (`/proc`, mach + IOKit, PDH + Toolhelp) selected at compile time. 17 test suites, CI gated on Linux, macOS, and Windows. Solo-led on a 4-person team; the contribution badge above is computed live by a CI job that runs `git blame -w -C -M` on every push to `main`.
+> A from-scratch widget toolkit on raw SDL3 pixel surfaces plus three native metrics backends (`/proc`, mach + IOKit, PDH + Toolhelp) selected at compile time. 33 test suites, CI gated on Linux, macOS, and Windows. Solo-led on a 4-person team; the contribution badge above is computed live by a CI job that runs `git blame -w -C -M` on every push to `main`.
 
 [![C++23](https://img.shields.io/badge/C%2B%2B-23-00599C?logo=cplusplus&logoColor=white)](https://en.cppreference.com/w/cpp/23)
 [![SDL3](https://img.shields.io/badge/SDL-3-1a1a1a)](https://www.libsdl.org/)
@@ -45,7 +45,7 @@ Detailed comparison: [docs/COMPARISON.md](docs/COMPARISON.md).
 - **Event-driven, no scene rebuilds.** Clicks trickle top-down through the layout tree; tab switches drain as paired show/hide events in a single pass; metrics mutate widgets in place every 500 ms.
 - **Modern C++ on purpose.** A `Cloneable<Derived>` CRTP mixin gives every widget a covariant `clone()` for free; ownership flows through `unique_ptr`; the layout tree is a generic `Tree<T>`.
 - **Parallel fills.** Wide `drawBox` / `drawTriangle` operations partition pixel rows across a `ThreadPool` and join on `std::future`s per frame (a teammate's work; see the contribution table).
-- **17 test suites** and a Linux + macOS + Windows GitHub Actions matrix, plus a non-blocking AddressSanitizer + UndefinedBehaviorSanitizer leg (`make asan`, `make ubsan`).
+- **33 test suites** and a Linux + macOS + Windows GitHub Actions matrix, plus a non-blocking AddressSanitizer + UndefinedBehaviorSanitizer leg (`make asan`, `make ubsan`).
 
 > This is a 4-person team project, and I was the lead and primary author. The "Stefan's code" badge at the top is computed by a CI job that runs `git blame -w -C -M` across `src/`, `include/`, `bench/`, and `coremetrics.cpp` on every push to `main`, so the percentage is always current and never hand-typed. See [Team and my contribution](#team-and-my-contribution) for the per-file breakdown, and `scripts/compute-contributions.sh` for the exact logic.
 
@@ -65,10 +65,10 @@ sudo apt install /tmp/coremetrics.deb
 # Arch Linux (AUR)
 yay -S coremetrics-bin
 
-# Any platform (tarball, replace v0.2.15 with the latest release tag)
-curl -LO https://github.com/sviatil0/coremetrics/releases/download/v0.2.15/coremetrics-v0.2.15-macos-arm64.tar.gz
-tar xf coremetrics-v0.2.15-macos-arm64.tar.gz
-cd coremetrics-v0.2.15-macos-arm64
+# Any platform (tarball, replace v0.2.26 with the latest release tag)
+curl -LO https://github.com/sviatil0/coremetrics/releases/download/v0.2.26/coremetrics-v0.2.26-macos-arm64.tar.gz
+tar xf coremetrics-v0.2.26-macos-arm64.tar.gz
+cd coremetrics-v0.2.26-macos-arm64
 ./coremetrics
 ```
 
@@ -101,6 +101,10 @@ make                 # builds bin/coremetrics and launches it
 ./bin/coremetrics --poll-ms 250                     # custom refresh cadence (clamped 100..10000)
 ./bin/coremetrics --top 10                          # headless: print top 10 procs to stdout + exit
 ./bin/coremetrics --top 10 --watch                  # live tail; refreshes every poll interval, ctrl-C to exit
+./bin/coremetrics --top 10 --top-sort cpu           # re-order by CPU% (also: mem, io)
+./bin/coremetrics --top 10 --top-color always       # ANSI threshold colors (auto by isatty)
+./bin/coremetrics --help                            # show full flag reference and exit
+./bin/coremetrics --version                         # print 'coremetrics X.Y.Z' and exit
 ```
 
 <details>
@@ -156,7 +160,7 @@ flowchart TD
     end
 
     subgraph L2["LAYER 2 - widgets"]
-        GE["GUIElement hierarchy<br/>Bar Row Label Button Image Selection<br/>each draw(Screen&)"]
+        GE["GUIElement hierarchy<br/>Bar Sparkline Label Row Button Image<br/>ProgressRing Gauge Donut Heatmap StackedBar<br/>Toggle Slider TabStrip Dropdown TreeView Modal Tooltip<br/>each draw(Screen&)"]
         Factory["GUIElementFactory + Cloneable CRTP"]
     end
 
@@ -218,7 +222,7 @@ flowchart TD
 |---|---|---|
 | **Math core** | `vec2.hpp`, `vec3.hpp`, `matrix.hpp`, `linear.hpp` | Templated (int/float) vectors and a 3x3 `Matrix`; dot, cross, magnitude, unit, transpose |
 | **Rasterizer** | `screen.hpp` / `screen.cpp`, `ThreadPool.hpp` | Draw primitives onto an `SDL_Surface`; parallelize wide fills |
-| **Widgets** | `GUIElement.hpp`, `Cloneable.hpp`, `Bar`, `Row`, `Label`, `Button`, `Image`, `selection` | Self-drawing UI elements behind one polymorphic `draw(Screen&)` interface |
+| **Widgets** | `GUIElement.hpp`, `Cloneable.hpp`, `Bar`, `Sparkline`, `Label`, `Row`, `Button`, `Image`, plus 12 v0.3-era widgets (`ProgressRing`, `Gauge`, `Donut`, `Heatmap`, `StackedBar`, `Toggle`, `Slider`, `TabStrip`, `Dropdown`, `TreeView`, `Modal`, `Tooltip`) | Self-drawing UI elements behind one polymorphic `draw(Screen&)` interface |
 | **Layout** | `Tree.hpp`, `Layout.hpp`, `LayoutManager.hpp`, `GUIFile.hpp` | Relative-coordinate layout tree, painter's-algorithm render, XML load/save |
 | **Events** | `Event*.hpp`, `EventManager.hpp`, `SoundPlayer.hpp` | Queue, trickle dispatch, layout show/hide, WAV playback |
 | **Metrics** | `SystemMetrics.hpp` + `SystemMetrics_{linux,mac,win}.cpp` | Live CPU / RAM / GPU / process stats per OS |
@@ -246,7 +250,7 @@ Tab switching is event-driven: each tab button emits a hide event for the other 
 - GUI library, rasterizer, event system, layout tree, and the CoreMetrics demo build and run.
 - Live CPU / RAM and per-process stats on macOS, Linux, and Windows.
 - Total GPU usage on Linux (`gpu_busy_percent`), macOS (`IOAccelerator`), and Windows (PDH).
-- 17 test suites; Linux, macOS, and Windows compile + test matrix in CI, all three legs required.
+- 33 test suites; Linux, macOS, and Windows compile + test matrix in CI, all three legs required.
 
 **Known limitations**
 
