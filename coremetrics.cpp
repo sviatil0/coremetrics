@@ -35,6 +35,7 @@
 #include "ProcessUtils.hpp"
 #include "Sparkline.hpp"
 #include "HelpOverlay.hpp"
+#include "SparklineLabels.hpp"
 #include "Thresholds.hpp"
 #include "Theme.hpp"
 #include "AssetPath.hpp"
@@ -721,18 +722,9 @@ static void renderProcessesSummary(Screen &dest)
 // them three unlabeled polylines at the bottom of the System tab read as
 // abstract decoration; with them a reviewer instantly sees they're CPU
 // / RAM / GPU history. y-baseline picked to sit just above each strip.
-static void renderSparklineLabels(Screen &dest)
-{
-    const vec3 dim = Theme::textDim();
-    // One label per sparkline, painted 12px above the chart's top edge
-    // so the text sits in clear sky above the polyline fill instead of
-    // getting overwritten on every peak. Chart rects are CPU 246..286,
-    // RAM 312..352, GPU 378..418, NET 444..474.
-    Font::drawText(dest, "CPU history", ivec2(24, 230), dim);
-    Font::drawText(dest, "RAM history", ivec2(24, 296), dim);
-    Font::drawText(dest, "GPU history", ivec2(24, 362), dim);
-    Font::drawText(dest, "NET history", ivec2(24, 428), dim);
-}
+// Sparkline label paint moved to src/SparklineLabels.cpp as Phase 1.2
+// slice 2 of the GUI evolution spec. Reaches the same pixels via
+// SparklineLabels::render(dest).
 
 static void pollMetrics()
 {
@@ -1562,7 +1554,7 @@ int main(int argc, char **argv)
                 // incoming traffic is the headline number for most users.
                 if (g_netTxSparkline != nullptr) g_netTxSparkline->draw(shot);
                 if (g_netRxSparkline != nullptr) g_netRxSparkline->draw(shot);
-                renderSparklineLabels(shot);
+                SparklineLabels::render(shot);
             }
         }
         else if (!g_filterText.empty())
@@ -2171,7 +2163,7 @@ int main(int argc, char **argv)
                     // traffic stays the visually dominant line.
                     if (g_netTxSparkline != nullptr) g_netTxSparkline->draw(screen);
                     if (g_netRxSparkline != nullptr) g_netRxSparkline->draw(screen);
-                    renderSparklineLabels(screen);
+                    SparklineLabels::render(screen);
                 }
             }
         }
