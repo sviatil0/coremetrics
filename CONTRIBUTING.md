@@ -75,6 +75,8 @@ The full suite must stay green on macOS and Linux for the PR to land. ASan and U
 
 A release is a PR from `dev` into `main`. It does not introduce new work, only collects what already landed on `dev`.
 
+Once that PR is merged and `main` is checked out, `scripts/release.sh` cuts the actual release in one shot. It takes either a bump type (`patch`, `minor`, `major`) or an explicit `X.Y.Z`, rewrites the footer version in `base.xml`, commits with the `release: vX.Y.Z footer version` message, pushes `main`, then creates and pushes the `vX.Y.Z` tag. It refuses to run on a dirty tree or off `main`, and prints the draft release URL plus the brew-bump hint on success.
+
 ## Multi-agent workflow
 
 A lot of this repo's velocity comes from running parallel Claude Code subagents on worktrees, each owning a disjoint slice of the codebase, opening a separate PR. The branching rules in [Release branch flow](#release-branch-flow) still hold: every agent branch is cut from `dev`, every PR targets `dev`, and only `dev -> main` is promoted on a tagged release. Conflicts between concurrent agent PRs are resolved by rebasing the later PR onto the merged trunk. The contribution badge workflow now re-fetches main before pushing so it tolerates the race.
