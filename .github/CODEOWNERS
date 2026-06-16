@@ -1,0 +1,9 @@
+# CoreMetrics CODEOWNERS
+#
+# Auto-requests review from the listed owner whenever matching files change.
+# Currently a single-owner project; expand as the team grows.
+
+*                       @sviatil0
+/src/SystemMetrics_*    @sviatil0
+/docs/                  @sviatil0
+/.github/               @sviatil0
