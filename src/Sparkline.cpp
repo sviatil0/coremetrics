@@ -144,19 +144,19 @@ void Sparkline::draw(Screen &screen) const
         return maxPos.x - static_cast<int>(static_cast<float>(indexFromNewest) * stepX);
     };
 
-    // Dim fill color sits at 18% of the line color so the area under the
-    // curve reads as a tinted region without overpowering the polyline or
-    // any UI sitting on top of the sparkline rect. In threshold mode the
-    // fill is recomputed per segment from the segment's stroke color so
-    // tint and stroke stay in sync as the line passes 60% and 80%.
-    vec3 fillColor(color.x * 0.18f, color.y * 0.18f, color.z * 0.18f);
+    // Darker fill at 10% of the line color so the polyline pops clearly
+    // against it instead of disappearing into a similarly-bright tint.
+    // In threshold mode the fill is recomputed per segment from the
+    // segment's stroke color so tint and stroke stay in sync as the line
+    // passes 60% and 80%.
+    vec3 fillColor(color.x * 0.10f, color.y * 0.10f, color.z * 0.10f);
 
     // 50% horizontal midline gives the polyline a reference plane so a
     // reviewer can tell a peak at 100% apart from one at 30% without
-    // squinting at the rect bounds. Drawn under the fill so the data
-    // overlays it cleanly.
+    // squinting at the rect bounds. Brighter than before (0.28 vs 0.18)
+    // so the midline is actually visible against the fill region.
     int midY = (minPos.y + maxPos.y) / 2;
-    vec3 midlineColor(0.18f, 0.18f, 0.18f);
+    vec3 midlineColor(0.28f, 0.28f, 0.28f);
     ivec2 midA(minPos.x, midY);
     ivec2 midB(maxPos.x, midY);
     screen.drawLine(midA, midB, midlineColor);
@@ -208,23 +208,30 @@ void Sparkline::draw(Screen &screen) const
             float peakPct = peak / maxValue;
             segColor = Thresholds::colorForRatio(peakPct);
         }
+        // 5px stroke (y-2..y+2) so the polyline is unmistakably visible
+        // against the dark fill region. The middle line is the exact
+        // data; the four offsets are decorative thickness.
         screen.drawLine(a, b, segColor);
-        ivec2 aUp(a.x, a.y - 1);
-        ivec2 bUp(b.x, b.y - 1);
-        ivec2 aDn(a.x, a.y + 1);
-        ivec2 bDn(b.x, b.y + 1);
-        screen.drawLine(aUp, bUp, segColor);
-        screen.drawLine(aDn, bDn, segColor);
+        ivec2 aUp1(a.x, a.y - 1);
+        ivec2 bUp1(b.x, b.y - 1);
+        ivec2 aUp2(a.x, a.y - 2);
+        ivec2 bUp2(b.x, b.y - 2);
+        ivec2 aDn1(a.x, a.y + 1);
+        ivec2 bDn1(b.x, b.y + 1);
+        ivec2 aDn2(a.x, a.y + 2);
+        ivec2 bDn2(b.x, b.y + 2);
+        screen.drawLine(aUp1, bUp1, segColor);
+        screen.drawLine(aUp2, bUp2, segColor);
+        screen.drawLine(aDn1, bDn1, segColor);
+        screen.drawLine(aDn2, bDn2, segColor);
     }
 
     // Axis tick labels at the right edge anchor the rect to absolute
-    // values (0..100). Typical sparkline rects are (24,*)..(864,*) inside
-    // a 960px window, leaving ~96px of room past maxPos.x, so the labels
-    // fit comfortably outside the data area. The "100" label sits at the
-    // chart's top edge and "0" at the bottom edge, both above the chart's
-    // visual midline so they read as endpoint markers without bleeding
-    // into the next chart's space.
-    vec3 labelColor(0.30f, 0.30f, 0.30f);
+    // values (0..100). Brighter color (0.55 vs 0.30) so the labels are
+    // clearly readable rather than fading into the panel background.
+    // "100" sits at chart top, "0" at chart bottom, both outside the
+    // polyline fill area.
+    vec3 labelColor(0.55f, 0.55f, 0.55f);
     ivec2 hiPos(maxPos.x + 4, minPos.y - 4);
     ivec2 loPos(maxPos.x + 4, maxPos.y - 16);
     Font::drawText(screen, "100", hiPos, labelColor);
