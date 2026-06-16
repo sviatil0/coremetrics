@@ -36,6 +36,7 @@
 #include "Sparkline.hpp"
 #include "HelpOverlay.hpp"
 #include "SparklineLabels.hpp"
+#include "UptimeAndLoad.hpp"
 #include "Thresholds.hpp"
 #include "Theme.hpp"
 #include "AssetPath.hpp"
@@ -421,29 +422,9 @@ static void destroySparklines()
     g_netTxSparkline.reset();
 }
 
-static std::string formatLoadAverages()
-{
-    if (g_loadAverages.size() < 3)
-    {
-        return "Load --";
-    }
-    char buf[64];
-    std::snprintf(buf, sizeof(buf), "Load %.2f %.2f %.2f",
-                  g_loadAverages[0], g_loadAverages[1], g_loadAverages[2]);
-    return std::string(buf);
-}
-
-static void renderUptimeAndLoad(Screen &dest)
-{
-    // Dim white for the labels, accent green so it reads as a status row.
-    const vec3 dimColor = Theme::textDim();
-    Font::drawText(dest, formatUptimeString(g_uptimeSeconds), ivec2(24, 44), dimColor);
-    // Uptime + Load + Disk all share the y=44 baseline so the status
-    // row reads as a single line instead of a staircase. The earlier
-    // y=56 placement for Load predated the DISK strip and left Load
-    // ~12 px below Up, which was visible as a misaligned middle field.
-    Font::drawText(dest, formatLoadAverages(), ivec2(220, 44), dimColor);
-}
+// Uptime + Load row paint moved to src/UptimeAndLoad.cpp as Phase 1.2
+// slice 3 of the GUI evolution spec. Call site passes g_uptimeSeconds
+// and g_loadAverages explicitly via UptimeAndLoad::render(...).
 
 static std::string formatRate(unsigned long long kbPerSec)
 {
@@ -1539,7 +1520,7 @@ int main(int argc, char **argv)
         renderFooterLiveStats(shot);
         if (tab != "processes")
         {
-            renderUptimeAndLoad(shot);
+            UptimeAndLoad::render(shot, g_uptimeSeconds, g_loadAverages);
             renderDiskUsage(shot);
             renderAggregateDiskIo(shot);
             renderNetIo(shot);
@@ -2148,7 +2129,7 @@ int main(int argc, char **argv)
                 LayoutManager::getInstance().getRoot(), "system");
             if (systemNode != nullptr && systemNode->getData().isActive())
             {
-                renderUptimeAndLoad(screen);
+                UptimeAndLoad::render(screen, g_uptimeSeconds, g_loadAverages);
                 renderDiskUsage(screen);
                 renderAggregateDiskIo(screen);
                 renderNetIo(screen);
