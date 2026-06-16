@@ -682,6 +682,25 @@ static void renderProcessesSummary(Screen &dest)
     Font::drawText(dest, totalText, ivec2(32, 44), COLOR_ACCENT_GREEN);
     Font::drawText(dest, cpuText, ivec2(280, 44), dim);
     Font::drawText(dest, memText, ivec2(520, 44), dim);
+
+    // Scroll position indicator. Only shown when the table is longer
+    // than the visible window so a user with 22 processes does not see
+    // a meaningless "1-15 / 22" on a static page; the moment it appears
+    // it signals "PgDown/Down arrow to scroll".
+    std::size_t windowSize = PROCESSES_VISIBLE_ROWS;
+    if (g_processVisibleCount > windowSize)
+    {
+        std::size_t firstRow = g_processScrollOffset + 1;
+        std::size_t lastRow = g_processScrollOffset + windowSize;
+        if (lastRow > g_processVisibleCount)
+        {
+            lastRow = g_processVisibleCount;
+        }
+        std::string scrollText = std::to_string(firstRow) + ".."
+                                 + std::to_string(lastRow) + " / "
+                                 + std::to_string(g_processVisibleCount);
+        Font::drawText(dest, scrollText, ivec2(760, 44), COLOR_ACCENT_GREEN);
+    }
 }
 
 // Keyboard shortcuts overlay. Painted last so it sits on top of every
