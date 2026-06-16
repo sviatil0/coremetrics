@@ -1,0 +1,104 @@
+name: Weekly repo stats
+
+# Posts a quick scannable progress report to the workflow run summary so the
+# maintainer can eyeball how the repo is moving without invoking any scripts
+# locally. Runs every Monday afternoon UTC and is also dispatchable on demand.
+#
+# Numbers reported:
+#   - total commit count (HEAD, no merges)
+#   - distinct contributor count (mailmap-resolved)
+#   - cloc total over the source tree (src, include, bench, coremetrics.cpp)
+#   - current per-author contribution share from compute-contributions.sh
+#
+# Read-only: never pushes, never tags, never touches main.
+
+on:
+  schedule:
+    - cron: '17 13 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  stats:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # need full history for shortlog and blame
+
+      - name: Install cloc
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cloc
+
+      - name: Collect commit and contributor counts
+        id: counts
+        run: |
+          commits="$(git rev-list --count --no-merges HEAD)"
+          # `shortlog -sne` emits one line per author; piping wc -l gives the
+          # distinct author count after mailmap resolution.
+          contributors="$(git shortlog -sne --no-merges HEAD | wc -l | tr -d ' ')"
+          echo "commits=$commits" >> "$GITHUB_OUTPUT"
+          echo "contributors=$contributors" >> "$GITHUB_OUTPUT"
+
+      - name: Capture per-author commit shortlog
+        id: shortlog
+        run: |
+          {
+            echo 'shortlog<<EOF'
+            git shortlog -sne --no-merges HEAD
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Run cloc over source tree
+        id: cloc
+        run: |
+          cloc --quiet src include bench coremetrics.cpp \
+            | tee cloc-report.txt
+          # Pull the "SUM" total-code column out of cloc's plain text report so
+          # the summary can show a single LOC number at the top.
+          total="$(awk '/^SUM:/ {print $5}' cloc-report.txt)"
+          echo "total_loc=${total:-unknown}" >> "$GITHUB_OUTPUT"
+
+      - name: Recompute current contribution breakdown
+        run: bash scripts/compute-contributions.sh
+
+      - name: Write summary
+        env:
+          COMMITS: ${{ steps.counts.outputs.commits }}
+          CONTRIBUTORS: ${{ steps.counts.outputs.contributors }}
+          TOTAL_LOC: ${{ steps.cloc.outputs.total_loc }}
+          SHORTLOG: ${{ steps.shortlog.outputs.shortlog }}
+        run: |
+          {
+            echo "# CoreMetrics weekly repo stats"
+            echo
+            echo "_Snapshot of \`${GITHUB_SHA}\` on \`${GITHUB_REF_NAME}\`._"
+            echo
+            echo "## Headline numbers"
+            echo
+            echo "| Metric | Value |"
+            echo "| --- | ---: |"
+            echo "| Commits (no merges) | ${COMMITS} |"
+            echo "| Distinct contributors | ${CONTRIBUTORS} |"
+            echo "| Total source LOC (cloc) | ${TOTAL_LOC} |"
+            echo
+            echo "## Commit shortlog"
+            echo
+            echo '```'
+            echo "${SHORTLOG}"
+            echo '```'
+            echo
+            echo "## cloc report"
+            echo
+            echo '```'
+            cat cloc-report.txt
+            echo '```'
+            echo
+            echo "## Current contribution share"
+            echo
+            cat .github/badges/contributions.md
+          } >> "$GITHUB_STEP_SUMMARY"
