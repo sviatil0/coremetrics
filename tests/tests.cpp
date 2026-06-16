@@ -17,8 +17,7 @@
 #include "RingBufferTest.hpp"
 #include "SignalUtilsTest.hpp"
 #include "CloneableTest.hpp"
-#include "SettingsTest.hpp"
-#include "TreeViewTest.hpp"
+#include "SparklineTest.hpp"
 
 int main(int argc, char **argv)
 {
@@ -45,8 +44,7 @@ int main(int argc, char **argv)
 	ringBufferTestSuite();
 	signalUtilsTestSuite();
 	cloneableTestSuite();
-	settingsTestSuite();
-	treeViewTestSuite();
+	sparklineTestSuite();
 
 	SDL_Quit();
 

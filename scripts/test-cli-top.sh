@@ -50,20 +50,44 @@ OUT_IO=$("$BIN" --top 3 --top-sort io 2>&1)
 check "--top-sort io prints numeric IO column" \
     "echo \"\$OUT_IO\" | tail -n +2 | head -1 | awk '{print \$NF}' | grep -qE '^[0-9]+$'"
 
+# Real ESC byte derived via printf so dash + bash both produce U+001B
+# without relying on the bash-only $'\033' literal.
+ESC=$(printf '\033')
+
 # --top-color never strips ANSI escapes
 OUT_NOCOLOR=$("$BIN" --top 3 --top-color never 2>&1)
 check "--top-color never produces no ANSI escape" \
-    "! echo \"\$OUT_NOCOLOR\" | grep -q $'\033'"
+    "! echo \"\$OUT_NOCOLOR\" | grep -q \"\$ESC\""
 
 # --top-color always emits ANSI escapes even when piped
 OUT_COLOR=$("$BIN" --top 3 --top-color always 2>&1)
 check "--top-color always emits ANSI escape" \
-    "echo \"\$OUT_COLOR\" | grep -q $'\033'"
+    "echo \"\$OUT_COLOR\" | grep -q \"\$ESC\""
 
 # Bad --top N falls back to default (20)
 OUT_BAD=$("$BIN" --top abc 2>&1)
 check "--top with non-numeric arg falls back to default 20 rows" \
     "test \$(echo \"\$OUT_BAD\" | tail -n +2 | wc -l) -ge 10"
+
+# --help / -h prints the Usage block and exits 0
+OUT_HELP=$("$BIN" --help 2>&1)
+check "--help prints Usage block" \
+    "echo \"\$OUT_HELP\" | head -1 | grep -q '^Usage: coremetrics'"
+check "--help mentions every documented headless mode" \
+    "echo \"\$OUT_HELP\" | grep -q -- '--top N' && echo \"\$OUT_HELP\" | grep -q -- '--screenshot PATH' && echo \"\$OUT_HELP\" | grep -q -- '--export-csv PATH'"
+
+OUT_H_SHORT=$("$BIN" -h 2>&1)
+check "-h short alias prints Usage" \
+    "echo \"\$OUT_H_SHORT\" | head -1 | grep -q '^Usage: coremetrics'"
+
+# --version / -V prints a semver line and exits 0
+OUT_VERSION=$("$BIN" --version 2>&1)
+check "--version prints semver line" \
+    "echo \"\$OUT_VERSION\" | grep -qE '^coremetrics [0-9]+\\.[0-9]+\\.[0-9]+$'"
+
+OUT_V_SHORT=$("$BIN" -V 2>&1)
+check "-V short alias prints semver" \
+    "echo \"\$OUT_V_SHORT\" | grep -qE '^coremetrics [0-9]+\\.[0-9]+\\.[0-9]+$'"
 
 echo
 echo "----"

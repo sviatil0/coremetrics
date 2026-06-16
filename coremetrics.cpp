@@ -1322,12 +1322,19 @@ int main(int argc, char **argv)
                    g_collapsedPids);
     g_sortColumn = static_cast<SortColumn>(loadedSortColumn);
 
-    // --help / -h print the same flag reference the manpage carries
-    // and exit 0 before any other state is touched. Lets users see
-    // the full CLI without needing 'man coremetrics' installed.
+    // --help / -h print the same flag reference the manpage carries.
+    // --version / -V print a one-line semver string. Both exit 0
+    // before any other state is touched.
     for (int i = 1; i < argc; ++i)
     {
         std::string arg = argv[i];
+        if (arg == "--version" || arg == "-V")
+        {
+            // Mirrors base.xml's footer label; bumped by the release
+            // flow that touches the XML.
+            std::printf("coremetrics 0.2.26\n");
+            return 0;
+        }
         if (arg == "--help" || arg == "-h")
         {
             std::printf(
@@ -1353,6 +1360,7 @@ int main(int argc, char **argv)
                 "\n"
                 "Other:\n"
                 "  -h, --help                print this help and exit\n"
+                "  -V, --version             print version and exit\n"
                 "\n"
                 "See coremetrics(1) for the full manpage and key bindings.\n"
             );
