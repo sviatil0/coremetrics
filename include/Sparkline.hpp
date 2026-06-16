@@ -18,6 +18,14 @@
 // on the segment's peak value as a percent of maxValue, matching the
 // palette used by Bar and the per-core strip. Default off so existing
 // single-color sparklines (network rx green, tx orange) keep their look.
+//
+// When autoScale is on, push() widens maxValue to fit any incoming sample
+// that would otherwise be clamped, adding 10% headroom so the chart does
+// not pin to its new ceiling. Older samples are not rescaled: they keep
+// the value they were stored with and just sit lower on the new range.
+// Default off so the fixed 0..100 percent sparklines (CPU, RAM, GPU) keep
+// their stable comparison surface; the network sparkline opts in because
+// its KB/s scale has no natural ceiling.
 class Sparkline
 {
 private:
@@ -28,6 +36,7 @@ private:
     float maxValue;
     RingBuffer<float> samples;
     bool thresholdMode;
+    bool autoScale;
 
 public:
     Sparkline(ivec2 minPos, ivec2 maxPos, vec3 color,
@@ -43,6 +52,9 @@ public:
 
     void setThresholdMode(bool enabled);
     bool getThresholdMode() const;
+
+    void setAutoScale(bool enabled);
+    bool getAutoScale() const;
 
     void draw(Screen &screen) const;
 };
