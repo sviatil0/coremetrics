@@ -1,0 +1,195 @@
+name: Brew Tap Publish
+
+# After the Release workflow finishes for a `v*` tag, this workflow opens a
+# PR against sviatil0/homebrew-coremetrics that bumps Formula/coremetrics.rb
+# to the new version, URLs and sha256 sums. It avoids the manual formula
+# bump that used to follow every tag push.
+#
+# Requirements:
+#   - `BREW_TAP_TOKEN` secret: a PAT with `contents: write` and
+#     `pull-requests: write` scope on sviatil0/homebrew-coremetrics. The job
+#     fails loudly if the secret is missing.
+
+on:
+  workflow_run:
+    workflows: ["Release"]
+    types:
+      - completed
+
+permissions:
+  contents: read
+
+jobs:
+  bump-formula:
+    # Only run when the upstream Release workflow succeeded and was triggered
+    # by a tag push matching `v*`. workflow_run does not natively filter by
+    # tag, so we gate on event + ref shape here.
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      startsWith(github.event.workflow_run.head_branch, 'v')
+    runs-on: ubuntu-latest
+    env:
+      TAP_REPO: sviatil0/homebrew-coremetrics
+      SRC_REPO: sviatil0/coremetrics
+      TAG: ${{ github.event.workflow_run.head_branch }}
+      GIT_AUTHOR_NAME: Sviatoslav Oleksiienko
+      GIT_AUTHOR_EMAIL: soleksiienko1@gmail.com
+      GIT_COMMITTER_NAME: Sviatoslav Oleksiienko
+      GIT_COMMITTER_EMAIL: soleksiienko1@gmail.com
+
+    steps:
+      - name: Verify BREW_TAP_TOKEN is configured
+        env:
+          BREW_TAP_TOKEN: ${{ secrets.BREW_TAP_TOKEN }}
+        run: |
+          if [ -z "${BREW_TAP_TOKEN}" ]; then
+            echo "::error::BREW_TAP_TOKEN secret is not configured on this repo."
+            echo "::error::Add a PAT with contents+pull-requests write scope on ${TAP_REPO}."
+            exit 1
+          fi
+
+      - name: Sanity-check tag shape
+        run: |
+          if [[ ! "${TAG}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+            echo "::error::Unexpected tag shape: '${TAG}' (expected vX.Y.Z)."
+            exit 1
+          fi
+          echo "Bumping formula for tag ${TAG}"
+
+      - name: Wait for release assets to be available
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # The Release workflow uploads tarballs via softprops/action-gh-release;
+          # the workflow_run event can land a few seconds before the assets
+          # are visible to the API. Poll up to 5 minutes.
+          for i in $(seq 1 30); do
+            ASSETS=$(gh release view "${TAG}" --repo "${SRC_REPO}" --json assets --jq '.assets[].name' 2>/dev/null || true)
+            if echo "${ASSETS}" | grep -q "coremetrics-${TAG}-macos-arm64.tar.gz" && \
+               echo "${ASSETS}" | grep -q "coremetrics-${TAG}-linux-x86_64.tar.gz"; then
+              echo "Both tarballs are present on release ${TAG}."
+              exit 0
+            fi
+            echo "Assets not ready yet (attempt ${i}/30), sleeping 10s..."
+            sleep 10
+          done
+          echo "::error::Timed out waiting for release assets on ${TAG}."
+          exit 1
+
+      - name: Download release tarballs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p dist
+          cd dist
+          gh release download "${TAG}" --repo "${SRC_REPO}" \
+            --pattern "coremetrics-${TAG}-macos-arm64.tar.gz" \
+            --pattern "coremetrics-${TAG}-linux-x86_64.tar.gz"
+          ls -la
+
+      - name: Compute sha256 sums
+        id: sha
+        run: |
+          MAC_SHA=$(sha256sum "dist/coremetrics-${TAG}-macos-arm64.tar.gz" | awk '{print $1}')
+          LINUX_SHA=$(sha256sum "dist/coremetrics-${TAG}-linux-x86_64.tar.gz" | awk '{print $1}')
+          echo "mac_sha=${MAC_SHA}" >> "$GITHUB_OUTPUT"
+          echo "linux_sha=${LINUX_SHA}" >> "$GITHUB_OUTPUT"
+          echo "macOS arm64 sha256: ${MAC_SHA}"
+          echo "Linux x86_64 sha256: ${LINUX_SHA}"
+
+      - name: Clone the tap repository
+        env:
+          BREW_TAP_TOKEN: ${{ secrets.BREW_TAP_TOKEN }}
+        run: |
+          git clone "https://x-access-token:${BREW_TAP_TOKEN}@github.com/${TAP_REPO}.git" tap
+          cd tap
+          git config user.name "${GIT_AUTHOR_NAME}"
+          git config user.email "${GIT_AUTHOR_EMAIL}"
+
+      - name: Update Formula/coremetrics.rb
+        env:
+          MAC_SHA: ${{ steps.sha.outputs.mac_sha }}
+          LINUX_SHA: ${{ steps.sha.outputs.linux_sha }}
+        run: |
+          VERSION="${TAG#v}"
+          FORMULA="tap/Formula/coremetrics.rb"
+          if [ ! -f "${FORMULA}" ]; then
+            echo "::error::${FORMULA} not found in ${TAP_REPO}."
+            exit 1
+          fi
+
+          # Bump version line.
+          sed -i -E "s|^(  version )\"[^\"]+\"|\\1\"${VERSION}\"|" "${FORMULA}"
+
+          # Rewrite macOS arm64 URL + sha256.
+          sed -i -E "s|(/releases/download/)v[^/]+(/coremetrics-)v[^-]+(-macos-arm64\\.tar\\.gz)|\\1${TAG}\\2${TAG}\\3|g" "${FORMULA}"
+          # Rewrite Linux x86_64 URL.
+          sed -i -E "s|(/releases/download/)v[^/]+(/coremetrics-)v[^-]+(-linux-x86_64\\.tar\\.gz)|\\1${TAG}\\2${TAG}\\3|g" "${FORMULA}"
+
+          # Replace the sha256 lines. The macOS block is inside on_arm; the
+          # Linux block is the only sha256 inside on_linux. We rely on the
+          # ordering in the formula (macOS first, Linux second) and use awk
+          # to swap them deterministically.
+          awk -v mac="${MAC_SHA}" -v lin="${LINUX_SHA}" '
+            BEGIN { section = "" }
+            /on_macos do/ { section = "macos" }
+            /on_linux do/ { section = "linux" }
+            /sha256 "[0-9a-f]+"/ {
+              if (section == "macos") {
+                sub(/sha256 "[0-9a-f]+"/, "sha256 \"" mac "\"")
+                section = "post-macos"
+              } else if (section == "linux") {
+                sub(/sha256 "[0-9a-f]+"/, "sha256 \"" lin "\"")
+                section = "post-linux"
+              }
+            }
+            { print }
+          ' "${FORMULA}" > "${FORMULA}.new"
+          mv "${FORMULA}.new" "${FORMULA}"
+
+          echo "----- Updated formula -----"
+          cat "${FORMULA}"
+
+      - name: Commit, push, and open PR
+        env:
+          BREW_TAP_TOKEN: ${{ secrets.BREW_TAP_TOKEN }}
+          GH_TOKEN: ${{ secrets.BREW_TAP_TOKEN }}
+        run: |
+          VERSION="${TAG#v}"
+          BRANCH="bump/coremetrics-${VERSION}"
+          cd tap
+
+          # If an identical PR branch already exists upstream, reset it so we
+          # can force-push the latest formula. Homebrew taps are tiny so this
+          # is safe.
+          git checkout -B "${BRANCH}"
+
+          if git diff --quiet; then
+            echo "No changes to commit; formula is already up to date for ${TAG}."
+            exit 0
+          fi
+
+          git add Formula/coremetrics.rb
+          git commit -m "chore(formula): bump coremetrics to ${VERSION}"
+          git push --force-with-lease origin "${BRANCH}"
+
+          # Open a PR if one is not already open from this branch.
+          EXISTING=$(gh pr list --repo "${TAP_REPO}" --head "${BRANCH}" --state open --json number --jq '.[0].number' || true)
+          if [ -n "${EXISTING}" ]; then
+            echo "PR #${EXISTING} already open for ${BRANCH}; the force-push refreshed it."
+            exit 0
+          fi
+
+          gh pr create \
+            --repo "${TAP_REPO}" \
+            --base main \
+            --head "${BRANCH}" \
+            --title "chore(formula): bump coremetrics to ${VERSION}" \
+            --body "Automated bump from sviatil0/coremetrics tag \`${TAG}\`.
+
+          - version: \`${VERSION}\`
+          - macOS arm64 sha256: \`${{ steps.sha.outputs.mac_sha }}\`
+          - Linux x86_64 sha256: \`${{ steps.sha.outputs.linux_sha }}\`
+
+          Generated by \`.github/workflows/brew-tap-publish.yml\` in the upstream repo."
