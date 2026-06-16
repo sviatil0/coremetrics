@@ -10,6 +10,7 @@
 #include "layoutTest.hpp"
 #include "ThreadPoolTest.hpp"
 #include "BarTest.hpp"
+#include "GaugeTest.hpp"
 #include "RowTest.hpp"
 #include "SystemMetricsTest.hpp"
 #include "SystemMetricsParseTest.hpp"
@@ -36,6 +37,7 @@ int main(int argc, char **argv)
 	layoutTestSuite();
 	threadPoolTestSuite();
 	barTestSuite();
+	gaugeTestSuite();
 	rowTestSuite();
 	systemMetricsTestSuite();
 	systemMetricsParseTestSuite();
