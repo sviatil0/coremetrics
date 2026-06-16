@@ -738,19 +738,23 @@ static void renderHelpOverlay(Screen &dest)
     row += rowStep;
 
     Font::drawText(dest, "up / down", ivec2(keyX, row), keyColor);
-    Font::drawText(dest, "move row selection", ivec2(descX, row), descColor);
+    Font::drawText(dest, "row select (auto-scroll at edge)", ivec2(descX, row), descColor);
     row += rowStep;
 
-    Font::drawText(dest, "space", ivec2(keyX, row), keyColor);
-    Font::drawText(dest, "select highlighted row", ivec2(descX, row), descColor);
+    Font::drawText(dest, "pgup / pgdn", ivec2(keyX, row), keyColor);
+    Font::drawText(dest, "scroll process list by a page", ivec2(descX, row), descColor);
+    row += rowStep;
+
+    Font::drawText(dest, "home / end", ivec2(keyX, row), keyColor);
+    Font::drawText(dest, "jump to top / bottom of list", ivec2(descX, row), descColor);
+    row += rowStep;
+
+    Font::drawText(dest, "wheel", ivec2(keyX, row), keyColor);
+    Font::drawText(dest, "scroll process list (3 rows/tick)", ivec2(descX, row), descColor);
     row += rowStep;
 
     Font::drawText(dest, "k", ivec2(keyX, row), keyColor);
     Font::drawText(dest, "open signal / kill menu", ivec2(descX, row), descColor);
-    row += rowStep;
-
-    Font::drawText(dest, "1..6", ivec2(keyX, row), keyColor);
-    Font::drawText(dest, "pick signal in kill menu", ivec2(descX, row), descColor);
     row += rowStep;
 
     Font::drawText(dest, "y / enter", ivec2(keyX, row), keyColor);
