@@ -85,16 +85,16 @@ static Row *g_headerRow = nullptr;
 // gains 3 live polylines fed by RingBuffer<float> samples.
 static bool g_sparklinesEnabled = false;
 constexpr std::size_t SPARKLINE_CAPACITY = 64;
-static Sparkline *g_cpuSparkline = nullptr;
-static Sparkline *g_ramSparkline = nullptr;
-static Sparkline *g_gpuSparkline = nullptr;
+static std::unique_ptr<Sparkline> g_cpuSparkline;
+static std::unique_ptr<Sparkline> g_ramSparkline;
+static std::unique_ptr<Sparkline> g_gpuSparkline;
 // Network throughput history: two polylines overlaid in the same rect
 // directly below the GPU strip. rx in accent green, tx in orange so a
 // reviewer can read incoming vs outgoing traffic at a glance without a
 // legend. y-range fixed at 0..2048 KB/s so the chart stays a stable
 // comparison surface across ticks (samples are clamped, not stretched).
-static Sparkline *g_netRxSparkline = nullptr;
-static Sparkline *g_netTxSparkline = nullptr;
+static std::unique_ptr<Sparkline> g_netRxSparkline;
+static std::unique_ptr<Sparkline> g_netTxSparkline;
 constexpr float NET_SPARKLINE_MAX_KBPS = 2048.0f;
 
 // Per-logical-CPU utilization for the small strip below the aggregate bars.
@@ -368,14 +368,14 @@ static void buildSparklines()
     // gutter (chart maxPos.x = 864, screen width = 960). 0 tick now sits
     // 4px BELOW the chart (maxPos.y + 4) so it never sits inside the
     // polyline fill area.
-    g_cpuSparkline = new Sparkline(ivec2(24, 246), ivec2(864, 286), accent,
-                                   0.0f, 100.0f, SPARKLINE_CAPACITY);
+    g_cpuSparkline = std::make_unique<Sparkline>(
+        ivec2(24, 246), ivec2(864, 286), accent, 0.0f, 100.0f, SPARKLINE_CAPACITY);
     g_cpuSparkline->setThresholdMode(true);
-    g_ramSparkline = new Sparkline(ivec2(24, 312), ivec2(864, 352), accent,
-                                   0.0f, 100.0f, SPARKLINE_CAPACITY);
+    g_ramSparkline = std::make_unique<Sparkline>(
+        ivec2(24, 312), ivec2(864, 352), accent, 0.0f, 100.0f, SPARKLINE_CAPACITY);
     g_ramSparkline->setThresholdMode(true);
-    g_gpuSparkline = new Sparkline(ivec2(24, 378), ivec2(864, 418), accent,
-                                   0.0f, 100.0f, SPARKLINE_CAPACITY);
+    g_gpuSparkline = std::make_unique<Sparkline>(
+        ivec2(24, 378), ivec2(864, 418), accent, 0.0f, 100.0f, SPARKLINE_CAPACITY);
     g_gpuSparkline->setThresholdMode(true);
     // tx (orange) is constructed first so it renders behind the rx
     // (green) line in the draw pass; incoming traffic reads as more
@@ -383,24 +383,19 @@ static void buildSparklines()
     // y=482..516 EXIT button + footer chrome.
     const vec3 netTx(0.95f, 0.65f, 0.30f);
     const vec3 netRx(0.5f, 0.85f, 0.5f);
-    g_netTxSparkline = new Sparkline(ivec2(24, 444), ivec2(864, 474), netTx,
-                                     0.0f, NET_SPARKLINE_MAX_KBPS, SPARKLINE_CAPACITY);
-    g_netRxSparkline = new Sparkline(ivec2(24, 444), ivec2(864, 474), netRx,
-                                     0.0f, NET_SPARKLINE_MAX_KBPS, SPARKLINE_CAPACITY);
+    g_netTxSparkline = std::make_unique<Sparkline>(
+        ivec2(24, 444), ivec2(864, 474), netTx, 0.0f, NET_SPARKLINE_MAX_KBPS, SPARKLINE_CAPACITY);
+    g_netRxSparkline = std::make_unique<Sparkline>(
+        ivec2(24, 444), ivec2(864, 474), netRx, 0.0f, NET_SPARKLINE_MAX_KBPS, SPARKLINE_CAPACITY);
 }
 
 static void destroySparklines()
 {
-    delete g_cpuSparkline;
-    delete g_ramSparkline;
-    delete g_gpuSparkline;
-    delete g_netRxSparkline;
-    delete g_netTxSparkline;
-    g_cpuSparkline = nullptr;
-    g_ramSparkline = nullptr;
-    g_gpuSparkline = nullptr;
-    g_netRxSparkline = nullptr;
-    g_netTxSparkline = nullptr;
+    g_cpuSparkline.reset();
+    g_ramSparkline.reset();
+    g_gpuSparkline.reset();
+    g_netRxSparkline.reset();
+    g_netTxSparkline.reset();
 }
 
 static std::string formatLoadAverages()
