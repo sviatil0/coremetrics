@@ -50,15 +50,19 @@ OUT_IO=$("$BIN" --top 3 --top-sort io 2>&1)
 check "--top-sort io prints numeric IO column" \
     "echo \"\$OUT_IO\" | tail -n +2 | head -1 | awk '{print \$NF}' | grep -qE '^[0-9]+$'"
 
+# Real ESC byte derived via printf so dash + bash both produce U+001B
+# without relying on the bash-only $'\033' literal.
+ESC=$(printf '\033')
+
 # --top-color never strips ANSI escapes
 OUT_NOCOLOR=$("$BIN" --top 3 --top-color never 2>&1)
 check "--top-color never produces no ANSI escape" \
-    "! echo \"\$OUT_NOCOLOR\" | grep -q $'\033'"
+    "! echo \"\$OUT_NOCOLOR\" | grep -q \"\$ESC\""
 
 # --top-color always emits ANSI escapes even when piped
 OUT_COLOR=$("$BIN" --top 3 --top-color always 2>&1)
 check "--top-color always emits ANSI escape" \
-    "echo \"\$OUT_COLOR\" | grep -q $'\033'"
+    "echo \"\$OUT_COLOR\" | grep -q \"\$ESC\""
 
 # Bad --top N falls back to default (20)
 OUT_BAD=$("$BIN" --top abc 2>&1)
