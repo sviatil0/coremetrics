@@ -2,11 +2,17 @@ name: PR auto-label
 on:
   pull_request_target:
     types: [opened, reopened, synchronize]
+    branches: [main, dev]
 permissions:
   contents: read
   pull-requests: write
 jobs:
   label:
+    # Skip fork PRs so the privileged pull_request_target token never
+    # runs against an untrusted head ref. Maintainers can re-trigger
+    # labeling by adding the labels manually or by re-pushing to a
+    # branch in this repo. Internal PRs continue to label automatically.
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
       - uses: actions/labeler@v5
