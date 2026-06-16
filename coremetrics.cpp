@@ -3,6 +3,13 @@
 #include <csignal>
 #include <cstdio>
 #include <cstdlib>
+#ifndef _WIN32
+#include <unistd.h>
+#else
+#include <io.h>
+#define isatty _isatty
+#define fileno _fileno
+#endif
 #include <fstream>
 #include <iostream>
 #include <memory>
@@ -1198,11 +1205,32 @@ static bool topSortByIoDesc(const ProcessInfo &a, const ProcessInfo &b)
     return aIo > bIo;
 }
 
+// Pick an ANSI 24-bit color escape for a percent value using the same
+// green/yellow/red threshold palette the GUI uses (see Thresholds.hpp).
+// Returns "" when colorization is off so the caller can splice it in
+// unconditionally without surrounding if/else noise.
+static const char *topColorForPct(float pct, bool colorize)
+{
+    if (!colorize)
+    {
+        return "";
+    }
+    if (pct >= 80.0f)
+    {
+        return "\033[31m"; // red
+    }
+    if (pct >= 60.0f)
+    {
+        return "\033[33m"; // yellow
+    }
+    return "\033[32m"; // green
+}
+
 // Pretty-print the top-N process table to stdout for the headless
 // `--top` and `--watch` modes. Separated so both the one-shot path
 // and the watch loop call the exact same formatter. Project rule
 // forbids lambdas in app code, so this is a free static helper.
-static void printTopProcesses(int topCount, TopSortKey sortKey)
+static void printTopProcesses(int topCount, TopSortKey sortKey, bool colorize)
 {
     // Over-fetch by 4x so the secondary sort by cpu/io has enough
     // candidates to choose from when the backend ordered the list by
@@ -1225,8 +1253,10 @@ static void printTopProcesses(int topCount, TopSortKey sortKey)
     {
         procs.resize(static_cast<std::size_t>(topCount));
     }
-    std::printf("%-7s %-32s %6s %6s %12s\n",
-                "PID", "NAME", "CPU%", "MEM%", "IO KB/s");
+    const char *reset = colorize ? "\033[0m" : "";
+    const char *headerColor = colorize ? "\033[1m" : "";
+    std::printf("%s%-7s %-32s %6s %6s %12s%s\n",
+                headerColor, "PID", "NAME", "CPU%", "MEM%", "IO KB/s", reset);
     for (const auto &p : procs)
     {
         std::string name = p.name;
@@ -1235,8 +1265,13 @@ static void printTopProcesses(int topCount, TopSortKey sortKey)
             name.resize(32);
         }
         unsigned long long ioKbPerSec = p.diskReadKbPerSec + p.diskWriteKbPerSec;
-        std::printf("%-7d %-32s %6.1f %6.1f %12llu\n",
-                    p.pid, name.c_str(), p.cpuPct, p.memPct, ioKbPerSec);
+        const char *cpuC = topColorForPct(p.cpuPct, colorize);
+        const char *memC = topColorForPct(p.memPct, colorize);
+        std::printf("%-7d %-32s %s%6.1f%s %s%6.1f%s %12llu\n",
+                    p.pid, name.c_str(),
+                    cpuC, p.cpuPct, reset,
+                    memC, p.memPct, reset,
+                    ioKbPerSec);
     }
     std::fflush(stdout);
 }
@@ -1269,6 +1304,10 @@ int main(int argc, char **argv)
     // chosen column. Default is mem (matches the backend's natural
     // sort order from topProcesses(N)). Unknown values fall back to mem.
     TopSortKey topSortKey = TopSortKey::Memory;
+    // `--top-color auto|always|never`: colorize the --top / --watch
+    // output. auto (default) checks isatty so piped output stays
+    // ASCII-clean. always forces color on. never forces it off.
+    int topColorMode = 0; // 0=auto, 1=always, 2=never
 
     // Hydrate persisted preferences before argv parsing so any CLI
     // flag the user supplies this run overrides the saved value.
@@ -1372,6 +1411,35 @@ int main(int argc, char **argv)
                 topSortKey = TopSortKey::Memory;
             }
         }
+        if (std::string(argv[i]) == "--top-color" && i + 1 < argc)
+        {
+            std::string mode = argv[i + 1];
+            if (mode == "always")
+            {
+                topColorMode = 1;
+            }
+            else if (mode == "never")
+            {
+                topColorMode = 2;
+            }
+            else
+            {
+                topColorMode = 0;
+            }
+        }
+    }
+
+    // Resolve the auto color mode by checking whether stdout is a TTY.
+    // Pipes and CI logs get plain text; an interactive terminal gets
+    // the threshold-colored CPU% / MEM% cells.
+    bool topColorize = false;
+    if (topColorMode == 1)
+    {
+        topColorize = true;
+    }
+    else if (topColorMode == 0)
+    {
+        topColorize = (isatty(fileno(stdout)) != 0);
     }
 
     // `--top` runs before SDL_Init since it never paints. Prints a
@@ -1387,7 +1455,7 @@ int main(int argc, char **argv)
         std::signal(SIGTERM, handleShutdownSignal);
         if (!watchMode)
         {
-            printTopProcesses(topCount, topSortKey);
+            printTopProcesses(topCount, topSortKey, topColorize);
             return 0;
         }
         // --watch: clear the terminal with the ANSI 2J + cursor home
@@ -1397,7 +1465,7 @@ int main(int argc, char **argv)
         while (!g_shutdownRequested.load())
         {
             std::printf("\033[2J\033[H");
-            printTopProcesses(topCount, topSortKey);
+            printTopProcesses(topCount, topSortKey, topColorize);
             SDL_Delay(static_cast<Uint32>(g_pollIntervalMs));
         }
         return 0;
