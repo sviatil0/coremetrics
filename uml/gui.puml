@@ -166,6 +166,27 @@ GUIElement <|-- "Cloneable<Derived>"
 "Cloneable<Derived>" <|-- Button
 "Cloneable<Derived>" <|-- Bar
 "Cloneable<Derived>" <|-- Row
+"Cloneable<Derived>" <|-- Sparkline
+"Cloneable<Derived>" <|-- ProgressRing
+"Cloneable<Derived>" <|-- Gauge
+"Cloneable<Derived>" <|-- Donut
+"Cloneable<Derived>" <|-- Heatmap
+"Cloneable<Derived>" <|-- StackedBar
+"Cloneable<Derived>" <|-- Toggle
+"Cloneable<Derived>" <|-- Slider
+"Cloneable<Derived>" <|-- TabStrip
+"Cloneable<Derived>" <|-- Dropdown
+"Cloneable<Derived>" <|-- TreeView
+"Cloneable<Derived>" <|-- Modal
+"Cloneable<Derived>" <|-- Tooltip
+
+note as v03widgets
+  v0.3-era widgets:
+  ProgressRing, Gauge, Donut, Heatmap, StackedBar,
+  Toggle, Slider, TabStrip, Dropdown, TreeView,
+  Modal, Tooltip. Each owns a draw(Screen&) and
+  uses Cloneable<Self> for polymorphic clone.
+end note
 
 Point -[hidden]-> Line
 Line -[hidden]-> Box
