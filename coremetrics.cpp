@@ -370,10 +370,13 @@ static void buildSparklines()
     // polyline fill area.
     g_cpuSparkline = new Sparkline(ivec2(24, 246), ivec2(864, 286), accent,
                                    0.0f, 100.0f, SPARKLINE_CAPACITY);
+    g_cpuSparkline->setThresholdMode(true);
     g_ramSparkline = new Sparkline(ivec2(24, 312), ivec2(864, 352), accent,
                                    0.0f, 100.0f, SPARKLINE_CAPACITY);
+    g_ramSparkline->setThresholdMode(true);
     g_gpuSparkline = new Sparkline(ivec2(24, 378), ivec2(864, 418), accent,
                                    0.0f, 100.0f, SPARKLINE_CAPACITY);
+    g_gpuSparkline->setThresholdMode(true);
     // tx (orange) is constructed first so it renders behind the rx
     // (green) line in the draw pass; incoming traffic reads as more
     // important. NET strip ends at y=474 leaving 8px clear of the
