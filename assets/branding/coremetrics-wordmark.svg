@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- CoreMetrics wordmark, sans-serif text on near-black plate. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 140" role="img" aria-label="coremetrics wordmark">
+  <rect width="600" height="140" rx="20" ry="20" fill="#0d0d0d"/>
+  <text x="40" y="92"
+        font-family="ui-sans-serif, system-ui, -apple-system, sans-serif"
+        font-size="72"
+        font-weight="700"
+        letter-spacing="-2"
+        fill="#dfffe0">coremetrics</text>
+  <circle cx="560" cy="70" r="10" fill="#dfffe0"/>
+</svg>
