@@ -74,3 +74,9 @@ The full suite must stay green on macOS and Linux for the PR to land. ASan and U
 ## Releasing
 
 A release is a PR from `dev` into `main`. It does not introduce new work, only collects what already landed on `dev`.
+
+## Multi-agent workflow
+
+A lot of this repo's velocity comes from running parallel Claude Code subagents on worktrees, each owning a disjoint slice of the codebase, opening a separate PR. The branching rules in [Release branch flow](#release-branch-flow) still hold: every agent branch is cut from `dev`, every PR targets `dev`, and only `dev -> main` is promoted on a tagged release. Conflicts between concurrent agent PRs are resolved by rebasing the later PR onto the merged trunk. The contribution badge workflow now re-fetches main before pushing so it tolerates the race.
+
+You do not need to use the agent workflow to contribute. A single PR cut from `dev` is welcome and reviewed the same way.
