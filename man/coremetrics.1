@@ -1,4 +1,4 @@
-.TH COREMETRICS 1 "2026" "0.2.17" "User Commands"
+.TH COREMETRICS 1 "2026" "0.2.24" "User Commands"
 .SH NAME
 coremetrics \- cross-platform desktop system metrics monitor
 .SH SYNOPSIS
@@ -11,6 +11,7 @@ coremetrics \- cross-platform desktop system metrics monitor
 [\fB--screenshot\fR \fIPATH\fR [system|processes]]
 [\fB--export-csv\fR \fIPATH\fR]
 [\fB--export-json\fR \fIPATH\fR]
+[\fB--top\fR \fIN\fR [\fB--watch\fR]]
 .SH DESCRIPTION
 .B coremetrics
 is a real-time system monitor (CPU, RAM, GPU, processes) built on a from-scratch
@@ -64,6 +65,22 @@ and exit. No window is opened.
 Write a one-shot JSON dump of the current process list to
 .I PATH
 and exit. No window is opened.
+.TP
+.BI --top " N"
+Print the top
+.I N
+processes (by memory percent) to standard output as a fixed-width
+text table and exit. No window or audio init. Default
+.I N
+is 20 when omitted; clamped to [1, 999].
+.TP
+.B --watch
+Used with
+.B --top
+to switch from a one-shot dump to a live tail: the table is cleared
+and re-printed every poll interval (see
+.BR --poll-ms ).
+Exit with Ctrl-C.
 .SH KEYBOARD
 .TP
 .B ?
@@ -79,10 +96,20 @@ Enter filter input mode on the Processes tab. Type to filter by command name.
 Toggle tree mode on the Processes tab.
 .TP
 .B up / down
-Move the selected row in the Processes table.
+Move the selected row in the Processes table. Auto-scrolls the visible
+window when held at the top or bottom edge.
+.TP
+.B pgup / pgdn
+Scroll the Processes table by a full page (15 rows).
+.TP
+.B home / end
+Jump to the top or bottom of the Processes table.
+.TP
+.B mouse wheel
+Scroll the Processes table by 3 rows per wheel tick.
 .TP
 .B space
-Select the highlighted row.
+Toggle tree collapse on the selected node (Processes tab, tree mode).
 .TP
 .B k
 Open the signal / kill menu for the selected process.
@@ -117,6 +144,17 @@ Dump the current process list to JSON and exit:
 .PP
 .RS 4
 coremetrics --export-json snapshot.json
+.RE
+.PP
+Print the top 10 processes once, then watch them live like
+.BR top (1):
+.PP
+.RS 4
+coremetrics --top 10
+.RE
+.PP
+.RS 4
+coremetrics --top 10 --watch
 .RE
 .SH AUTHOR
 Sviatoslav Oleksiienko <soleksiienko1@gmail.com>
