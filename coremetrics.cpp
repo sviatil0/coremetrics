@@ -1601,6 +1601,46 @@ int main(int argc, char **argv)
                 }
                 break;
             }
+            case SDL_EVENT_MOUSE_WHEEL:
+            {
+                // Mouse-wheel scroll on the Processes tab moves the
+                // visible window through the process list. y is the
+                // vertical wheel delta (positive = scroll up). Each
+                // wheel tick shifts by 3 rows so a comfortable wrist
+                // motion covers most of the visible window.
+                if (processesTabActive())
+                {
+                    constexpr std::size_t WHEEL_ROWS_PER_TICK = 3;
+                    constexpr std::size_t WINDOW = PROCESSES_VISIBLE_ROWS;
+                    int delta = static_cast<int>(event.wheel.y);
+                    if (delta > 0)
+                    {
+                        std::size_t step = static_cast<std::size_t>(delta) * WHEEL_ROWS_PER_TICK;
+                        if (g_processScrollOffset >= step)
+                        {
+                            g_processScrollOffset -= step;
+                        }
+                        else
+                        {
+                            g_processScrollOffset = 0;
+                        }
+                    }
+                    else if (delta < 0)
+                    {
+                        std::size_t step = static_cast<std::size_t>(-delta) * WHEEL_ROWS_PER_TICK;
+                        if (g_processVisibleCount > WINDOW)
+                        {
+                            std::size_t maxOffset = g_processVisibleCount - WINDOW;
+                            g_processScrollOffset += step;
+                            if (g_processScrollOffset > maxOffset)
+                            {
+                                g_processScrollOffset = maxOffset;
+                            }
+                        }
+                    }
+                }
+                break;
+            }
             case SDL_EVENT_TEXT_INPUT:
             {
                 if (g_filterInputActive && processesTabActive())
