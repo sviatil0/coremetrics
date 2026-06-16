@@ -18,6 +18,7 @@
 #include "SignalUtilsTest.hpp"
 #include "CloneableTest.hpp"
 #include "SettingsTest.hpp"
+#include "TraceLogTest.hpp"
 
 int main(int argc, char **argv)
 {
@@ -45,6 +46,7 @@ int main(int argc, char **argv)
 	signalUtilsTestSuite();
 	cloneableTestSuite();
 	settingsTestSuite();
+	traceLogTestSuite();
 
 	SDL_Quit();
 
