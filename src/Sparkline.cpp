@@ -11,7 +11,8 @@ Sparkline::Sparkline(ivec2 minPos, ivec2 maxPos, vec3 color,
       minValue(minValue),
       maxValue(maxValue),
       samples(capacity),
-      thresholdMode(false)
+      thresholdMode(false),
+      autoScale(false)
 {
 }
 
@@ -21,9 +22,21 @@ void Sparkline::push(float value)
     {
         value = minValue;
     }
+    // In auto-scale mode, an over-ceiling sample widens the range instead
+    // of being clamped, with 10% headroom so the chart does not redraw the
+    // new peak pinned to the top edge on its very first frame. Existing
+    // samples in the ring buffer are intentionally not rescaled: they keep
+    // the value they were stored at and just sit lower on the new range.
     if (value > maxValue)
     {
-        value = maxValue;
+        if (autoScale)
+        {
+            maxValue = value * 1.1f;
+        }
+        else
+        {
+            value = maxValue;
+        }
     }
     // First sample fills the ring buffer with itself so the rendered
     // polyline spans the full width from frame 1 instead of starting
@@ -73,6 +86,16 @@ void Sparkline::setThresholdMode(bool enabled)
 bool Sparkline::getThresholdMode() const
 {
     return thresholdMode;
+}
+
+void Sparkline::setAutoScale(bool enabled)
+{
+    autoScale = enabled;
+}
+
+bool Sparkline::getAutoScale() const
+{
+    return autoScale;
 }
 
 void Sparkline::draw(Screen &screen) const
