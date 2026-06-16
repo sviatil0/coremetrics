@@ -1321,6 +1321,44 @@ int main(int argc, char **argv)
                    g_collapsedPids);
     g_sortColumn = static_cast<SortColumn>(loadedSortColumn);
 
+    // --help / -h print the same flag reference the manpage carries
+    // and exit 0 before any other state is touched. Lets users see
+    // the full CLI without needing 'man coremetrics' installed.
+    for (int i = 1; i < argc; ++i)
+    {
+        std::string arg = argv[i];
+        if (arg == "--help" || arg == "-h")
+        {
+            std::printf(
+                "Usage: coremetrics [options]\n"
+                "\n"
+                "Live UI flags:\n"
+                "  --sparklines              show CPU/RAM/GPU/NET history sparklines\n"
+                "  --tree                    open Processes tab in parent/child tree mode\n"
+                "  --filter PATTERN          seed the Processes-tab name filter\n"
+                "  --poll-ms N               refresh cadence in ms (clamped 100..10000)\n"
+                "  --duration SECONDS        auto-exit after N seconds (live UI)\n"
+                "\n"
+                "Headless modes:\n"
+                "  --screenshot PATH [system|processes]\n"
+                "                            render one frame to PATH and exit\n"
+                "  --export-csv PATH         dump one-shot CSV and exit\n"
+                "  --export-json PATH        dump one-shot JSON and exit\n"
+                "  --top N                   print top-N processes to stdout and exit\n"
+                "  --watch                   used with --top: re-print every poll interval\n"
+                "  --top-sort cpu|mem|io     re-order --top output (default mem)\n"
+                "  --top-color auto|always|never\n"
+                "                            colorize --top output (default auto via isatty)\n"
+                "\n"
+                "Other:\n"
+                "  -h, --help                print this help and exit\n"
+                "\n"
+                "See coremetrics(1) for the full manpage and key bindings.\n"
+            );
+            return 0;
+        }
+    }
+
     for (int i = 1; i < argc; ++i)
     {
         if (std::string(argv[i]) == "--screenshot" && i + 1 < argc)
