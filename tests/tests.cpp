@@ -17,6 +17,7 @@
 #include "RingBufferTest.hpp"
 #include "SignalUtilsTest.hpp"
 #include "CloneableTest.hpp"
+#include "SettingsTest.hpp"
 
 int main(int argc, char **argv)
 {
@@ -43,6 +44,7 @@ int main(int argc, char **argv)
 	ringBufferTestSuite();
 	signalUtilsTestSuite();
 	cloneableTestSuite();
+	settingsTestSuite();
 
 	SDL_Quit();
 
