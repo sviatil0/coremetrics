@@ -1179,6 +1179,30 @@ static void pollMetrics()
     }
 }
 
+// Pretty-print the top-N process table to stdout for the headless
+// `--top` and `--watch` modes. Separated so both the one-shot path
+// and the watch loop call the exact same formatter. Project rule
+// forbids lambdas in app code, so this is a free static helper.
+static void printTopProcesses(int topCount)
+{
+    std::vector<ProcessInfo> procs = SystemMetrics::topProcesses(
+        static_cast<std::size_t>(topCount));
+    std::printf("%-7s %-32s %6s %6s %12s\n",
+                "PID", "NAME", "CPU%", "MEM%", "IO KB/s");
+    for (const auto &p : procs)
+    {
+        std::string name = p.name;
+        if (name.size() > 32)
+        {
+            name.resize(32);
+        }
+        unsigned long long ioKbPerSec = p.diskReadKbPerSec + p.diskWriteKbPerSec;
+        std::printf("%-7d %-32s %6.1f %6.1f %12llu\n",
+                    p.pid, name.c_str(), p.cpuPct, p.memPct, ioKbPerSec);
+    }
+    std::fflush(stdout);
+}
+
 int main(int argc, char **argv)
 {
     // Optional headless screenshot mode: `coremetrics --screenshot out.bmp`
@@ -1198,6 +1222,11 @@ int main(int argc, char **argv)
     // tools without scraping a screenshot or a CSV file. N is clamped
     // to [1, 999]; default 20 if the value is missing or unparseable.
     int topCount = 0;
+    // `--watch` switches --top from one-shot to live tail-style: the
+    // table re-prints every poll interval, clearing the terminal first
+    // so the latest snapshot replaces the previous one in place. Ctrl-C
+    // exits cleanly via the existing SIGINT handler.
+    bool watchMode = false;
 
     // Hydrate persisted preferences before argv parsing so any CLI
     // flag the user supplies this run overrides the saved value.
@@ -1281,6 +1310,10 @@ int main(int argc, char **argv)
             }
             topCount = parsed;
         }
+        if (std::string(argv[i]) == "--watch")
+        {
+            watchMode = true;
+        }
     }
 
     // `--top` runs before SDL_Init since it never paints. Prints a
@@ -1289,20 +1322,25 @@ int main(int argc, char **argv)
     // so output reflects the same numbers a user would see on screen.
     if (topCount > 0)
     {
-        std::vector<ProcessInfo> procs = SystemMetrics::topProcesses(
-            static_cast<std::size_t>(topCount));
-        std::printf("%-7s %-32s %6s %6s %12s\n",
-                    "PID", "NAME", "CPU%", "MEM%", "IO KB/s");
-        for (const auto &p : procs)
+        // Install the signal handler before the loop so Ctrl-C exits
+        // cleanly out of --watch instead of leaving a half-cleared
+        // terminal. The same flag the GUI main loop watches.
+        std::signal(SIGINT, handleShutdownSignal);
+        std::signal(SIGTERM, handleShutdownSignal);
+        if (!watchMode)
         {
-            std::string name = p.name;
-            if (name.size() > 32)
-            {
-                name.resize(32);
-            }
-            unsigned long long ioKbPerSec = p.diskReadKbPerSec + p.diskWriteKbPerSec;
-            std::printf("%-7d %-32s %6.1f %6.1f %12llu\n",
-                        p.pid, name.c_str(), p.cpuPct, p.memPct, ioKbPerSec);
+            printTopProcesses(topCount);
+            return 0;
+        }
+        // --watch: clear the terminal with the ANSI 2J + cursor home
+        // sequence then re-print. Cheap, no curses, works in any
+        // terminal emulator. Uses g_pollIntervalMs (defaults 500 ms,
+        // overridable via --poll-ms) so the cadence matches the GUI.
+        while (!g_shutdownRequested.load())
+        {
+            std::printf("\033[2J\033[H");
+            printTopProcesses(topCount);
+            SDL_Delay(static_cast<Uint32>(g_pollIntervalMs));
         }
         return 0;
     }
