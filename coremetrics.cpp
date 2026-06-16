@@ -673,12 +673,13 @@ static void renderFooterLiveStats(Screen &dest)
 // rest of the footer chrome uses so the eye lands on the count first.
 static void renderProcessesSummary(Screen &dest)
 {
-    // y=40..60 sits below the tab strip (y=0..36) and above the
-    // column header row defined in base.xml at y=64..84, so the
-    // summary annotates the table without hiding the PID / NAME /
-    // CPU% / MEM% / DISK I/O labels.
+    // Strip lives at y=448..464, BELOW the 15 visible data rows
+    // (y=100..400) and ABOVE the footer chrome (y=476..520). Earlier
+    // versions sat the strip at y=40..60 which physically collided
+    // with the y=8..40 tab buttons defined in base.xml; glyph
+    // descenders bled into the button outlines.
     const vec3 stripBg(0.08f, 0.08f, 0.08f);
-    dest.drawBox(ivec2(24, 40), ivec2(936, 60), stripBg);
+    dest.drawBox(ivec2(24, 448), ivec2(936, 466), stripBg);
 
     const vec3 dim(0.65f, 0.65f, 0.65f);
     std::size_t n = g_lastProcCount;
@@ -687,9 +688,9 @@ static void renderProcessesSummary(Screen &dest)
     std::string cpuText = "Sum CPU: " + formatPct(g_sumCpuPct) + "%";
     std::string memText = "Sum MEM: " + formatPct(g_sumMemPct) + "%";
 
-    Font::drawText(dest, totalText, ivec2(32, 44), COLOR_ACCENT_GREEN);
-    Font::drawText(dest, cpuText, ivec2(280, 44), dim);
-    Font::drawText(dest, memText, ivec2(520, 44), dim);
+    Font::drawText(dest, totalText, ivec2(32, 452), COLOR_ACCENT_GREEN);
+    Font::drawText(dest, cpuText, ivec2(280, 452), dim);
+    Font::drawText(dest, memText, ivec2(520, 452), dim);
 
     // Scroll position indicator. Only shown when the table is longer
     // than the visible window so a user with 22 processes does not see
@@ -707,7 +708,7 @@ static void renderProcessesSummary(Screen &dest)
         std::string scrollText = std::to_string(firstRow) + ".."
                                  + std::to_string(lastRow) + " / "
                                  + std::to_string(g_processVisibleCount);
-        Font::drawText(dest, scrollText, ivec2(760, 44), COLOR_ACCENT_GREEN);
+        Font::drawText(dest, scrollText, ivec2(760, 452), COLOR_ACCENT_GREEN);
     }
 }
 
