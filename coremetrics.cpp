@@ -118,6 +118,16 @@ constexpr int PROCESSES_VISIBLE_ROWS = 15;
 static int g_selectedPid = -1;
 static int g_selectedRowIndex = -1;
 static std::vector<int> g_visiblePids;
+// First-row index in the fetched process list. PgDown/PgUp shift the
+// visible window by PROCESSES_VISIBLE_ROWS; up/down arrow at the edge
+// of the visible window scrolls by one. Stays clamped to
+// [0, max(0, procCount - dataRowCount)] so the bottom row of data
+// fills the last visible slot even on overscroll.
+static std::size_t g_processScrollOffset = 0;
+// Snapshot of the most recent procs.size() after filter+truncate, set
+// by pollMetrics for the key handler so PgDown / arrow keys can clamp
+// against the actual table length without recomputing.
+static std::size_t g_processVisibleCount = 0;
 // Per-visible-row glyph overlay state for tree mode. When non-empty,
 // the prefix string contains the indent spaces + '+ ' or '- ' that
 // should be re-painted in color over the white text the Row already
@@ -1033,6 +1043,32 @@ static void pollMetrics()
         }
         procs = std::move(kept);
     }
+    // Stash the post-filter size before truncating so the scroll
+    // clamp + the "N more below" indicator can use it.
+    g_processVisibleCount = procs.size();
+    // Clamp the scroll offset against the current table length so a
+    // shrinking window of matching processes never leaves a stale
+    // offset pointing past the end.
+    if (g_processVisibleCount <= dataRowCount)
+    {
+        g_processScrollOffset = 0;
+    }
+    else
+    {
+        std::size_t maxOffset = g_processVisibleCount - dataRowCount;
+        if (g_processScrollOffset > maxOffset)
+        {
+            g_processScrollOffset = maxOffset;
+        }
+    }
+    // Slice the visible window of dataRowCount entries starting at
+    // g_processScrollOffset so up/down + PgUp/PgDown move through the
+    // full process list instead of being capped at the first page.
+    if (g_processScrollOffset > 0)
+    {
+        procs.erase(procs.begin(),
+                    procs.begin() + static_cast<std::ptrdiff_t>(g_processScrollOffset));
+    }
     if (procs.size() > dataRowCount)
     {
         procs.resize(dataRowCount);
@@ -1726,15 +1762,82 @@ int main(int argc, char **argv)
                     }
                     else if (key == SDLK_UP)
                     {
-                        next = (next > 0) ? next - 1 : 0;
+                        if (next > 0)
+                        {
+                            next -= 1;
+                        }
+                        else if (g_processScrollOffset > 0)
+                        {
+                            // Already at top visible row; scroll the
+                            // window up by one so the previous off-screen
+                            // process becomes the new selection on the
+                            // next poll tick.
+                            g_processScrollOffset -= 1;
+                        }
                     }
                     else
                     {
                         int max = static_cast<int>(g_visiblePids.size()) - 1;
-                        next = (next < max) ? next + 1 : max;
+                        if (next < max)
+                        {
+                            next += 1;
+                        }
+                        else if (g_processVisibleCount
+                                 > g_processScrollOffset + g_visiblePids.size())
+                        {
+                            // Already at bottom visible row; scroll the
+                            // window down by one so the next off-screen
+                            // process becomes the new selection.
+                            g_processScrollOffset += 1;
+                        }
                     }
                     g_selectedRowIndex = next;
                     g_selectedPid = g_visiblePids[next];
+                }
+                else if (key == SDLK_PAGEUP)
+                {
+                    if (g_processScrollOffset >= PROCESSES_VISIBLE_ROWS)
+                    {
+                        g_processScrollOffset -= PROCESSES_VISIBLE_ROWS;
+                    }
+                    else
+                    {
+                        g_processScrollOffset = 0;
+                    }
+                }
+                else if (key == SDLK_PAGEDOWN)
+                {
+                    std::size_t dataRowCount = PROCESSES_VISIBLE_ROWS;
+                    if (g_processVisibleCount > dataRowCount)
+                    {
+                        std::size_t maxOffset = g_processVisibleCount - dataRowCount;
+                        g_processScrollOffset += PROCESSES_VISIBLE_ROWS;
+                        if (g_processScrollOffset > maxOffset)
+                        {
+                            g_processScrollOffset = maxOffset;
+                        }
+                    }
+                }
+                else if (key == SDLK_HOME)
+                {
+                    g_processScrollOffset = 0;
+                    if (!g_visiblePids.empty())
+                    {
+                        g_selectedRowIndex = 0;
+                        g_selectedPid = g_visiblePids.front();
+                    }
+                }
+                else if (key == SDLK_END)
+                {
+                    std::size_t dataRowCount = PROCESSES_VISIBLE_ROWS;
+                    if (g_processVisibleCount > dataRowCount)
+                    {
+                        g_processScrollOffset = g_processVisibleCount - dataRowCount;
+                    }
+                    else
+                    {
+                        g_processScrollOffset = 0;
+                    }
                 }
                 else if (key == SDLK_K && g_selectedPid >= 0)
                 {
