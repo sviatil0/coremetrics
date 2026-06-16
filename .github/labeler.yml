@@ -1,0 +1,48 @@
+ci:
+  - changed-files:
+      - any-glob-to-any-file:
+          - .github/**
+docs:
+  - changed-files:
+      - any-glob-to-any-file:
+          - docs/**
+          - "*.md"
+          - man/**
+tests:
+  - changed-files:
+      - any-glob-to-any-file:
+          - tests/**
+src:
+  - changed-files:
+      - any-glob-to-any-file:
+          - src/**
+          - include/**
+          - coremetrics.cpp
+packaging:
+  - changed-files:
+      - any-glob-to-any-file:
+          - packaging/**
+          - Formula/**
+          - snap/**
+ui:
+  - changed-files:
+      - any-glob-to-any-file:
+          - src/Bar.cpp
+          - src/Sparkline.cpp
+          - src/Label.cpp
+          - src/Button.cpp
+          - src/Row.cpp
+          - src/font.cpp
+          - base.xml
+win:
+  - changed-files:
+      - any-glob-to-any-file:
+          - src/SystemMetrics_win.cpp
+mac:
+  - changed-files:
+      - any-glob-to-any-file:
+          - src/SystemMetrics_mac.cpp
+linux:
+  - changed-files:
+      - any-glob-to-any-file:
+          - src/SystemMetrics_linux.cpp
