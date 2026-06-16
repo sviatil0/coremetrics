@@ -99,6 +99,8 @@ make                 # builds bin/coremetrics and launches it
 ./bin/coremetrics --sparklines                      # adds rolling CPU/RAM/GPU charts
 ./bin/coremetrics --duration 5                      # auto-quit after 5s (for CI smoke tests)
 ./bin/coremetrics --poll-ms 250                     # custom refresh cadence (clamped 100..10000)
+./bin/coremetrics --top 10                          # headless: print top 10 procs to stdout + exit
+./bin/coremetrics --top 10 --watch                  # live tail; refreshes every poll interval, ctrl-C to exit
 ```
 
 <details>
