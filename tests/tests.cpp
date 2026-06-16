@@ -10,7 +10,6 @@
 #include "layoutTest.hpp"
 #include "ThreadPoolTest.hpp"
 #include "BarTest.hpp"
-#include "StackedBarTest.hpp"
 #include "RowTest.hpp"
 #include "SystemMetricsTest.hpp"
 #include "SystemMetricsParseTest.hpp"
@@ -19,7 +18,7 @@
 #include "SignalUtilsTest.hpp"
 #include "CloneableTest.hpp"
 #include "SettingsTest.hpp"
-#include "TraceLogTest.hpp"
+#include "ToggleTest.hpp"
 
 int main(int argc, char **argv)
 {
@@ -39,7 +38,6 @@ int main(int argc, char **argv)
 	layoutTestSuite();
 	threadPoolTestSuite();
 	barTestSuite();
-	stackedBarTestSuite();
 	rowTestSuite();
 	systemMetricsTestSuite();
 	systemMetricsParseTestSuite();
@@ -48,7 +46,7 @@ int main(int argc, char **argv)
 	signalUtilsTestSuite();
 	cloneableTestSuite();
 	settingsTestSuite();
-	traceLogTestSuite();
+	toggleTestSuite();
 
 	SDL_Quit();
 
