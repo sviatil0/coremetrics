@@ -144,19 +144,17 @@ void Sparkline::draw(Screen &screen) const
         return maxPos.x - static_cast<int>(static_cast<float>(indexFromNewest) * stepX);
     };
 
-    // Darker fill at 10% of the line color so the polyline pops clearly
-    // against it instead of disappearing into a similarly-bright tint.
-    // In threshold mode the fill is recomputed per segment from the
-    // segment's stroke color so tint and stroke stay in sync as the line
-    // passes 60% and 80%.
-    vec3 fillColor(color.x * 0.10f, color.y * 0.10f, color.z * 0.10f);
+    // Lower fill (6% tint, down from 10%) so the chart reads as line +
+    // background rather than a saturated slab when the value is flat or
+    // pinned at the top of the range. In threshold mode the fill is
+    // recomputed per segment from the segment's stroke color so tint
+    // and stroke stay in sync as the line passes 60% and 80%.
+    vec3 fillColor(color.x * 0.06f, color.y * 0.06f, color.z * 0.06f);
 
-    // 50% horizontal midline gives the polyline a reference plane so a
-    // reviewer can tell a peak at 100% apart from one at 30% without
-    // squinting at the rect bounds. Brighter than before (0.28 vs 0.18)
-    // so the midline is actually visible against the fill region.
+    // 50% horizontal midline. Dimmed back to 0.20 so the midline is
+    // visible but doesn't compete with the polyline at low values.
     int midY = (minPos.y + maxPos.y) / 2;
-    vec3 midlineColor(0.28f, 0.28f, 0.28f);
+    vec3 midlineColor(0.20f, 0.20f, 0.20f);
     ivec2 midA(minPos.x, midY);
     ivec2 midB(maxPos.x, midY);
     screen.drawLine(midA, midB, midlineColor);
@@ -208,22 +206,17 @@ void Sparkline::draw(Screen &screen) const
             float peakPct = peak / maxValue;
             segColor = Thresholds::colorForRatio(peakPct);
         }
-        // 5px stroke (y-2..y+2) so the polyline is unmistakably visible
-        // against the dark fill region. The middle line is the exact
-        // data; the four offsets are decorative thickness.
+        // 3px stroke (y-1..y+1). Down from a 5px stroke so the chart
+        // reads as one line rather than a fat ribbon at the typical
+        // 40px chart height. The middle line is the exact data; the
+        // two offsets are decorative thickness.
         screen.drawLine(a, b, segColor);
-        ivec2 aUp1(a.x, a.y - 1);
-        ivec2 bUp1(b.x, b.y - 1);
-        ivec2 aUp2(a.x, a.y - 2);
-        ivec2 bUp2(b.x, b.y - 2);
-        ivec2 aDn1(a.x, a.y + 1);
-        ivec2 bDn1(b.x, b.y + 1);
-        ivec2 aDn2(a.x, a.y + 2);
-        ivec2 bDn2(b.x, b.y + 2);
-        screen.drawLine(aUp1, bUp1, segColor);
-        screen.drawLine(aUp2, bUp2, segColor);
-        screen.drawLine(aDn1, bDn1, segColor);
-        screen.drawLine(aDn2, bDn2, segColor);
+        ivec2 aUp(a.x, a.y - 1);
+        ivec2 bUp(b.x, b.y - 1);
+        ivec2 aDn(a.x, a.y + 1);
+        ivec2 bDn(b.x, b.y + 1);
+        screen.drawLine(aUp, bUp, segColor);
+        screen.drawLine(aDn, bDn, segColor);
     }
 
     // Axis tick labels at the right edge anchor the rect to absolute

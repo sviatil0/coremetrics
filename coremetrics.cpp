@@ -227,8 +227,11 @@ constexpr int MEMSEG_X1 = 864;
 // 14px height made the two bars feel like duplicate metrics; 8px keeps
 // the segment colors readable while letting the eye treat the strip
 // as a thin annotation rather than its own row.
-constexpr int MEMSEG_Y0 = 164;
-constexpr int MEMSEG_Y1 = 172;
+// Memory breakdown strip thinned to a 4px sliver (was 8px) and pinned
+// directly under the RAM bar so the System tab reads as one bar with a
+// thin annotation instead of two stacked bars.
+constexpr int MEMSEG_Y0 = 162;
+constexpr int MEMSEG_Y1 = 166;
 
 static ivec2 g_headerColMin[5];
 static ivec2 g_headerColMax[5];
