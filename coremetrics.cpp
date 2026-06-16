@@ -1179,14 +1179,52 @@ static void pollMetrics()
     }
 }
 
+enum class TopSortKey
+{
+    Memory,
+    Cpu,
+    Io
+};
+
+static bool topSortByCpuDesc(const ProcessInfo &a, const ProcessInfo &b)
+{
+    return a.cpuPct > b.cpuPct;
+}
+
+static bool topSortByIoDesc(const ProcessInfo &a, const ProcessInfo &b)
+{
+    unsigned long long aIo = a.diskReadKbPerSec + a.diskWriteKbPerSec;
+    unsigned long long bIo = b.diskReadKbPerSec + b.diskWriteKbPerSec;
+    return aIo > bIo;
+}
+
 // Pretty-print the top-N process table to stdout for the headless
 // `--top` and `--watch` modes. Separated so both the one-shot path
 // and the watch loop call the exact same formatter. Project rule
 // forbids lambdas in app code, so this is a free static helper.
-static void printTopProcesses(int topCount)
+static void printTopProcesses(int topCount, TopSortKey sortKey)
 {
-    std::vector<ProcessInfo> procs = SystemMetrics::topProcesses(
-        static_cast<std::size_t>(topCount));
+    // Over-fetch by 4x so the secondary sort by cpu/io has enough
+    // candidates to choose from when the backend ordered the list by
+    // memory. topProcesses() returns by mem% desc; we re-sort here.
+    std::size_t fetchN = static_cast<std::size_t>(topCount) * 4;
+    if (fetchN < 50)
+    {
+        fetchN = 50;
+    }
+    std::vector<ProcessInfo> procs = SystemMetrics::topProcesses(fetchN);
+    if (sortKey == TopSortKey::Cpu)
+    {
+        std::sort(procs.begin(), procs.end(), topSortByCpuDesc);
+    }
+    else if (sortKey == TopSortKey::Io)
+    {
+        std::sort(procs.begin(), procs.end(), topSortByIoDesc);
+    }
+    if (procs.size() > static_cast<std::size_t>(topCount))
+    {
+        procs.resize(static_cast<std::size_t>(topCount));
+    }
     std::printf("%-7s %-32s %6s %6s %12s\n",
                 "PID", "NAME", "CPU%", "MEM%", "IO KB/s");
     for (const auto &p : procs)
@@ -1227,6 +1265,10 @@ int main(int argc, char **argv)
     // so the latest snapshot replaces the previous one in place. Ctrl-C
     // exits cleanly via the existing SIGINT handler.
     bool watchMode = false;
+    // `--top-sort cpu|mem|io` re-orders the printed table by the
+    // chosen column. Default is mem (matches the backend's natural
+    // sort order from topProcesses(N)). Unknown values fall back to mem.
+    TopSortKey topSortKey = TopSortKey::Memory;
 
     // Hydrate persisted preferences before argv parsing so any CLI
     // flag the user supplies this run overrides the saved value.
@@ -1314,6 +1356,22 @@ int main(int argc, char **argv)
         {
             watchMode = true;
         }
+        if (std::string(argv[i]) == "--top-sort" && i + 1 < argc)
+        {
+            std::string key = argv[i + 1];
+            if (key == "cpu")
+            {
+                topSortKey = TopSortKey::Cpu;
+            }
+            else if (key == "io")
+            {
+                topSortKey = TopSortKey::Io;
+            }
+            else
+            {
+                topSortKey = TopSortKey::Memory;
+            }
+        }
     }
 
     // `--top` runs before SDL_Init since it never paints. Prints a
@@ -1329,7 +1387,7 @@ int main(int argc, char **argv)
         std::signal(SIGTERM, handleShutdownSignal);
         if (!watchMode)
         {
-            printTopProcesses(topCount);
+            printTopProcesses(topCount, topSortKey);
             return 0;
         }
         // --watch: clear the terminal with the ANSI 2J + cursor home
@@ -1339,7 +1397,7 @@ int main(int argc, char **argv)
         while (!g_shutdownRequested.load())
         {
             std::printf("\033[2J\033[H");
-            printTopProcesses(topCount);
+            printTopProcesses(topCount, topSortKey);
             SDL_Delay(static_cast<Uint32>(g_pollIntervalMs));
         }
         return 0;
