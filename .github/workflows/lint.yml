@@ -24,7 +24,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Run actionlint
         # fail-on-error keeps the action exit code at 0 even when
         # shellcheck reports issues, so the step (and therefore the
