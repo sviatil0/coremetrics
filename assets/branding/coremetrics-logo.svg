@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- CoreMetrics logo, CM monogram on a rounded near-black square. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="CoreMetrics logo">
+  <rect width="256" height="256" rx="48" ry="48" fill="#0d0d0d"/>
+  <g fill="none" stroke="#dfffe0" stroke-width="20" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M104 80 a48 48 0 1 0 0 96"/>
+    <path d="M144 176 V80 L176 128 L208 80 V176"/>
+  </g>
+  <circle cx="64" cy="200" r="8" fill="#dfffe0"/>
+</svg>
