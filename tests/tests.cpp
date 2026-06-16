@@ -18,7 +18,7 @@
 #include "SignalUtilsTest.hpp"
 #include "CloneableTest.hpp"
 #include "SettingsTest.hpp"
-#include "DropdownTest.hpp"
+#include "TreeViewTest.hpp"
 
 int main(int argc, char **argv)
 {
@@ -46,7 +46,7 @@ int main(int argc, char **argv)
 	signalUtilsTestSuite();
 	cloneableTestSuite();
 	settingsTestSuite();
-	dropdownTestSuite();
+	treeViewTestSuite();
 
 	SDL_Quit();
 
