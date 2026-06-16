@@ -18,7 +18,7 @@
 #include "SignalUtilsTest.hpp"
 #include "CloneableTest.hpp"
 #include "SettingsTest.hpp"
-#include "TooltipTest.hpp"
+#include "DropdownTest.hpp"
 
 int main(int argc, char **argv)
 {
@@ -46,7 +46,7 @@ int main(int argc, char **argv)
 	signalUtilsTestSuite();
 	cloneableTestSuite();
 	settingsTestSuite();
-	tooltipTestSuite();
+	dropdownTestSuite();
 
 	SDL_Quit();
 
