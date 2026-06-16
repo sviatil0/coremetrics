@@ -438,16 +438,6 @@ static std::string formatRate(unsigned long long kbPerSec)
     return std::to_string(kbPerSec) + " KB/s";
 }
 
-static void renderAggregateDiskIo(Screen &dest)
-{
-    // Disk I/O is now sampled but rendered as part of renderNetIo to
-    // produce a single right-aligned 'disk + net' string in the footer
-    // chrome. This function is left as a no-op so the existing call
-    // sites do not need to change; consolidating both rates into one
-    // line keeps the footer compact and predictable.
-    (void)dest;
-}
-
 static void renderNetIo(Screen &dest)
 {
     bool anyDisk = (g_aggregateDiskReadKbPerSec != 0
@@ -1522,7 +1512,6 @@ int main(int argc, char **argv)
         {
             UptimeAndLoad::render(shot, g_uptimeSeconds, g_loadAverages);
             renderDiskUsage(shot);
-            renderAggregateDiskIo(shot);
             renderNetIo(shot);
             renderMemBreakdownStrip(shot);
             renderPerCoreStrip(shot);
@@ -2131,7 +2120,6 @@ int main(int argc, char **argv)
             {
                 UptimeAndLoad::render(screen, g_uptimeSeconds, g_loadAverages);
                 renderDiskUsage(screen);
-                renderAggregateDiskIo(screen);
                 renderNetIo(screen);
                 renderMemBreakdownStrip(screen);
                 renderPerCoreStrip(screen);
