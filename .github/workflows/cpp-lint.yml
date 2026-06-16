@@ -1,0 +1,104 @@
+name: C++ Lint
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cpp-lint-${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  clang-format:
+    # Non-blocking advisory pass. Surfaces formatting drift in the job
+    # log without gating PRs while the codebase catches up to the
+    # established .clang-format. Flip continue-on-error to false once
+    # the existing drift is cleared.
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install clang-format
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-format
+
+      - name: Check formatting
+        run: |
+          FILES=$(git ls-files '*.cpp' '*.hpp' '*.h' '*.cc' '*.cxx' \
+            | grep -Ev '^(obj|bin)/')
+          if [ -z "$FILES" ]; then
+            echo "no C++ files found"
+            exit 0
+          fi
+          BAD=""
+          for f in $FILES; do
+            if ! clang-format --dry-run --Werror --style=file "$f" \
+              > /dev/null 2>&1; then
+              BAD="$BAD $f"
+            fi
+          done
+          if [ -n "$BAD" ]; then
+            echo "::warning::clang-format drift found in:"
+            for f in $BAD; do
+              echo "  $f"
+            done
+            echo
+            echo "Run 'clang-format -i $BAD' locally to fix."
+            exit 1
+          fi
+          echo "All C++ files match .clang-format"
+
+  clang-tidy:
+    # Non-blocking. Runs a focused subset of clang-tidy checks against
+    # the project sources. The checks are picked to flag genuine bugs
+    # (bugprone-*, performance-*, readability-redundant-*) without
+    # being noisy about every style nit.
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install clang-tidy + deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-tidy pkg-config build-essential \
+            libfreetype-dev libharfbuzz-dev
+
+      - name: Setup SDL3
+        uses: libsdl-org/setup-sdl@main
+        with:
+          install-linux-dependencies: true
+          version: 3-latest
+          version-sdl-ttf: 3-latest
+          version-sdl-image: 3-latest
+
+      - name: Run clang-tidy
+        run: |
+          CFLAGS="-std=c++23 -I./include $(pkg-config --cflags sdl3 sdl3-ttf sdl3-image)"
+          FILES=$(git ls-files 'src/*.cpp' 'coremetrics.cpp')
+          BAD=""
+          for f in $FILES; do
+            echo "::group::clang-tidy $f"
+            if ! clang-tidy "$f" \
+              --checks='-*,bugprone-*,performance-*,readability-redundant-*,modernize-use-nullptr,modernize-use-override' \
+              --quiet \
+              -- $CFLAGS 2>&1; then
+              BAD="$BAD $f"
+            fi
+            echo "::endgroup::"
+          done
+          if [ -n "$BAD" ]; then
+            echo "::warning::clang-tidy flagged issues in:"
+            for f in $BAD; do
+              echo "  $f"
+            done
+            exit 1
+          fi
+          echo "clang-tidy clean across all sources"
