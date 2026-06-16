@@ -136,7 +136,7 @@ jobs:
           ls -la dist/coremetrics_*.deb
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coremetrics-${{ steps.plat.outputs.suffix }}
           path: |
