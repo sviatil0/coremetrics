@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <atomic>
 #include <csignal>
+#include <cstdio>
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
@@ -1169,6 +1170,11 @@ int main(int argc, char **argv)
     // file and exit. Both run before SDL_Init so they need no display.
     std::string exportCsvPath;
     std::string exportJsonPath;
+    // `--top N` prints the top N processes by memory % to stdout as a
+    // plain text table and exits. Lets the binary be piped into shell
+    // tools without scraping a screenshot or a CSV file. N is clamped
+    // to [1, 999]; default 20 if the value is missing or unparseable.
+    int topCount = 0;
 
     // Hydrate persisted preferences before argv parsing so any CLI
     // flag the user supplies this run overrides the saved value.
@@ -1235,6 +1241,47 @@ int main(int argc, char **argv)
         {
             exportJsonPath = argv[i + 1];
         }
+        if (std::string(argv[i]) == "--top")
+        {
+            int parsed = 20;
+            if (i + 1 < argc)
+            {
+                parsed = std::atoi(argv[i + 1]);
+                if (parsed < 1)
+                {
+                    parsed = 20;
+                }
+                if (parsed > 999)
+                {
+                    parsed = 999;
+                }
+            }
+            topCount = parsed;
+        }
+    }
+
+    // `--top` runs before SDL_Init since it never paints. Prints a
+    // fixed-width text table to stdout (PID/NAME/CPU%/MEM%/IO) and
+    // exits 0. Reads metrics with the same backend the live UI uses
+    // so output reflects the same numbers a user would see on screen.
+    if (topCount > 0)
+    {
+        std::vector<ProcessInfo> procs = SystemMetrics::topProcesses(
+            static_cast<std::size_t>(topCount));
+        std::printf("%-7s %-32s %6s %6s %12s\n",
+                    "PID", "NAME", "CPU%", "MEM%", "IO KB/s");
+        for (const auto &p : procs)
+        {
+            std::string name = p.name;
+            if (name.size() > 32)
+            {
+                name.resize(32);
+            }
+            unsigned long long ioKbPerSec = p.diskReadKbPerSec + p.diskWriteKbPerSec;
+            std::printf("%-7d %-32s %6.1f %6.1f %12llu\n",
+                        p.pid, name.c_str(), p.cpuPct, p.memPct, ioKbPerSec);
+        }
+        return 0;
     }
 
     // Export path runs before SDL_Init: no window, no audio, no font.
