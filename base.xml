@@ -53,7 +53,7 @@
 
         <box>
             <ivec2><x>8</x><y>44</y></ivec2>
-            <ivec2><x>952</x><y>45</y></ivec2>
+            <ivec2><x>952</x><y>46</y></ivec2>
             <vec3><x>0.255</x><y>0.282</y><z>0.408</z></vec3>
         </box>
 
@@ -295,7 +295,7 @@
 
         <box>
             <ivec2><x>8</x><y>478</y></ivec2>
-            <ivec2><x>952</x><y>479</y></ivec2>
+            <ivec2><x>952</x><y>480</y></ivec2>
             <vec3><x>0.255</x><y>0.282</y><z>0.408</z></vec3>
         </box>
 
