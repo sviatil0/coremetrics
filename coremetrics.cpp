@@ -45,6 +45,7 @@
 #include "ProcessesSummary.hpp"
 #include "SignalMenuOverlay.hpp"
 #include "TopProcessesPrinter.hpp"
+#include "FilterStrip.hpp"
 #include "Thresholds.hpp"
 #include "Theme.hpp"
 #include "AssetPath.hpp"
@@ -1925,28 +1926,7 @@ int main(int argc, char **argv)
         // widget itself.
         if (processesTabActive() && (g_filterInputActive || !g_filterText.empty()))
         {
-            // Filter input strip at the top of the Processes tab, above
-            // the header row. Two-tone: accent label, primary text for
-            // the query, a blinking cursor when input is active.
-            // Pillar A palette migration (follow-up to PR #207): the
-            // query text now flows through Theme::textPrimary() instead
-            // of a raw vec3(1,1,1) literal so the Tokyo Night palette
-            // governs every interactive overlay.
-            const vec3 labelColor = Theme::accentGreen();
-            const vec3 textColor = Theme::textPrimary();
-            const vec3 hintColor = Theme::textDim();
-            std::string prefix = g_filterInputActive ? "filter> " : "filter: ";
-            std::string body = g_filterText;
-            if (g_filterInputActive && ((SDL_GetTicks() / 400) % 2) == 0)
-            {
-                body += "_";
-            }
-            Font::drawText(screen, prefix, ivec2(24, 44), labelColor);
-            Font::drawText(screen, body, ivec2(120, 44), textColor);
-            if (!g_filterInputActive && !g_filterText.empty())
-            {
-                Font::drawText(screen, "Esc clears", ivec2(800, 44), hintColor);
-            }
+            FilterStrip::render(screen, g_filterInputActive, g_filterText, SDL_GetTicks());
         }
 
         if (processesTabActive() && g_selectedRowIndex >= 0
