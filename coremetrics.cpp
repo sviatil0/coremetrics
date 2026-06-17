@@ -39,6 +39,7 @@
 #include "UptimeAndLoad.hpp"
 #include "NetIoFooter.hpp"
 #include "DiskUsageRow.hpp"
+#include "MemBreakdownStrip.hpp"
 #include "Thresholds.hpp"
 #include "Theme.hpp"
 #include "AssetPath.hpp"
@@ -233,18 +234,8 @@ static unsigned long long g_aggregateDiskReadKbPerSec = 0;
 static unsigned long long g_aggregateDiskWriteKbPerSec = 0;
 // Aggregate network rx/tx sampled every poll. Loopback excluded.
 static NetIo g_netIo{0, 0};
-constexpr int MEMSEG_X0 = 84;
-constexpr int MEMSEG_X1 = 864;
-// Slim strip (164..172) so the breakdown reads as a continuation of
-// the RAM bar above, not a second RAM bar stacked beneath. The earlier
-// 14px height made the two bars feel like duplicate metrics; 8px keeps
-// the segment colors readable while letting the eye treat the strip
-// as a thin annotation rather than its own row.
-// Memory breakdown strip thinned to a 4px sliver (was 8px) and pinned
-// directly under the RAM bar so the System tab reads as one bar with a
-// thin annotation instead of two stacked bars.
-constexpr int MEMSEG_Y0 = 162;
-constexpr int MEMSEG_Y1 = 166;
+// MEMSEG_* geometry moved to src/MemBreakdownStrip.cpp alongside the
+// renderer that owns the strip.
 
 static ivec2 g_headerColMin[5];
 static ivec2 g_headerColMax[5];
@@ -448,47 +439,9 @@ static std::string formatRate(unsigned long long kbPerSec)
 // slice 5 of the GUI evolution spec. Call site passes g_diskUsage
 // explicitly via DiskUsageRow::render(...).
 
-static void renderMemBreakdownStrip(Screen &dest)
-{
-    if (g_memBreakdown.totalKb == 0)
-    {
-        return;
-    }
-    const int width = MEMSEG_X1 - MEMSEG_X0;
-    if (width <= 0)
-    {
-        return;
-    }
-
-    auto segPx = [&](unsigned long long kb) {
-        // Compute as 64-bit to avoid overflowing the multiplication on
-        // large-memory hosts (256GB+).
-        unsigned long long n = static_cast<unsigned long long>(width) * kb;
-        return static_cast<int>(n / g_memBreakdown.totalKb);
-    };
-
-    const vec3 colActive = Theme::accentRed(); // red: in-use by processes
-    const vec3 colWired(0.95f, 0.66f, 0.30f);  // orange: kernel + pinned
-    const vec3 colCached(0.45f, 0.78f, 0.95f); // blue: reclaimable cache
-    const vec3 colFree(0.18f, 0.18f, 0.18f);   // dark: free
-
-    int x = MEMSEG_X0;
-    // Active
-    int aw = segPx(g_memBreakdown.activeKb);
-    if (aw > 0) { dest.drawBox(ivec2(x, MEMSEG_Y0), ivec2(x + aw, MEMSEG_Y1), colActive); x += aw; }
-    // Wired
-    int ww = segPx(g_memBreakdown.wiredKb);
-    if (ww > 0) { dest.drawBox(ivec2(x, MEMSEG_Y0), ivec2(x + ww, MEMSEG_Y1), colWired); x += ww; }
-    // Cached
-    int cw = segPx(g_memBreakdown.cachedKb);
-    if (cw > 0) { dest.drawBox(ivec2(x, MEMSEG_Y0), ivec2(x + cw, MEMSEG_Y1), colCached); x += cw; }
-    // Free fills whatever is left so rounding remainder gets absorbed visually.
-    if (x < MEMSEG_X1)
-    {
-        dest.drawBox(ivec2(x, MEMSEG_Y0), ivec2(MEMSEG_X1, MEMSEG_Y1), colFree);
-    }
-
-}
+// Memory breakdown strip paint moved to src/MemBreakdownStrip.cpp as
+// Phase 1.2 slice 6 of the GUI evolution spec. Call site passes
+// g_memBreakdown explicitly via MemBreakdownStrip::render(...).
 
 static void renderPerCoreStrip(Screen &dest)
 {
@@ -1436,7 +1389,7 @@ int main(int argc, char **argv)
             UptimeAndLoad::render(shot, g_uptimeSeconds, g_loadAverages);
             DiskUsageRow::render(shot, g_diskUsage);
             NetIoFooter::render(shot, g_aggregateDiskReadKbPerSec, g_aggregateDiskWriteKbPerSec, g_netIo);
-            renderMemBreakdownStrip(shot);
+            MemBreakdownStrip::render(shot, g_memBreakdown);
             renderPerCoreStrip(shot);
             if (g_sparklinesEnabled)
             {
@@ -2044,7 +1997,7 @@ int main(int argc, char **argv)
                 UptimeAndLoad::render(screen, g_uptimeSeconds, g_loadAverages);
                 DiskUsageRow::render(screen, g_diskUsage);
                 NetIoFooter::render(screen, g_aggregateDiskReadKbPerSec, g_aggregateDiskWriteKbPerSec, g_netIo);
-                renderMemBreakdownStrip(screen);
+                MemBreakdownStrip::render(screen, g_memBreakdown);
                 renderPerCoreStrip(screen);
                 if (g_sparklinesEnabled)
                 {
