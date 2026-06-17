@@ -90,10 +90,10 @@ sudo apt install /tmp/coremetrics.deb
 # Arch Linux (AUR)
 yay -S coremetrics-bin
 
-# Any platform (tarball, replace v0.2.26 with the latest release tag)
-curl -LO https://github.com/sviatil0/coremetrics/releases/download/v0.2.26/coremetrics-v0.2.26-macos-arm64.tar.gz
-tar xf coremetrics-v0.2.26-macos-arm64.tar.gz
-cd coremetrics-v0.2.26-macos-arm64
+# Any platform (tarball, replace v0.3.0 with the latest release tag)
+curl -LO https://github.com/sviatil0/coremetrics/releases/download/v0.3.0/coremetrics-v0.3.0-macos-arm64.tar.gz
+tar xf coremetrics-v0.3.0-macos-arm64.tar.gz
+cd coremetrics-v0.3.0-macos-arm64
 ./coremetrics
 ```
 

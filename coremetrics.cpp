@@ -950,7 +950,7 @@ int main(int argc, char **argv)
         {
             // Mirrors base.xml's footer label; bumped by the release
             // flow that touches the XML.
-            std::printf("coremetrics 0.2.26\n");
+            std::printf("coremetrics 0.3.0\n");
             return 0;
         }
         if (arg == "--help" || arg == "-h")
