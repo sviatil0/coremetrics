@@ -206,6 +206,13 @@
             <ivec2><x>936</x><y>91</y></ivec2>
             <vec3><x>0.255</x><y>0.282</y><z>0.408</z></vec3>
         </box>
+        <box><ivec2><x>24</x><y>120</y></ivec2><ivec2><x>936</x><y>140</y></ivec2><vec3><x>0.184</x><y>0.200</y><z>0.302</z></vec3></box>
+        <box><ivec2><x>24</x><y>160</y></ivec2><ivec2><x>936</x><y>180</y></ivec2><vec3><x>0.184</x><y>0.200</y><z>0.302</z></vec3></box>
+        <box><ivec2><x>24</x><y>200</y></ivec2><ivec2><x>936</x><y>220</y></ivec2><vec3><x>0.184</x><y>0.200</y><z>0.302</z></vec3></box>
+        <box><ivec2><x>24</x><y>240</y></ivec2><ivec2><x>936</x><y>260</y></ivec2><vec3><x>0.184</x><y>0.200</y><z>0.302</z></vec3></box>
+        <box><ivec2><x>24</x><y>280</y></ivec2><ivec2><x>936</x><y>300</y></ivec2><vec3><x>0.184</x><y>0.200</y><z>0.302</z></vec3></box>
+        <box><ivec2><x>24</x><y>320</y></ivec2><ivec2><x>936</x><y>340</y></ivec2><vec3><x>0.184</x><y>0.200</y><z>0.302</z></vec3></box>
+        <box><ivec2><x>24</x><y>360</y></ivec2><ivec2><x>936</x><y>380</y></ivec2><vec3><x>0.184</x><y>0.200</y><z>0.302</z></vec3></box>
         <row><ivec2><x>24</x><y>100</y></ivec2><ivec2><x>936</x><y>120</y></ivec2><cell weight=0.10></cell><cell weight=0.42></cell><cell weight=0.12></cell><cell weight=0.12></cell><cell weight=0.24></cell><vec3><x>0.753</x><y>0.792</y><z>0.961</z></vec3></row>
         <row><ivec2><x>24</x><y>120</y></ivec2><ivec2><x>936</x><y>140</y></ivec2><cell weight=0.10></cell><cell weight=0.42></cell><cell weight=0.12></cell><cell weight=0.12></cell><cell weight=0.24></cell><vec3><x>0.753</x><y>0.792</y><z>0.961</z></vec3></row>
         <row><ivec2><x>24</x><y>140</y></ivec2><ivec2><x>936</x><y>160</y></ivec2><cell weight=0.10></cell><cell weight=0.42></cell><cell weight=0.12></cell><cell weight=0.12></cell><cell weight=0.24></cell><vec3><x>0.753</x><y>0.792</y><z>0.961</z></vec3></row>
