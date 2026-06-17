@@ -9,6 +9,7 @@
 #include "GUIElementFactory.hpp"
 #include "ClickEvent.hpp"
 #include "ShowEvent.hpp"
+#include "Theme.hpp"
 
 bool checkPixel(SDL_Surface *surface, int x, int y, Uint8 expectedR, Uint8 expectedG, Uint8 expectedB)
 {
@@ -87,7 +88,13 @@ void testImageMissingFile()
 
 void testButtonDraw()
 {
-    std::cout << "Button - Draw White Border: ";
+    // Button::draw paints a 1 px Theme::panelBorder() stroke wrapping a
+    // fill of the constructor color. Theme::panelBorder() is
+    // vec3(0.255, 0.282, 0.408), which round-trips through the 8-bit
+    // surface as (65, 72, 104). The expected stroke color is computed
+    // here from the live Theme getter so a future palette tweak does
+    // not silently break this assertion.
+    std::cout << "Button - Draw Panel Border: ";
     Screen s(30, 30);
     Button btn(ivec2(5, 5), ivec2(20, 20), vec3(0.0f, 0.0f, 1.0f));
     btn.draw(s);
@@ -95,7 +102,11 @@ void testButtonDraw()
     SDL_Surface *target = SDL_CreateSurface(30, 30, SDL_PIXELFORMAT_RGBA8888);
     s.blitTo(target);
 
-    bool passed = checkPixel(target, 5, 5, 255, 255, 255);
+    vec3 expected = Theme::panelBorder();
+    Uint8 expectedR = static_cast<Uint8>(expected.x * 255.0f);
+    Uint8 expectedG = static_cast<Uint8>(expected.y * 255.0f);
+    Uint8 expectedB = static_cast<Uint8>(expected.z * 255.0f);
+    bool passed = checkPixel(target, 5, 5, expectedR, expectedG, expectedB);
 
     SDL_DestroySurface(target);
     std::cout << (passed ? "PASS" : "FAIL") << '\n';
