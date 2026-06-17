@@ -43,6 +43,7 @@
 #include "PerCoreStrip.hpp"
 #include "FooterLiveStats.hpp"
 #include "ProcessesSummary.hpp"
+#include "TopProcessesPrinter.hpp"
 #include "Thresholds.hpp"
 #include "Theme.hpp"
 #include "AssetPath.hpp"
@@ -847,96 +848,6 @@ static void pollMetrics()
     }
 }
 
-enum class TopSortKey
-{
-    Memory,
-    Cpu,
-    Io
-};
-
-static bool topSortByCpuDesc(const ProcessInfo &a, const ProcessInfo &b)
-{
-    return a.cpuPct > b.cpuPct;
-}
-
-static bool topSortByIoDesc(const ProcessInfo &a, const ProcessInfo &b)
-{
-    unsigned long long aIo = a.diskReadKbPerSec + a.diskWriteKbPerSec;
-    unsigned long long bIo = b.diskReadKbPerSec + b.diskWriteKbPerSec;
-    return aIo > bIo;
-}
-
-// Pick an ANSI 24-bit color escape for a percent value using the same
-// green/yellow/red threshold palette the GUI uses (see Thresholds.hpp).
-// Returns "" when colorization is off so the caller can splice it in
-// unconditionally without surrounding if/else noise.
-static const char *topColorForPct(float pct, bool colorize)
-{
-    if (!colorize)
-    {
-        return "";
-    }
-    if (pct >= 80.0f)
-    {
-        return "\033[31m"; // red
-    }
-    if (pct >= 60.0f)
-    {
-        return "\033[33m"; // yellow
-    }
-    return "\033[32m"; // green
-}
-
-// Pretty-print the top-N process table to stdout for the headless
-// `--top` and `--watch` modes. Separated so both the one-shot path
-// and the watch loop call the exact same formatter. Project rule
-// forbids lambdas in app code, so this is a free static helper.
-static void printTopProcesses(int topCount, TopSortKey sortKey, bool colorize)
-{
-    // Over-fetch by 4x so the secondary sort by cpu/io has enough
-    // candidates to choose from when the backend ordered the list by
-    // memory. topProcesses() returns by mem% desc; we re-sort here.
-    std::size_t fetchN = static_cast<std::size_t>(topCount) * 4;
-    if (fetchN < 50)
-    {
-        fetchN = 50;
-    }
-    std::vector<ProcessInfo> procs = SystemMetrics::topProcesses(fetchN);
-    if (sortKey == TopSortKey::Cpu)
-    {
-        std::sort(procs.begin(), procs.end(), topSortByCpuDesc);
-    }
-    else if (sortKey == TopSortKey::Io)
-    {
-        std::sort(procs.begin(), procs.end(), topSortByIoDesc);
-    }
-    if (procs.size() > static_cast<std::size_t>(topCount))
-    {
-        procs.resize(static_cast<std::size_t>(topCount));
-    }
-    const char *reset = colorize ? "\033[0m" : "";
-    const char *headerColor = colorize ? "\033[1m" : "";
-    std::printf("%s%-7s %-32s %6s %6s %12s%s\n",
-                headerColor, "PID", "NAME", "CPU%", "MEM%", "IO KB/s", reset);
-    for (const auto &p : procs)
-    {
-        std::string name = p.name;
-        if (name.size() > 32)
-        {
-            name.resize(32);
-        }
-        unsigned long long ioKbPerSec = p.diskReadKbPerSec + p.diskWriteKbPerSec;
-        const char *cpuC = topColorForPct(p.cpuPct, colorize);
-        const char *memC = topColorForPct(p.memPct, colorize);
-        std::printf("%-7d %-32s %s%6.1f%s %s%6.1f%s %12llu\n",
-                    p.pid, name.c_str(),
-                    cpuC, p.cpuPct, reset,
-                    memC, p.memPct, reset,
-                    ioKbPerSec);
-    }
-    std::fflush(stdout);
-}
-
 int main(int argc, char **argv)
 {
     // Optional headless screenshot mode: `coremetrics --screenshot out.bmp`
@@ -964,7 +875,7 @@ int main(int argc, char **argv)
     // `--top-sort cpu|mem|io` re-orders the printed table by the
     // chosen column. Default is mem (matches the backend's natural
     // sort order from topProcesses(N)). Unknown values fall back to mem.
-    TopSortKey topSortKey = TopSortKey::Memory;
+    TopSortKey topSortKey = TopSortKey::Mem;
     // `--top-color auto|always|never`: colorize the --top / --watch
     // output. auto (default) checks isatty so piped output stays
     // ASCII-clean. always forces color on. never forces it off.
@@ -1115,7 +1026,7 @@ int main(int argc, char **argv)
             }
             else
             {
-                topSortKey = TopSortKey::Memory;
+                topSortKey = TopSortKey::Mem;
             }
         }
         if (std::string(argv[i]) == "--top-color" && i + 1 < argc)
@@ -1162,7 +1073,7 @@ int main(int argc, char **argv)
         std::signal(SIGTERM, handleShutdownSignal);
         if (!watchMode)
         {
-            printTopProcesses(topCount, topSortKey, topColorize);
+            TopProcessesPrinter::print(topCount, topSortKey, topColorize);
             return 0;
         }
         // --watch: clear the terminal with the ANSI 2J + cursor home
@@ -1172,7 +1083,7 @@ int main(int argc, char **argv)
         while (!g_shutdownRequested.load())
         {
             std::printf("\033[2J\033[H");
-            printTopProcesses(topCount, topSortKey, topColorize);
+            TopProcessesPrinter::print(topCount, topSortKey, topColorize);
             SDL_Delay(static_cast<Uint32>(g_pollIntervalMs));
         }
         return 0;
