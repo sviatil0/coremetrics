@@ -212,6 +212,34 @@ void Font::drawTextBold(Screen &screen, const std::string &text, ivec2 pos, vec3
     drawTextBold(screen, text, pos, color, Size::Body);
 }
 
+int Font::measureTextWidth(const std::string &text, Size size)
+{
+    if (text.empty())
+    {
+        return 0;
+    }
+    TTF_Font *font = ensureFont(size);
+    if (font == nullptr)
+    {
+        return 0;
+    }
+    // TTF_GetStringSize returns the laid-out width without rasterizing the
+    // glyphs, so the call is cheap enough to do on every toggle event. The
+    // height result is ignored: the y baseline is fixed by the button rect.
+    int width = 0;
+    int height = 0;
+    if (!TTF_GetStringSize(font, text.c_str(), text.size(), &width, &height))
+    {
+        return 0;
+    }
+    return width;
+}
+
+int Font::measureTextWidth(const std::string &text)
+{
+    return measureTextWidth(text, Size::Body);
+}
+
 void Font::shutdown()
 {
     for (auto &kv : g_textSurfaceCacheCaption)
