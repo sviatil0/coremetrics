@@ -46,6 +46,7 @@
 #include "SignalMenuOverlay.hpp"
 #include "TopProcessesPrinter.hpp"
 #include "FilterStrip.hpp"
+#include "StatusFlash.hpp"
 #include "Thresholds.hpp"
 #include "Theme.hpp"
 #include "AssetPath.hpp"
@@ -1935,10 +1936,13 @@ int main(int argc, char **argv)
             int y0 = PROCESSES_FIRST_ROW_Y + g_selectedRowIndex * PROCESS_ROW_HEIGHT;
             int y1 = y0 + PROCESS_ROW_HEIGHT - 1;
             // Thin accent strip on the left edge of the row. Cheap to draw,
-            // does not overdraw the text in the row.
+            // does not overdraw the text in the row. Brand-blue Theme::accent()
+            // matches the active-tab indicator introduced in #210 so the strip
+            // reads as "selected by user input" rather than the load-pressure
+            // green that the old COLOR_ACCENT_GREEN was suggesting.
             screen.drawBox(ivec2(PROCESSES_ROW_X0 - 6, y0),
                            ivec2(PROCESSES_ROW_X0 - 2, y1),
-                           COLOR_ACCENT_GREEN);
+                           Theme::accent());
         }
 
         if (g_signalMenuVisible)
@@ -1951,7 +1955,7 @@ int main(int argc, char **argv)
             // Paint the flash over the right end of the footer status strip,
             // before the EXIT button. The accent color is reused so the flash
             // reads as part of the same status row, not a foreign popup.
-            Font::drawText(screen, g_statusFlash, ivec2(540, 492), COLOR_ACCENT_GREEN);
+            StatusFlash::render(screen, g_statusFlash);
         }
         else if (!g_statusFlash.empty())
         {
