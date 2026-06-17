@@ -30,6 +30,23 @@
 
 </div>
 
+## Lightweight by design
+
+CoreMetrics is a graphical system monitor that ships in **1.6 MB on disk** and holds **~60 MB resident** at steady state. The custom rasterizer + SDL3 surfaces strategy keeps the runtime footprint closer to a terminal tool than to a stock GUI app.
+
+| Tool | Type | Binary | Resident RAM | Notes |
+|---|---|---|---|---|
+| **CoreMetrics** | **GUI** | **1.6 MB** | **~60 MB** | This project |
+| Activity Monitor (macOS, builtin) | GUI | bundled | ~150-300 MB | Apple |
+| iStat Menus | GUI | ~80 MB | ~80-150 MB | Paid |
+| Stats (macOS, open source) | GUI | ~25 MB | ~70-120 MB | Menubar |
+| Task Manager (Windows, builtin) | GUI | bundled | ~80-120 MB | Microsoft |
+| btop | TUI | ~1.5 MB | ~30-50 MB | Text only |
+| htop | TUI | ~200 KB | ~10-20 MB | Text only |
+| Conky | desktop widget | ~500 KB | ~20-40 MB | Linux only |
+
+Roughly **1/3 the RAM of Activity Monitor** and **1/2 of iStat Menus** at a comparable feature set, while shipping a real graphical UI rather than a terminal table. Numbers above measured on macOS arm64; the Linux and Windows builds use the same backend split and the same render path. The renderer itself is a from-scratch `Screen` class on top of raw SDL3 surfaces, no Electron, no Qt, no Skia.
+
 | System tab | Processes tab |
 |:---:|:---:|
 | ![System tab](assets/screenshot-system.png) | ![Processes tab](assets/screenshot-processes.png) |
