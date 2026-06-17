@@ -41,6 +41,7 @@
 #include "DiskUsageRow.hpp"
 #include "MemBreakdownStrip.hpp"
 #include "PerCoreStrip.hpp"
+#include "FooterLiveStats.hpp"
 #include "Thresholds.hpp"
 #include "Theme.hpp"
 #include "AssetPath.hpp"
@@ -451,19 +452,9 @@ static std::size_t g_lastProcCount = 0;
 static float g_sumCpuPct = 0.0f;
 static float g_sumMemPct = 0.0f;
 
-static void renderFooterLiveStats(Screen &dest)
-{
-    // procs N at x=370. The DISK+NET text begins at x=460. To survive
-    // a 4-digit proc count (10 chars * ~10px = 100px ending at x=470),
-    // truncate the count to a max width budget rather than printing
-    // arbitrary integers. Real-world process counts above ~9999 are
-    // already pathological on a personal machine.
-    const vec3 dim(0.5f, 0.5f, 0.5f);
-    std::size_t n = g_lastProcCount;
-    if (n > 9999) n = 9999;
-    std::string text = std::to_string(n) + " procs";
-    Font::drawText(dest, text, ivec2(370, 492), dim);
-}
+// Footer "N procs" live count moved to src/FooterLiveStats.cpp as
+// Phase 1.2 slice 8 of the GUI evolution spec. Reaches the same pixels
+// via FooterLiveStats::render(dest, g_lastProcCount).
 
 // Processes-tab aggregate strip painted above the column headers, below
 // the tab strip. Reads the cached g_lastProcCount / g_sumCpuPct /
@@ -1340,7 +1331,7 @@ int main(int argc, char **argv)
             int activeTabIndex = (tab == "processes") ? 1 : 0;
             TabIndicator::render(shot, activeTabIndex);
         }
-        renderFooterLiveStats(shot);
+        FooterLiveStats::render(shot, g_lastProcCount);
         if (tab != "processes")
         {
             UptimeAndLoad::render(shot, g_uptimeSeconds, g_loadAverages);
@@ -2021,7 +2012,7 @@ int main(int argc, char **argv)
                                ivec2(nameCellX, rowY), color);
             }
         }
-        renderFooterLiveStats(screen);
+        FooterLiveStats::render(screen, g_lastProcCount);
 
         // Aggregate summary strip sits above the Processes table column
         // headers (y=72) so a glance at the top of the tab shows the
