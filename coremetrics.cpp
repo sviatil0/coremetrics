@@ -1970,7 +1970,7 @@ int main(int argc, char **argv)
             lastPoll = now;
         }
 
-        screen.clear();
+        screen.clear(Theme::bgBase());
         // Selected-row background. Painted BEFORE the layout render so the
         // row's text (drawn by the Row widget during LayoutManager render)
         // sits on top of the highlight box rather than under it. Renders

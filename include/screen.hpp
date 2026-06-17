@@ -27,6 +27,7 @@ public:
     ~Screen();
 
     void clear();
+    void clear(const Tvec3<float> &color);
     void blitTo(SDL_Surface *target);
     void blitSurface(SDL_Surface *src, const Tvec2<int> &pos);
     void drawPixel(const Tvec2<int> &pos, const Tvec3<float> &color);
