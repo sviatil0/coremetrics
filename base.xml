@@ -48,6 +48,36 @@
 
     <layout sX=0.0 sY=0.089 eX=1.0 eY=1.0 active=true name=system>
 
+        <!-- CPU card: fill + 4 px-thick edge borders. Painted before the
+             label/bar/label trio so the existing widgets sit on top. Card
+             rect (16,80) -> (944,116) gives ~4 px of internal padding
+             around the bar widget at (84,88) -> (864,112). -->
+        <box>
+            <ivec2><x>16</x><y>80</y></ivec2>
+            <ivec2><x>944</x><y>116</y></ivec2>
+            <vec3><x>0.141</x><y>0.157</y><z>0.231</z></vec3>
+        </box>
+        <box>
+            <ivec2><x>16</x><y>80</y></ivec2>
+            <ivec2><x>944</x><y>81</y></ivec2>
+            <vec3><x>0.255</x><y>0.282</y><z>0.408</z></vec3>
+        </box>
+        <box>
+            <ivec2><x>16</x><y>115</y></ivec2>
+            <ivec2><x>944</x><y>116</y></ivec2>
+            <vec3><x>0.255</x><y>0.282</y><z>0.408</z></vec3>
+        </box>
+        <box>
+            <ivec2><x>16</x><y>80</y></ivec2>
+            <ivec2><x>17</x><y>116</y></ivec2>
+            <vec3><x>0.255</x><y>0.282</y><z>0.408</z></vec3>
+        </box>
+        <box>
+            <ivec2><x>943</x><y>80</y></ivec2>
+            <ivec2><x>944</x><y>116</y></ivec2>
+            <vec3><x>0.255</x><y>0.282</y><z>0.408</z></vec3>
+        </box>
+
         <label>
             <ivec2><x>24</x><y>92</y></ivec2>
             <vec3><x>0.753</x><y>0.792</y><z>0.961</z></vec3>
@@ -67,6 +97,33 @@
             <text>0.0%</text>
         </label>
 
+        <!-- RAM card: same shape as CPU card, shifted to bar row at 136. -->
+        <box>
+            <ivec2><x>16</x><y>128</y></ivec2>
+            <ivec2><x>944</x><y>164</y></ivec2>
+            <vec3><x>0.141</x><y>0.157</y><z>0.231</z></vec3>
+        </box>
+        <box>
+            <ivec2><x>16</x><y>128</y></ivec2>
+            <ivec2><x>944</x><y>129</y></ivec2>
+            <vec3><x>0.255</x><y>0.282</y><z>0.408</z></vec3>
+        </box>
+        <box>
+            <ivec2><x>16</x><y>163</y></ivec2>
+            <ivec2><x>944</x><y>164</y></ivec2>
+            <vec3><x>0.255</x><y>0.282</y><z>0.408</z></vec3>
+        </box>
+        <box>
+            <ivec2><x>16</x><y>128</y></ivec2>
+            <ivec2><x>17</x><y>164</y></ivec2>
+            <vec3><x>0.255</x><y>0.282</y><z>0.408</z></vec3>
+        </box>
+        <box>
+            <ivec2><x>943</x><y>128</y></ivec2>
+            <ivec2><x>944</x><y>164</y></ivec2>
+            <vec3><x>0.255</x><y>0.282</y><z>0.408</z></vec3>
+        </box>
+
         <label>
             <ivec2><x>24</x><y>140</y></ivec2>
             <vec3><x>0.753</x><y>0.792</y><z>0.961</z></vec3>
@@ -85,6 +142,33 @@
             <vec3><x>0.620</x><y>0.808</y><z>0.416</z></vec3>
             <text>0.0%</text>
         </label>
+
+        <!-- GPU card: same shape as CPU card, shifted to bar row at 184. -->
+        <box>
+            <ivec2><x>16</x><y>176</y></ivec2>
+            <ivec2><x>944</x><y>212</y></ivec2>
+            <vec3><x>0.141</x><y>0.157</y><z>0.231</z></vec3>
+        </box>
+        <box>
+            <ivec2><x>16</x><y>176</y></ivec2>
+            <ivec2><x>944</x><y>177</y></ivec2>
+            <vec3><x>0.255</x><y>0.282</y><z>0.408</z></vec3>
+        </box>
+        <box>
+            <ivec2><x>16</x><y>211</y></ivec2>
+            <ivec2><x>944</x><y>212</y></ivec2>
+            <vec3><x>0.255</x><y>0.282</y><z>0.408</z></vec3>
+        </box>
+        <box>
+            <ivec2><x>16</x><y>176</y></ivec2>
+            <ivec2><x>17</x><y>212</y></ivec2>
+            <vec3><x>0.255</x><y>0.282</y><z>0.408</z></vec3>
+        </box>
+        <box>
+            <ivec2><x>943</x><y>176</y></ivec2>
+            <ivec2><x>944</x><y>212</y></ivec2>
+            <vec3><x>0.255</x><y>0.282</y><z>0.408</z></vec3>
+        </box>
 
         <label>
             <ivec2><x>24</x><y>188</y></ivec2>
