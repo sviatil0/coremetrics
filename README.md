@@ -47,12 +47,12 @@ CoreMetrics is a graphical system monitor that ships in **1.6 MB on disk** and h
 
 Roughly **1/3 the RAM of Activity Monitor** and **1/2 of iStat Menus** at a comparable feature set, while shipping a real graphical UI rather than a terminal table. Numbers above measured on macOS arm64; the Linux and Windows builds use the same backend split and the same render path. The renderer itself is a from-scratch `Screen` class on top of raw SDL3 surfaces, no Electron, no Qt, no Skia.
 
-| System tab | Processes tab |
-|:---:|:---:|
-| ![System tab](assets/screenshot-system.png) | ![Processes tab](assets/screenshot-processes.png) |
-| CPU / RAM / GPU / DISK readouts, load-colored (RAM and DISK red past 80%), per-core strip, memory breakdown segments, uptime + load average, optional sparklines | Sortable / filterable process table with PID / NAME / CPU% / MEM% / DISK I/O columns, parent-child tree view, row selection, and signal menu (TERM / KILL / INT / HUP / STOP / CONT) |
+| System tab | Processes tab | About tab |
+|:---:|:---:|:---:|
+| ![System tab](assets/screenshot-system.png) | ![Processes tab](assets/screenshot-processes.png) | ![About tab](assets/screenshot-about.png) |
+| CPU / RAM / GPU / DISK readouts, load-colored (RAM and DISK red past 80%), per-core strip, memory breakdown segments, uptime + load average, optional sparklines | Sortable / filterable process table with PID / NAME / CPU% / MEM% / DISK I/O columns, parent-child tree view, row selection, and signal menu (TERM / KILL / INT / HUP / STOP / CONT) | Host snapshot: CPU model, OS + arch, hostname, total RAM, uptime, logical cores, battery, license, source |
 
-> Both frames are rendered by the app itself, headlessly: `coremetrics --screenshot out.png [system|processes]` runs one render pass to an offscreen surface and saves it, no window required. The extension picks the writer (`.png` via `IMG_SavePNG`, anything else via `SDL_SaveBMP`).
+> Every frame is rendered by the app itself, headlessly: `coremetrics --screenshot out.png [system|processes|about]` runs one render pass to an offscreen surface and saves it, no window required. The extension picks the writer (`.png` via `IMG_SavePNG`, anything else via `SDL_SaveBMP`).
 
 New here? [**DOCS.md**](DOCS.md) maps the whole repo; [**API.md**](API.md) is the full public library reference (every class and method).
 
