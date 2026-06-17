@@ -22,6 +22,14 @@
 
 </div>
 
+<div align="center">
+
+![CoreMetrics demo](assets/coremetrics-demo.gif)
+
+*Alternating System and Processes tabs, rendered by the binary's own headless `--screenshot` mode and stitched into the loop above. Each frame is a real CoreMetrics paint, not a mockup. Higher-fidelity `assets/coremetrics-demo.mp4` is also checked in.*
+
+</div>
+
 | System tab | Processes tab |
 |:---:|:---:|
 | ![System tab](assets/screenshot-system.png) | ![Processes tab](assets/screenshot-processes.png) |
