@@ -38,6 +38,7 @@
 #include "SparklineLabels.hpp"
 #include "UptimeAndLoad.hpp"
 #include "NetIoFooter.hpp"
+#include "DiskUsageRow.hpp"
 #include "Thresholds.hpp"
 #include "Theme.hpp"
 #include "AssetPath.hpp"
@@ -443,36 +444,9 @@ static std::string formatRate(unsigned long long kbPerSec)
 // of the GUI evolution spec. Call site passes the three globals
 // explicitly via NetIoFooter::render(...).
 
-static void renderDiskUsage(Screen &dest)
-{
-    if (g_diskUsage.totalKb == 0)
-    {
-        return;
-    }
-    unsigned long long usedKb = (g_diskUsage.totalKb > g_diskUsage.freeKb)
-                                    ? g_diskUsage.totalKb - g_diskUsage.freeKb
-                                    : 0;
-    float pct = computeDiskUsedPct(g_diskUsage.totalKb, g_diskUsage.freeKb);
-
-    vec3 color = Theme::textDim();
-    if (pct >= Thresholds::RED_PCT)
-    {
-        color = Thresholds::colorRed();
-    }
-    else if (pct >= Thresholds::YELLOW_PCT)
-    {
-        color = Thresholds::colorYellow();
-    }
-
-    std::string text = "DISK " + formatGbString(usedKb) + " / "
-                       + formatGbString(g_diskUsage.totalKb) + " GB ("
-                       + formatPct(pct) + "%)";
-    // Right side of the status row at y=44, mirroring the Up + Load
-    // string on the left. x=560 leaves room for a long string ("DISK
-    // 1457 / 2048 GB (71.1%)") without clipping the SOUND ON button at
-    // x=812.
-    Font::drawText(dest, text, ivec2(560, 44), color);
-}
+// Disk usage row paint moved to src/DiskUsageRow.cpp as Phase 1.2
+// slice 5 of the GUI evolution spec. Call site passes g_diskUsage
+// explicitly via DiskUsageRow::render(...).
 
 static void renderMemBreakdownStrip(Screen &dest)
 {
@@ -1460,7 +1434,7 @@ int main(int argc, char **argv)
         if (tab != "processes")
         {
             UptimeAndLoad::render(shot, g_uptimeSeconds, g_loadAverages);
-            renderDiskUsage(shot);
+            DiskUsageRow::render(shot, g_diskUsage);
             NetIoFooter::render(shot, g_aggregateDiskReadKbPerSec, g_aggregateDiskWriteKbPerSec, g_netIo);
             renderMemBreakdownStrip(shot);
             renderPerCoreStrip(shot);
@@ -2068,7 +2042,7 @@ int main(int argc, char **argv)
             if (systemNode != nullptr && systemNode->getData().isActive())
             {
                 UptimeAndLoad::render(screen, g_uptimeSeconds, g_loadAverages);
-                renderDiskUsage(screen);
+                DiskUsageRow::render(screen, g_diskUsage);
                 NetIoFooter::render(screen, g_aggregateDiskReadKbPerSec, g_aggregateDiskWriteKbPerSec, g_netIo);
                 renderMemBreakdownStrip(screen);
                 renderPerCoreStrip(screen);
