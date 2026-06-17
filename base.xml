@@ -45,8 +45,13 @@
             <ivec2><x>952</x><y>40</y></ivec2>
             <vec3><x>0.184</x><y>0.200</y><z>0.302</z></vec3>
         </button>
+        <!-- Label x is recomputed at runtime so SOUND ON / SOUND OFF both
+             stay centered inside the 140 px wide toggle button. The hand
+             tuned x=834 here is the centered offset for the default
+             "SOUND ON" string at 20 pt Body; coremetrics.cpp updates it on
+             toggle via Font::measureTextWidth(). -->
         <label>
-            <ivec2><x>818</x><y>14</y></ivec2>
+            <ivec2><x>834</x><y>14</y></ivec2>
             <vec3><x>0.753</x><y>0.792</y><z>0.961</z></vec3>
             <text>SOUND ON</text>
         </label>

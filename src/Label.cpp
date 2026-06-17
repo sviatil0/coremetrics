@@ -15,6 +15,11 @@ void Label::setText(std::string text)
     m_text = std::move(text);
 }
 
+ivec2 Label::getPos() const
+{
+    return m_position;
+}
+
 void Label::setPos(ivec2 pos)
 {
     m_position = pos;

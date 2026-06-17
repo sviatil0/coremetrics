@@ -31,6 +31,12 @@ namespace Font
     // their static "CPU"/"RAM"/"GPU" labels.
     void drawTextBold(Screen &screen, const std::string &text, ivec2 pos, vec3 color);
     void drawTextBold(Screen &screen, const std::string &text, ivec2 pos, vec3 color, Size size);
+    // Measure the rendered width of text at the given size. Returns 0 if the
+    // TTF face is not initialized (headless tests). Used by chrome that needs
+    // to center a label inside a known-width button, e.g. the SOUND ON/OFF
+    // toggle whose label text length changes when the user toggles the sound.
+    int measureTextWidth(const std::string &text, Size size);
+    int measureTextWidth(const std::string &text);
     void shutdown();
 }
 

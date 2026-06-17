@@ -244,6 +244,36 @@ static void activateTab(const std::string &name)
     }
 }
 
+// SOUND toggle button rect. Initialized in buildScene(). Declared here
+// (ahead of the other tab-bar geometry) so recenterMuteLabel() can read
+// it directly without a forward declaration.
+static ivec2 g_muteBtnMin;
+static ivec2 g_muteBtnMax;
+
+// Recenter the SOUND ON / SOUND OFF label inside the mute toggle button.
+// The hand-tuned baseline in base.xml is centered for the default "SOUND ON"
+// string at 20 pt Body; toggling to "SOUND OFF" adds one glyph and would
+// otherwise leave the label visibly off-center. Measures the current label
+// text and centers it inside g_muteBtnMin..g_muteBtnMax. No-op if the label
+// or TTF face is not ready (headless / pre-init paths).
+static void recenterMuteLabel()
+{
+    if (g_muteLabel == nullptr)
+    {
+        return;
+    }
+    int textWidth = Font::measureTextWidth(g_muteLabel->getText());
+    if (textWidth <= 0)
+    {
+        return;
+    }
+    int btnWidth = g_muteBtnMax.x - g_muteBtnMin.x;
+    int newX = g_muteBtnMin.x + (btnWidth - textWidth) / 2;
+    // Keep the existing y baseline; only the x needs to track text width.
+    ivec2 pos = g_muteLabel->getPos();
+    g_muteLabel->setPos(ivec2(newX, pos.y));
+}
+
 static void closeSignalMenu()
 {
     g_signalMenuVisible = false;
@@ -277,8 +307,7 @@ static NetIo g_netIo{0, 0};
 
 static ivec2 g_headerColMin[5];
 static ivec2 g_headerColMax[5];
-static ivec2 g_muteBtnMin;
-static ivec2 g_muteBtnMax;
+// g_muteBtnMin/Max declared earlier alongside recenterMuteLabel().
 static ivec2 g_exitBtnMin;
 static ivec2 g_exitBtnMax;
 
@@ -340,7 +369,17 @@ static void cacheElementPointers()
     Tree<Layout> *tabbarNode = EventManager::findLayoutByName(root, "tabbar");
     if (tabbarNode != nullptr)
     {
-        g_muteLabel = nthLabelInLayout(*tabbarNode, 2);
+        // Tabbar labels in document order: 0 System, 1 Processes, 2 About,
+        // 3 SOUND ON/OFF. Pre-v3 code used index 2 which silently pointed
+        // at the "About" tab label and would mutate the tab title every
+        // time the user toggled sound; nobody noticed because the alarm
+        // strings happened to overwrite "About" with comparable-width
+        // characters. Index 3 is the actual SOUND label.
+        g_muteLabel = nthLabelInLayout(*tabbarNode, 3);
+        // Recenter the SOUND label from its XML default once the TTF face is
+        // initialized so the static "SOUND ON" string ends up pixel-centered
+        // inside the button rect; subsequent toggles re-run the same logic.
+        recenterMuteLabel();
     }
 
     g_processRows.clear();
@@ -1427,6 +1466,10 @@ int main(int argc, char **argv)
                     if (g_muteLabel != nullptr)
                     {
                         g_muteLabel->setText(g_alarmEnabled ? "SOUND ON" : "SOUND OFF");
+                        // The toggled string is wider/narrower than the
+                        // previous one; recenter so the label keeps an
+                        // even margin on both sides of the button rect.
+                        recenterMuteLabel();
                     }
                 }
                 else if (mx >= g_systemTabBtnMin.x && mx <= g_systemTabBtnMax.x
