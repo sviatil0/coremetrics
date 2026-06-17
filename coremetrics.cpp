@@ -71,8 +71,6 @@ constexpr Uint64 POLL_INTERVAL_MAX_MS = 10000;
 constexpr float ALARM_THRESHOLD = 80.0f;
 static const std::string ALARM_SOUND_PATH = AssetPath::resolve("assets/click.wav");
 
-static const vec3 COLOR_ACCENT_GREEN(0.871f, 1.0f, 0.608f);
-
 static Bar *g_cpuBar = nullptr;
 static Bar *g_ramBar = nullptr;
 static Bar *g_gpuBar = nullptr;
