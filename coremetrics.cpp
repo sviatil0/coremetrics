@@ -42,6 +42,7 @@
 #include "MemBreakdownStrip.hpp"
 #include "PerCoreStrip.hpp"
 #include "FooterLiveStats.hpp"
+#include "ProcessesSummary.hpp"
 #include "Thresholds.hpp"
 #include "Theme.hpp"
 #include "AssetPath.hpp"
@@ -456,52 +457,9 @@ static float g_sumMemPct = 0.0f;
 // Phase 1.2 slice 8 of the GUI evolution spec. Reaches the same pixels
 // via FooterLiveStats::render(dest, g_lastProcCount).
 
-// Processes-tab aggregate strip painted above the column headers, below
-// the tab strip. Reads the cached g_lastProcCount / g_sumCpuPct /
-// g_sumMemPct that pollMetrics() refreshes each tick so the strip stays
-// in sync with the table without a second pass over the process list.
-// Total count uses accent green; the CPU/MEM sums use the dim grey the
-// rest of the footer chrome uses so the eye lands on the count first.
-static void renderProcessesSummary(Screen &dest)
-{
-    // Strip lives at y=448..464, BELOW the 15 visible data rows
-    // (y=100..400) and ABOVE the footer chrome (y=476..520). Earlier
-    // versions sat the strip at y=40..60 which physically collided
-    // with the y=8..40 tab buttons defined in base.xml; glyph
-    // descenders bled into the button outlines.
-    const vec3 stripBg(0.08f, 0.08f, 0.08f);
-    dest.drawBox(ivec2(24, 448), ivec2(936, 466), stripBg);
-
-    const vec3 dim(0.65f, 0.65f, 0.65f);
-    std::size_t n = g_lastProcCount;
-    if (n > 9999) n = 9999;
-    std::string totalText = "Total: " + std::to_string(n) + " procs";
-    std::string cpuText = "Sum CPU: " + formatPct(g_sumCpuPct) + "%";
-    std::string memText = "Sum MEM: " + formatPct(g_sumMemPct) + "%";
-
-    Font::drawText(dest, totalText, ivec2(32, 452), COLOR_ACCENT_GREEN);
-    Font::drawText(dest, cpuText, ivec2(280, 452), dim);
-    Font::drawText(dest, memText, ivec2(520, 452), dim);
-
-    // Scroll position indicator. Only shown when the table is longer
-    // than the visible window so a user with 22 processes does not see
-    // a meaningless "1-15 / 22" on a static page; the moment it appears
-    // it signals "PgDown/Down arrow to scroll".
-    std::size_t windowSize = PROCESSES_VISIBLE_ROWS;
-    if (g_processVisibleCount > windowSize)
-    {
-        std::size_t firstRow = g_processScrollOffset + 1;
-        std::size_t lastRow = g_processScrollOffset + windowSize;
-        if (lastRow > g_processVisibleCount)
-        {
-            lastRow = g_processVisibleCount;
-        }
-        std::string scrollText = std::to_string(firstRow) + ".."
-                                 + std::to_string(lastRow) + " / "
-                                 + std::to_string(g_processVisibleCount);
-        Font::drawText(dest, scrollText, ivec2(760, 452), COLOR_ACCENT_GREEN);
-    }
-}
+// Processes-tab aggregate strip moved to src/ProcessesSummary.cpp as
+// Phase 1.2 slice 9 of the GUI evolution spec. Reaches the same pixels
+// via ProcessesSummary::render(dest, g_lastProcCount, ...).
 
 // Help overlay body moved to src/HelpOverlay.cpp as the first slice of
 // Phase 1.2 from the GUI evolution spec (PR #163). Reaches the same
@@ -635,7 +593,7 @@ static void pollMetrics()
     }
     g_aggregateDiskReadKbPerSec = aggReadKb;
     g_aggregateDiskWriteKbPerSec = aggWriteKb;
-    // Cached for renderProcessesSummary so the strip can paint each frame
+    // Cached for ProcessesSummary::render so the strip can paint each frame
     // without rewalking the process list. Stale by at most one poll tick.
     g_sumCpuPct = sumCpuPct;
     g_sumMemPct = sumMemPct;
@@ -1360,7 +1318,13 @@ int main(int argc, char **argv)
         }
         if (tab == "processes")
         {
-            renderProcessesSummary(shot);
+            ProcessesSummary::render(shot,
+                                     g_lastProcCount,
+                                     g_sumCpuPct,
+                                     g_sumMemPct,
+                                     g_processScrollOffset,
+                                     g_processVisibleCount,
+                                     PROCESSES_VISIBLE_ROWS);
             // Mirror the live loop's empty-state hint so the screenshot
             // matches what a user sees during the boot moment (Pillar A6).
             if (g_lastProcCount == 0)
@@ -2020,7 +1984,13 @@ int main(int argc, char **argv)
         // the layout tree so it is not overdrawn by the table chrome.
         if (processesTabActive())
         {
-            renderProcessesSummary(screen);
+            ProcessesSummary::render(screen,
+                                     g_lastProcCount,
+                                     g_sumCpuPct,
+                                     g_sumMemPct,
+                                     g_processScrollOffset,
+                                     g_processVisibleCount,
+                                     PROCESSES_VISIBLE_ROWS);
         }
 
         // Empty-state hint. When the Processes tab is active but the
