@@ -10,9 +10,10 @@
 // visible. Stripe sits at y=42..44 spanning the active tab button's
 // x range.
 //
-// tabIndex mapping: 0 = System (x=8..402), 1 = Processes (x=410..804).
-// Unknown values paint nothing rather than crashing; the helper stays
-// inert if a future tab is added before the indicator is taught about it.
+// tabIndex mapping: 0 = System (x=8..272), 1 = Processes (x=280..544),
+// 2 = About (x=552..804). Unknown values paint nothing rather than
+// crashing; the helper stays inert if a future tab is added before the
+// indicator is taught about it.
 //
 // Pillar A5 of docs/superpowers/specs/2026-06-16-modernization-roadmap.md.
 namespace TabIndicator

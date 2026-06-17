@@ -14,10 +14,13 @@ namespace TabIndicator
     constexpr int STRIPE_Y1 = 44;
 
     constexpr int SYSTEM_X0 = 8;
-    constexpr int SYSTEM_X1 = 402;
+    constexpr int SYSTEM_X1 = 272;
 
-    constexpr int PROCESSES_X0 = 410;
-    constexpr int PROCESSES_X1 = 804;
+    constexpr int PROCESSES_X0 = 280;
+    constexpr int PROCESSES_X1 = 544;
+
+    constexpr int ABOUT_X0 = 552;
+    constexpr int ABOUT_X1 = 804;
 
     void render(Screen &dest, int tabIndex)
     {
@@ -32,6 +35,11 @@ namespace TabIndicator
         {
             x0 = PROCESSES_X0;
             x1 = PROCESSES_X1;
+        }
+        else if (tabIndex == 2)
+        {
+            x0 = ABOUT_X0;
+            x1 = ABOUT_X1;
         }
         else
         {

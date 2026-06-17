@@ -57,6 +57,7 @@
 #include "Settings.hpp"
 #include "TabIndicator.hpp"
 #include "EmptyStates.hpp"
+#include "AboutTab.hpp"
 
 constexpr int RESX = 960;
 constexpr int RESY = 540;
@@ -205,6 +206,42 @@ static bool processesTabActive()
     Tree<Layout> *node = EventManager::findLayoutByName(
         LayoutManager::getInstance().getRoot(), "processes");
     return node != nullptr && node->getData().isActive();
+}
+
+static bool aboutTabActive()
+{
+    Tree<Layout> *node = EventManager::findLayoutByName(
+        LayoutManager::getInstance().getRoot(), "about");
+    return node != nullptr && node->getData().isActive();
+}
+
+// Mute and tab-button geometries are cached at scene build time. The
+// three tab buttons in base.xml each declare a target + hide pair, but
+// the XML schema only supports one hide per button. With three tabs a
+// click on "About" needs to hide both "system" and "processes"; rather
+// than extend Button to accept a list of hides we intercept tab clicks
+// in the main loop (the same pattern the EXIT and SOUND buttons
+// already use) and toggle the layout active flags directly. The cached
+// rects stay in lockstep with base.xml by reviewer convention.
+static ivec2 g_systemTabBtnMin = ivec2(8, 8);
+static ivec2 g_systemTabBtnMax = ivec2(272, 40);
+static ivec2 g_processesTabBtnMin = ivec2(280, 8);
+static ivec2 g_processesTabBtnMax = ivec2(544, 40);
+static ivec2 g_aboutTabBtnMin = ivec2(552, 8);
+static ivec2 g_aboutTabBtnMax = ivec2(804, 40);
+
+static void activateTab(const std::string &name)
+{
+    Tree<Layout> &root = LayoutManager::getInstance().getRoot();
+    const char *all[] = {"system", "processes", "about"};
+    for (const char *n : all)
+    {
+        Tree<Layout> *node = EventManager::findLayoutByName(root, n);
+        if (node != nullptr)
+        {
+            node->getData().setActive(std::string(n) == name);
+        }
+    }
 }
 
 static void closeSignalMenu()
@@ -890,7 +927,7 @@ int main(int argc, char **argv)
                 "  --duration SECONDS        auto-exit after N seconds (live UI)\n"
                 "\n"
                 "Headless modes:\n"
-                "  --screenshot PATH [system|processes]\n"
+                "  --screenshot PATH [system|processes|about]\n"
                 "                            render one frame to PATH and exit\n"
                 "  --export-csv PATH         dump one-shot CSV and exit\n"
                 "  --export-json PATH        dump one-shot JSON and exit\n"
@@ -1162,17 +1199,31 @@ int main(int argc, char **argv)
             EventManager::getInstance().pushEvent(std::make_unique<ShowEvent>("processes", true));
             EventManager::getInstance().processEvents(ivec2(0, 0), ivec2(RESX - 1, RESY - 1));
         }
+        else if (tab == "about")
+        {
+            EventManager::getInstance().pushEvent(std::make_unique<ShowEvent>("system", false));
+            EventManager::getInstance().pushEvent(std::make_unique<ShowEvent>("about", true));
+            EventManager::getInstance().processEvents(ivec2(0, 0), ivec2(RESX - 1, RESY - 1));
+        }
 
         shot.clear();
         LayoutManager::getInstance().render(shot, ivec2(0, 0), ivec2(RESX - 1, RESY - 1));
         // Active-tab indicator: keeps the headless screenshot output in
         // sync with what the live loop paints (Pillar A5).
         {
-            int activeTabIndex = (tab == "processes") ? 1 : 0;
+            int activeTabIndex = 0;
+            if (tab == "about")
+            {
+                activeTabIndex = 2;
+            }
+            else if (tab == "processes")
+            {
+                activeTabIndex = 1;
+            }
             TabIndicator::render(shot, activeTabIndex);
         }
         FooterLiveStats::render(shot, g_lastProcCount);
-        if (tab != "processes")
+        if (tab == "system")
         {
             // Dominant Title-size CPU/RAM/GPU readouts (Pillar A2). Paints
             // before the per-tab helpers so the smaller dim "%" sign sits
@@ -1195,7 +1246,7 @@ int main(int argc, char **argv)
                 SparklineLabels::render(shot);
             }
         }
-        else if (!g_filterText.empty())
+        else if (tab == "processes" && !g_filterText.empty())
         {
             const vec3 labelColor = Theme::accentGreen();
             const vec3 textColor(1.0f, 1.0f, 1.0f);
@@ -1217,6 +1268,10 @@ int main(int argc, char **argv)
             {
                 EmptyStates::renderProcessesEmpty(shot);
             }
+        }
+        else if (tab == "about")
+        {
+            AboutTab::render(shot, g_uptimeSeconds, g_perCoreCpu.size());
         }
         SDL_Surface *out = SDL_CreateSurface(RESX, RESY, SDL_PIXELFORMAT_RGBA32);
         if (out == nullptr)
@@ -1373,6 +1428,25 @@ int main(int argc, char **argv)
                     {
                         g_muteLabel->setText(g_alarmEnabled ? "SOUND ON" : "SOUND OFF");
                     }
+                }
+                else if (mx >= g_systemTabBtnMin.x && mx <= g_systemTabBtnMax.x
+                         && my >= g_systemTabBtnMin.y && my <= g_systemTabBtnMax.y)
+                {
+                    // Intercept tab-button clicks here so the three-tab fan
+                    // out (hide the two non-clicked layouts, show the
+                    // clicked one) is one atomic switch. The Button XML
+                    // schema only supports one hide per button.
+                    activateTab("system");
+                }
+                else if (mx >= g_processesTabBtnMin.x && mx <= g_processesTabBtnMax.x
+                         && my >= g_processesTabBtnMin.y && my <= g_processesTabBtnMax.y)
+                {
+                    activateTab("processes");
+                }
+                else if (mx >= g_aboutTabBtnMin.x && mx <= g_aboutTabBtnMax.x
+                         && my >= g_aboutTabBtnMin.y && my <= g_aboutTabBtnMax.y)
+                {
+                    activateTab("about");
                 }
                 else
                 {
@@ -1794,12 +1868,23 @@ int main(int argc, char **argv)
         // Active-tab indicator stripe. Painted right after the layout
         // tree so it sits on top of the tab-strip background but under
         // the per-tab overlays below. tabIndex derives from the live
-        // layout state via processesTabActive() so the stripe always
-        // tracks the visible content layout. Pillar A5 of the
-        // modernization roadmap.
+        // layout state so the stripe always tracks the visible content
+        // layout. Pillar A5 of the modernization roadmap.
         {
-            int activeTabIndex = processesTabActive() ? 1 : 0;
+            int activeTabIndex = 0;
+            if (aboutTabActive())
+            {
+                activeTabIndex = 2;
+            }
+            else if (processesTabActive())
+            {
+                activeTabIndex = 1;
+            }
             TabIndicator::render(screen, activeTabIndex);
+        }
+        if (aboutTabActive())
+        {
+            AboutTab::render(screen, g_uptimeSeconds, g_perCoreCpu.size());
         }
         {
             // Per-core strip and sparklines only paint while the System tab

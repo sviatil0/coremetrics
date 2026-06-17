@@ -3,7 +3,7 @@
     <layout sX=0.0 sY=0.0 eX=1.0 eY=0.09 active=true name=tabbar>
         <button>
             <ivec2><x>8</x><y>8</y></ivec2>
-            <ivec2><x>402</x><y>40</y></ivec2>
+            <ivec2><x>272</x><y>40</y></ivec2>
             <vec3><x>0.141</x><y>0.157</y><z>0.231</z></vec3>
             <target>system</target>
             <hide>processes</hide>
@@ -15,16 +15,29 @@
         </label>
 
         <button>
-            <ivec2><x>410</x><y>8</y></ivec2>
-            <ivec2><x>804</x><y>40</y></ivec2>
+            <ivec2><x>280</x><y>8</y></ivec2>
+            <ivec2><x>544</x><y>40</y></ivec2>
             <vec3><x>0.141</x><y>0.157</y><z>0.231</z></vec3>
             <target>processes</target>
             <hide>system</hide>
         </button>
         <label>
-            <ivec2><x>422</x><y>14</y></ivec2>
+            <ivec2><x>292</x><y>14</y></ivec2>
             <vec3><x>0.753</x><y>0.792</y><z>0.961</z></vec3>
             <text>Processes</text>
+        </label>
+
+        <button>
+            <ivec2><x>552</x><y>8</y></ivec2>
+            <ivec2><x>804</x><y>40</y></ivec2>
+            <vec3><x>0.141</x><y>0.157</y><z>0.231</z></vec3>
+            <target>about</target>
+            <hide>system</hide>
+        </button>
+        <label>
+            <ivec2><x>564</x><y>14</y></ivec2>
+            <vec3><x>0.753</x><y>0.792</y><z>0.961</z></vec3>
+            <text>About</text>
         </label>
 
         <button>
@@ -216,6 +229,57 @@
         <row><ivec2><x>24</x><y>340</y></ivec2><ivec2><x>936</x><y>360</y></ivec2><cell weight=0.10></cell><cell weight=0.42></cell><cell weight=0.12></cell><cell weight=0.12></cell><cell weight=0.24></cell><vec3><x>0.753</x><y>0.792</y><z>0.961</z></vec3></row>
         <row><ivec2><x>24</x><y>360</y></ivec2><ivec2><x>936</x><y>380</y></ivec2><cell weight=0.10></cell><cell weight=0.42></cell><cell weight=0.12></cell><cell weight=0.12></cell><cell weight=0.24></cell><vec3><x>0.753</x><y>0.792</y><z>0.961</z></vec3></row>
         <row><ivec2><x>24</x><y>380</y></ivec2><ivec2><x>936</x><y>400</y></ivec2><cell weight=0.10></cell><cell weight=0.42></cell><cell weight=0.12></cell><cell weight=0.12></cell><cell weight=0.24></cell><vec3><x>0.753</x><y>0.792</y><z>0.961</z></vec3></row>
+    </layout>
+
+    <layout sX=0.0 sY=0.089 eX=1.0 eY=1.0 active=false name=about>
+
+        <!-- Static "About CoreMetrics" header. Painted by the XML at the
+             top of the About tab so the dynamic Host + Runtime rows below
+             (rendered programmatically by AboutTab::render) read as
+             children of a stable title. -->
+        <label>
+            <ivec2><x>24</x><y>80</y></ivec2>
+            <vec3><x>0.478</x><y>0.635</y><z>0.969</z></vec3>
+            <text>CoreMetrics</text>
+        </label>
+        <label>
+            <ivec2><x>24</x><y>108</y></ivec2>
+            <vec3><x>0.604</x><y>0.647</y><z>0.808</z></vec3>
+            <text>v0.2.26</text>
+        </label>
+        <label>
+            <ivec2><x>24</x><y>128</y></ivec2>
+            <vec3><x>0.604</x><y>0.647</y><z>0.808</z></vec3>
+            <text>Custom C++23 GUI on SDL3</text>
+        </label>
+        <label>
+            <ivec2><x>24</x><y>148</y></ivec2>
+            <vec3><x>0.604</x><y>0.647</y><z>0.808</z></vec3>
+            <text>Footprint: 1.6 MB binary  ~60 MB resident</text>
+        </label>
+
+        <!-- License + source row near the bottom of the tab. -->
+        <label>
+            <ivec2><x>24</x><y>432</y></ivec2>
+            <vec3><x>0.478</x><y>0.635</y><z>0.969</z></vec3>
+            <text>License</text>
+        </label>
+        <label>
+            <ivec2><x>24</x><y>452</y></ivec2>
+            <vec3><x>0.604</x><y>0.647</y><z>0.808</z></vec3>
+            <text>LGPL-2.1</text>
+        </label>
+        <label>
+            <ivec2><x>320</x><y>432</y></ivec2>
+            <vec3><x>0.478</x><y>0.635</y><z>0.969</z></vec3>
+            <text>Source</text>
+        </label>
+        <label>
+            <ivec2><x>320</x><y>452</y></ivec2>
+            <vec3><x>0.604</x><y>0.647</y><z>0.808</z></vec3>
+            <text>github.com/sviatil0/coremetrics</text>
+        </label>
+
     </layout>
 
         <button>
