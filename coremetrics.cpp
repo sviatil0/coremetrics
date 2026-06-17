@@ -43,6 +43,7 @@
 #include "PerCoreStrip.hpp"
 #include "FooterLiveStats.hpp"
 #include "ProcessesSummary.hpp"
+#include "SignalMenuOverlay.hpp"
 #include "TopProcessesPrinter.hpp"
 #include "Thresholds.hpp"
 #include "Theme.hpp"
@@ -1962,58 +1963,7 @@ int main(int argc, char **argv)
 
         if (g_signalMenuVisible)
         {
-            // Centered panel. The overlay is small and the message is the
-            // information that matters; no decorative chrome beyond a 1px
-            // border in the accent color so it reads as an actionable
-            // foreground element.
-            const int panelX0 = 200;
-            const int panelY0 = 200;
-            const int panelX1 = 760;
-            const int panelY1 = 320;
-            // Pillar A palette migration (follow-up to PR #207). Panel
-            // fill, border, and text now route through Theme tokens so
-            // the modal sits on the Tokyo Night palette instead of the
-            // pre-#207 raw literals.
-            //   panelBg     -> Theme::panelBg()     (elevated card layer)
-            //   panelBorder -> Theme::accent()      (brand blue; signals
-            //                                        actionable foreground
-            //                                        and avoids blending
-            //                                        with the green load
-            //                                        palette)
-            //   textColor   -> Theme::textPrimary() (high-emphasis copy)
-            //   hintColor   -> Theme::textDim()     (mid-emphasis hint)
-            const vec3 panelBg = Theme::panelBg();
-            const vec3 panelBorder = Theme::accent();
-            screen.drawBox(ivec2(panelX0, panelY0), ivec2(panelX1, panelY1), panelBg);
-            // Border. 4 thin boxes is cheaper than a stroked rectangle.
-            screen.drawBox(ivec2(panelX0, panelY0), ivec2(panelX1, panelY0 + 1), panelBorder);
-            screen.drawBox(ivec2(panelX0, panelY1 - 1), ivec2(panelX1, panelY1), panelBorder);
-            screen.drawBox(ivec2(panelX0, panelY0), ivec2(panelX0 + 1, panelY1), panelBorder);
-            screen.drawBox(ivec2(panelX1 - 1, panelY0), ivec2(panelX1, panelY1), panelBorder);
-
-            const vec3 textColor = Theme::textPrimary();
-            const vec3 hintColor = Theme::textDim();
-            if (g_signalMenuPickedIndex < 0)
-            {
-                Font::drawText(screen, "Send signal to pid " + std::to_string(g_selectedPid),
-                               ivec2(panelX0 + 24, panelY0 + 18), textColor);
-                Font::drawText(screen, "1 TERM   2 KILL   3 INT   4 HUP   5 STOP   6 CONT",
-                               ivec2(panelX0 + 24, panelY0 + 50), COLOR_ACCENT_GREEN);
-                Font::drawText(screen, "Esc cancels",
-                               ivec2(panelX0 + 24, panelY1 - 30), hintColor);
-            }
-            else
-            {
-                SignalUtils::Signal sig =
-                    static_cast<SignalUtils::Signal>(g_signalMenuPickedIndex);
-                std::string prompt = std::string("Send ")
-                                     + SignalUtils::name(sig)
-                                     + " to pid " + std::to_string(g_selectedPid) + "?";
-                Font::drawText(screen, prompt,
-                               ivec2(panelX0 + 24, panelY0 + 18), textColor);
-                Font::drawText(screen, "Y / Enter = send     N / Esc = cancel",
-                               ivec2(panelX0 + 24, panelY0 + 50), COLOR_ACCENT_GREEN);
-            }
+            SignalMenuOverlay::render(screen, g_selectedPid, g_signalMenuPickedIndex);
         }
 
         if (!g_statusFlash.empty() && SDL_GetTicks() < g_statusFlashExpiryMs)
