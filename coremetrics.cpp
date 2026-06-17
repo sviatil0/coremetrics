@@ -40,6 +40,7 @@
 #include "NetIoFooter.hpp"
 #include "DiskUsageRow.hpp"
 #include "MemBreakdownStrip.hpp"
+#include "PerCoreStrip.hpp"
 #include "Thresholds.hpp"
 #include "Theme.hpp"
 #include "AssetPath.hpp"
@@ -200,19 +201,8 @@ static void closeSignalMenu()
     g_signalMenuVisible = false;
     g_signalMenuPickedIndex = -1;
 }
-constexpr int PERCORE_Y0 = 218;
-constexpr int PERCORE_Y1 = 236;
-// Full row width. The strip sits directly under the GPU bar and reads
-// as a per-core continuation without a separate label; the earlier
-// 'cores' label at x=24 collided with the 'CPU history' sparkline
-// label at y=230 (12-px gap, ~16-px glyph height).
-// Strip starts at x=84 so a "cores" label fits at x=24, mirroring the
-// CPU / RAM / GPU column above. Label color hidden when --sparklines
-// is on (the CPU history label at y=230 would collide visually if both
-// rendered at full opacity).
-constexpr int PERCORE_X0 = 84;
-constexpr int PERCORE_X1 = 936;
-constexpr int PERCORE_GAP = 4;
+// PERCORE_* geometry moved to src/PerCoreStrip.cpp alongside the
+// renderer that owns the strip.
 
 // Memory breakdown segmented bar. Sits just below the aggregate RAM bar
 // (y=136..160 in base.xml). Shows active / wired / cached / free segments
@@ -443,50 +433,9 @@ static std::string formatRate(unsigned long long kbPerSec)
 // Phase 1.2 slice 6 of the GUI evolution spec. Call site passes
 // g_memBreakdown explicitly via MemBreakdownStrip::render(...).
 
-static void renderPerCoreStrip(Screen &dest)
-{
-    if (g_perCoreCpu.empty())
-    {
-        return;
-    }
-    // Left-edge label sits in the same x=24 column as the CPU/RAM/GPU
-    // labels above. Hidden when --sparklines is enabled because the
-    // CPU history label at y=230 would crowd it.
-    if (!g_sparklinesEnabled)
-    {
-        const vec3 dim = Theme::textDim();
-        Font::drawText(dest, "cores", ivec2(24, 218), dim);
-    }
-    const std::size_t cores = g_perCoreCpu.size();
-    const int totalGap = PERCORE_GAP * static_cast<int>(cores - 1);
-    const int slot = (PERCORE_X1 - PERCORE_X0 - totalGap) / static_cast<int>(cores);
-    if (slot <= 0)
-    {
-        return;
-    }
-    const vec3 bg = Theme::panelBg();
-
-    for (std::size_t i = 0; i < cores; ++i)
-    {
-        int x0 = PERCORE_X0 + static_cast<int>(i) * (slot + PERCORE_GAP);
-        int x1 = x0 + slot;
-        dest.drawBox(ivec2(x0, PERCORE_Y0), ivec2(x1, PERCORE_Y1), bg);
-
-        float ratio = g_perCoreCpu[i] / 100.0f;
-        if (ratio <= 0.0f)
-        {
-            continue;
-        }
-        if (ratio > 1.0f) ratio = 1.0f;
-        int fillW = static_cast<int>(ratio * static_cast<float>(slot));
-        if (fillW <= 0)
-        {
-            continue;
-        }
-        vec3 color = Thresholds::colorForRatio(ratio);
-        dest.drawBox(ivec2(x0, PERCORE_Y0), ivec2(x0 + fillW, PERCORE_Y1), color);
-    }
-}
+// Per-core CPU strip paint moved to src/PerCoreStrip.cpp as Phase 1.2
+// slice 7 of the GUI evolution spec. Call site passes g_perCoreCpu +
+// g_sparklinesEnabled explicitly via PerCoreStrip::render(...).
 
 // Live footer string replacing the v0.1.x static "alarm threshold 80%"
 // label. Same color and y-baseline as the other footer chrome
@@ -1390,7 +1339,7 @@ int main(int argc, char **argv)
             DiskUsageRow::render(shot, g_diskUsage);
             NetIoFooter::render(shot, g_aggregateDiskReadKbPerSec, g_aggregateDiskWriteKbPerSec, g_netIo);
             MemBreakdownStrip::render(shot, g_memBreakdown);
-            renderPerCoreStrip(shot);
+            PerCoreStrip::render(shot, g_perCoreCpu, g_sparklinesEnabled);
             if (g_sparklinesEnabled)
             {
                 if (g_cpuSparkline != nullptr) g_cpuSparkline->draw(shot);
@@ -1998,7 +1947,7 @@ int main(int argc, char **argv)
                 DiskUsageRow::render(screen, g_diskUsage);
                 NetIoFooter::render(screen, g_aggregateDiskReadKbPerSec, g_aggregateDiskWriteKbPerSec, g_netIo);
                 MemBreakdownStrip::render(screen, g_memBreakdown);
-                renderPerCoreStrip(screen);
+                PerCoreStrip::render(screen, g_perCoreCpu, g_sparklinesEnabled);
                 if (g_sparklinesEnabled)
                 {
                     if (g_cpuSparkline != nullptr) g_cpuSparkline->draw(screen);
