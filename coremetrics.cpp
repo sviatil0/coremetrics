@@ -48,6 +48,8 @@
 #include "KillLog.hpp"
 #include "Exporter.hpp"
 #include "Settings.hpp"
+#include "TabIndicator.hpp"
+#include "EmptyStates.hpp"
 
 constexpr int RESX = 960;
 constexpr int RESY = 540;
@@ -1332,6 +1334,12 @@ int main(int argc, char **argv)
 
         shot.clear();
         LayoutManager::getInstance().render(shot, ivec2(0, 0), ivec2(RESX - 1, RESY - 1));
+        // Active-tab indicator: keeps the headless screenshot output in
+        // sync with what the live loop paints (Pillar A5).
+        {
+            int activeTabIndex = (tab == "processes") ? 1 : 0;
+            TabIndicator::render(shot, activeTabIndex);
+        }
         renderFooterLiveStats(shot);
         if (tab != "processes")
         {
@@ -1362,6 +1370,12 @@ int main(int argc, char **argv)
         if (tab == "processes")
         {
             renderProcessesSummary(shot);
+            // Mirror the live loop's empty-state hint so the screenshot
+            // matches what a user sees during the boot moment (Pillar A6).
+            if (g_lastProcCount == 0)
+            {
+                EmptyStates::renderProcessesEmpty(shot);
+            }
         }
         SDL_Surface *out = SDL_CreateSurface(RESX, RESY, SDL_PIXELFORMAT_RGBA32);
         if (out == nullptr)
@@ -1935,6 +1949,17 @@ int main(int argc, char **argv)
                            selectionBg);
         }
         LayoutManager::getInstance().render(screen, ivec2(0, 0), ivec2(RESX - 1, RESY - 1));
+
+        // Active-tab indicator stripe. Painted right after the layout
+        // tree so it sits on top of the tab-strip background but under
+        // the per-tab overlays below. tabIndex derives from the live
+        // layout state via processesTabActive() so the stripe always
+        // tracks the visible content layout. Pillar A5 of the
+        // modernization roadmap.
+        {
+            int activeTabIndex = processesTabActive() ? 1 : 0;
+            TabIndicator::render(screen, activeTabIndex);
+        }
         {
             // Per-core strip and sparklines only paint while the System tab
             // is the active layout. On Processes, the rows occupy the same
@@ -2005,6 +2030,20 @@ int main(int argc, char **argv)
         if (processesTabActive())
         {
             renderProcessesSummary(screen);
+        }
+
+        // Empty-state hint. When the Processes tab is active but the
+        // backend has not yet returned a sample, the layout would
+        // otherwise paint a blank 16-row table with no explanation.
+        // Painted after the row chrome so it lands on top of the empty
+        // rows rather than under them. The current gate covers the
+        // boot moment only; a future revision should also fire when an
+        // active filter excludes every visible row (g_lastProcCount is
+        // set pre-filter, so a separate visible-row count is needed).
+        // Pillar A6 of the modernization roadmap.
+        if (processesTabActive() && g_lastProcCount == 0)
+        {
+            EmptyStates::renderProcessesEmpty(screen);
         }
 
         // Process-kill overlays: selected-row highlight + signal menu + the
