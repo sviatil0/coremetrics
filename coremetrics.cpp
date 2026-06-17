@@ -1925,10 +1925,14 @@ int main(int argc, char **argv)
         if (processesTabActive() && (g_filterInputActive || !g_filterText.empty()))
         {
             // Filter input strip at the top of the Processes tab, above
-            // the header row. Two-tone: accent label, white query text,
-            // a blinking cursor when input is active.
+            // the header row. Two-tone: accent label, primary text for
+            // the query, a blinking cursor when input is active.
+            // Pillar A palette migration (follow-up to PR #207): the
+            // query text now flows through Theme::textPrimary() instead
+            // of a raw vec3(1,1,1) literal so the Tokyo Night palette
+            // governs every interactive overlay.
             const vec3 labelColor = Theme::accentGreen();
-            const vec3 textColor(1.0f, 1.0f, 1.0f);
+            const vec3 textColor = Theme::textPrimary();
             const vec3 hintColor = Theme::textDim();
             std::string prefix = g_filterInputActive ? "filter> " : "filter: ";
             std::string body = g_filterText;
@@ -1966,8 +1970,20 @@ int main(int argc, char **argv)
             const int panelY0 = 200;
             const int panelX1 = 760;
             const int panelY1 = 320;
-            const vec3 panelBg(0.08f, 0.08f, 0.08f);
-            const vec3 panelBorder = Theme::accentGreen();
+            // Pillar A palette migration (follow-up to PR #207). Panel
+            // fill, border, and text now route through Theme tokens so
+            // the modal sits on the Tokyo Night palette instead of the
+            // pre-#207 raw literals.
+            //   panelBg     -> Theme::panelBg()     (elevated card layer)
+            //   panelBorder -> Theme::accent()      (brand blue; signals
+            //                                        actionable foreground
+            //                                        and avoids blending
+            //                                        with the green load
+            //                                        palette)
+            //   textColor   -> Theme::textPrimary() (high-emphasis copy)
+            //   hintColor   -> Theme::textDim()     (mid-emphasis hint)
+            const vec3 panelBg = Theme::panelBg();
+            const vec3 panelBorder = Theme::accent();
             screen.drawBox(ivec2(panelX0, panelY0), ivec2(panelX1, panelY1), panelBg);
             // Border. 4 thin boxes is cheaper than a stroked rectangle.
             screen.drawBox(ivec2(panelX0, panelY0), ivec2(panelX1, panelY0 + 1), panelBorder);
@@ -1975,8 +1991,8 @@ int main(int argc, char **argv)
             screen.drawBox(ivec2(panelX0, panelY0), ivec2(panelX0 + 1, panelY1), panelBorder);
             screen.drawBox(ivec2(panelX1 - 1, panelY0), ivec2(panelX1, panelY1), panelBorder);
 
-            const vec3 textColor(1.0f, 1.0f, 1.0f);
-            const vec3 hintColor(0.6f, 0.6f, 0.6f);
+            const vec3 textColor = Theme::textPrimary();
+            const vec3 hintColor = Theme::textDim();
             if (g_signalMenuPickedIndex < 0)
             {
                 Font::drawText(screen, "Send signal to pid " + std::to_string(g_selectedPid),
