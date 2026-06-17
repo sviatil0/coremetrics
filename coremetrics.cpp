@@ -36,6 +36,7 @@
 #include "Sparkline.hpp"
 #include "HelpOverlay.hpp"
 #include "SparklineLabels.hpp"
+#include "MetricReadouts.hpp"
 #include "UptimeAndLoad.hpp"
 #include "NetIoFooter.hpp"
 #include "DiskUsageRow.hpp"
@@ -74,9 +75,13 @@ static const std::string ALARM_SOUND_PATH = AssetPath::resolve("assets/click.wav
 static Bar *g_cpuBar = nullptr;
 static Bar *g_ramBar = nullptr;
 static Bar *g_gpuBar = nullptr;
-static Label *g_cpuReadout = nullptr;
-static Label *g_ramReadout = nullptr;
-static Label *g_gpuReadout = nullptr;
+// Latest sampled percentages, kept at file scope so the render loop can
+// hand them to MetricReadouts::render(...) outside of pollMetrics().
+// The XML labels that used to display these were removed when the
+// readouts moved to programmatic Title-size paint (Pillar A2 wire-up).
+static float g_cpuPct = 0.0f;
+static float g_ramPct = 0.0f;
+static float g_gpuPct = 0.0f;
 static Label *g_muteLabel = nullptr;
 static Label *g_pollLabel = nullptr;
 static std::vector<Row *> g_processRows;
@@ -293,30 +298,6 @@ static void cacheElementPointers()
     g_cpuBar = findBarByMetric(root, "cpu");
     g_ramBar = findBarByMetric(root, "ram");
 
-    Tree<Layout> *systemNode = EventManager::findLayoutByName(root, "system");
-    if (systemNode != nullptr)
-    {
-        g_cpuReadout = nthLabelInLayout(*systemNode, 1);
-        g_ramReadout = nthLabelInLayout(*systemNode, 3);
-        g_gpuReadout = nthLabelInLayout(*systemNode, 5);
-        // The percent readouts are the heaviest piece of information on the
-        // System dashboard; UI audit wave 5 flagged them as visually equal to
-        // the static "CPU"/"RAM"/"GPU" stems. Tagging them bold double-blits
-        // the glyph surface (see Font::drawTextBold) so the numbers carry
-        // more weight without bundling a second TTF.
-        if (g_cpuReadout != nullptr)
-        {
-            g_cpuReadout->setBold(true);
-        }
-        if (g_ramReadout != nullptr)
-        {
-            g_ramReadout->setBold(true);
-        }
-        if (g_gpuReadout != nullptr)
-        {
-            g_gpuReadout->setBold(true);
-        }
-    }
     g_gpuBar = findBarByMetric(root, "gpu");
 
     Tree<Layout> *tabbarNode = EventManager::findLayoutByName(root, "tabbar");
@@ -480,6 +461,11 @@ static void pollMetrics()
     float cpuPct = SystemMetrics::readCpuPercent();
     float memPct = SystemMetrics::readMemPercent();
     float gpuPct = SystemMetrics::readGpuPercent();
+    // Stash the latest percentages so the render loop can hand them to
+    // MetricReadouts::render(...) outside of this scope.
+    g_cpuPct = cpuPct;
+    g_ramPct = memPct;
+    g_gpuPct = gpuPct;
 
     // Threshold-based fill colors mirror the per-core strip + DISK
     // readout palette: accent green idle, yellow at 60%+, red at 80%+.
@@ -500,22 +486,6 @@ static void pollMetrics()
         g_gpuBar->setValue(gpuPct);
         g_gpuBar->setFillColor(Thresholds::colorForPct(gpuPct));
     }
-    if (g_cpuReadout != nullptr)
-    {
-        g_cpuReadout->setText(formatPct(cpuPct) + "%");
-        g_cpuReadout->setColor(Thresholds::colorForPct(cpuPct));
-    }
-    if (g_ramReadout != nullptr)
-    {
-        g_ramReadout->setText(formatPct(memPct) + "%");
-        g_ramReadout->setColor(Thresholds::colorForPct(memPct));
-    }
-    if (g_gpuReadout != nullptr)
-    {
-        g_gpuReadout->setText(formatPct(gpuPct) + "%");
-        g_gpuReadout->setColor(Thresholds::colorForPct(gpuPct));
-    }
-
     if (g_cpuSparkline != nullptr)
     {
         g_cpuSparkline->push(cpuPct);
@@ -1204,6 +1174,10 @@ int main(int argc, char **argv)
         FooterLiveStats::render(shot, g_lastProcCount);
         if (tab != "processes")
         {
+            // Dominant Title-size CPU/RAM/GPU readouts (Pillar A2). Paints
+            // before the per-tab helpers so the smaller dim "%" sign sits
+            // above the card background without getting overdrawn.
+            MetricReadouts::render(shot, g_cpuPct, g_ramPct, g_gpuPct);
             UptimeAndLoad::render(shot, g_uptimeSeconds, g_loadAverages);
             DiskUsageRow::render(shot, g_diskUsage);
             NetIoFooter::render(shot, g_aggregateDiskReadKbPerSec, g_aggregateDiskWriteKbPerSec, g_netIo);
@@ -1835,6 +1809,9 @@ int main(int argc, char **argv)
                 LayoutManager::getInstance().getRoot(), "system");
             if (systemNode != nullptr && systemNode->getData().isActive())
             {
+                // Dominant Title-size CPU/RAM/GPU readouts (Pillar A2).
+                // Mirrors the screenshot path; same System-tab gate.
+                MetricReadouts::render(screen, g_cpuPct, g_ramPct, g_gpuPct);
                 UptimeAndLoad::render(screen, g_uptimeSeconds, g_loadAverages);
                 DiskUsageRow::render(screen, g_diskUsage);
                 NetIoFooter::render(screen, g_aggregateDiskReadKbPerSec, g_aggregateDiskWriteKbPerSec, g_netIo);

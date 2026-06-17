@@ -89,12 +89,8 @@
             <vec3><x>0.184</x><y>0.200</y><z>0.302</z></vec3>
             <metric>cpu</metric>
         </bar>
-        <!-- bold readout: CPU percent, wired via Label::setBold in cacheElementPointers -->
-        <label>
-            <ivec2><x>876</x><y>96</y></ivec2>
-            <vec3><x>0.620</x><y>0.808</y><z>0.416</z></vec3>
-            <text>0.0%</text>
-        </label>
+        <!-- CPU percent readout painted programmatically at Title size
+             (28 pt) by MetricReadouts::render(...). Pillar A2 wire-up. -->
 
         <!-- RAM card: same shape as CPU card, shifted to bar row at 136. -->
         <box>
@@ -135,12 +131,8 @@
             <vec3><x>0.184</x><y>0.200</y><z>0.302</z></vec3>
             <metric>ram</metric>
         </bar>
-        <!-- bold readout: RAM percent, wired via Label::setBold in cacheElementPointers -->
-        <label>
-            <ivec2><x>876</x><y>144</y></ivec2>
-            <vec3><x>0.620</x><y>0.808</y><z>0.416</z></vec3>
-            <text>0.0%</text>
-        </label>
+        <!-- RAM percent readout painted programmatically at Title size
+             (28 pt) by MetricReadouts::render(...). Pillar A2 wire-up. -->
 
         <!-- GPU card: same shape as CPU card, shifted to bar row at 184. -->
         <box>
@@ -181,12 +173,8 @@
             <vec3><x>0.184</x><y>0.200</y><z>0.302</z></vec3>
             <metric>gpu</metric>
         </bar>
-        <!-- bold readout: GPU percent, wired via Label::setBold in cacheElementPointers -->
-        <label>
-            <ivec2><x>876</x><y>192</y></ivec2>
-            <vec3><x>0.620</x><y>0.808</y><z>0.416</z></vec3>
-            <text>0.0%</text>
-        </label>
+        <!-- GPU percent readout painted programmatically at Title size
+             (28 pt) by MetricReadouts::render(...). Pillar A2 wire-up. -->
 
     </layout>
 
