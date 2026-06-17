@@ -25,6 +25,7 @@ public:
 
     std::string getText() const;
     void setText(std::string text);
+    ivec2 getPos() const;
     void setPos(ivec2 pos);
     void setColor(vec3 color);
     void setBold(bool bold);

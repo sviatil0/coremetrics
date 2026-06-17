@@ -34,6 +34,20 @@
 #include "LayoutUtils.hpp"
 #include "ProcessUtils.hpp"
 #include "Sparkline.hpp"
+#include "HelpOverlay.hpp"
+#include "SparklineLabels.hpp"
+#include "MetricReadouts.hpp"
+#include "UptimeAndLoad.hpp"
+#include "NetIoFooter.hpp"
+#include "DiskUsageRow.hpp"
+#include "MemBreakdownStrip.hpp"
+#include "PerCoreStrip.hpp"
+#include "FooterLiveStats.hpp"
+#include "ProcessesSummary.hpp"
+#include "SignalMenuOverlay.hpp"
+#include "TopProcessesPrinter.hpp"
+#include "FilterStrip.hpp"
+#include "StatusFlash.hpp"
 #include "Thresholds.hpp"
 #include "Theme.hpp"
 #include "AssetPath.hpp"
@@ -41,6 +55,9 @@
 #include "KillLog.hpp"
 #include "Exporter.hpp"
 #include "Settings.hpp"
+#include "TabIndicator.hpp"
+#include "EmptyStates.hpp"
+#include "AboutTab.hpp"
 
 constexpr int RESX = 960;
 constexpr int RESY = 540;
@@ -56,14 +73,16 @@ constexpr Uint64 POLL_INTERVAL_MAX_MS = 10000;
 constexpr float ALARM_THRESHOLD = 80.0f;
 static const std::string ALARM_SOUND_PATH = AssetPath::resolve("assets/click.wav");
 
-static const vec3 COLOR_ACCENT_GREEN(0.871f, 1.0f, 0.608f);
-
 static Bar *g_cpuBar = nullptr;
 static Bar *g_ramBar = nullptr;
 static Bar *g_gpuBar = nullptr;
-static Label *g_cpuReadout = nullptr;
-static Label *g_ramReadout = nullptr;
-static Label *g_gpuReadout = nullptr;
+// Latest sampled percentages, kept at file scope so the render loop can
+// hand them to MetricReadouts::render(...) outside of pollMetrics().
+// The XML labels that used to display these were removed when the
+// readouts moved to programmatic Title-size paint (Pillar A2 wire-up).
+static float g_cpuPct = 0.0f;
+static float g_ramPct = 0.0f;
+static float g_gpuPct = 0.0f;
 static Label *g_muteLabel = nullptr;
 static Label *g_pollLabel = nullptr;
 static std::vector<Row *> g_processRows;
@@ -189,24 +208,79 @@ static bool processesTabActive()
     return node != nullptr && node->getData().isActive();
 }
 
+static bool aboutTabActive()
+{
+    Tree<Layout> *node = EventManager::findLayoutByName(
+        LayoutManager::getInstance().getRoot(), "about");
+    return node != nullptr && node->getData().isActive();
+}
+
+// Mute and tab-button geometries are cached at scene build time. The
+// three tab buttons in base.xml each declare a target + hide pair, but
+// the XML schema only supports one hide per button. With three tabs a
+// click on "About" needs to hide both "system" and "processes"; rather
+// than extend Button to accept a list of hides we intercept tab clicks
+// in the main loop (the same pattern the EXIT and SOUND buttons
+// already use) and toggle the layout active flags directly. The cached
+// rects stay in lockstep with base.xml by reviewer convention.
+static ivec2 g_systemTabBtnMin = ivec2(8, 8);
+static ivec2 g_systemTabBtnMax = ivec2(272, 40);
+static ivec2 g_processesTabBtnMin = ivec2(280, 8);
+static ivec2 g_processesTabBtnMax = ivec2(544, 40);
+static ivec2 g_aboutTabBtnMin = ivec2(552, 8);
+static ivec2 g_aboutTabBtnMax = ivec2(804, 40);
+
+static void activateTab(const std::string &name)
+{
+    Tree<Layout> &root = LayoutManager::getInstance().getRoot();
+    const char *all[] = {"system", "processes", "about"};
+    for (const char *n : all)
+    {
+        Tree<Layout> *node = EventManager::findLayoutByName(root, n);
+        if (node != nullptr)
+        {
+            node->getData().setActive(std::string(n) == name);
+        }
+    }
+}
+
+// SOUND toggle button rect. Initialized in buildScene(). Declared here
+// (ahead of the other tab-bar geometry) so recenterMuteLabel() can read
+// it directly without a forward declaration.
+static ivec2 g_muteBtnMin;
+static ivec2 g_muteBtnMax;
+
+// Recenter the SOUND ON / SOUND OFF label inside the mute toggle button.
+// The hand-tuned baseline in base.xml is centered for the default "SOUND ON"
+// string at 20 pt Body; toggling to "SOUND OFF" adds one glyph and would
+// otherwise leave the label visibly off-center. Measures the current label
+// text and centers it inside g_muteBtnMin..g_muteBtnMax. No-op if the label
+// or TTF face is not ready (headless / pre-init paths).
+static void recenterMuteLabel()
+{
+    if (g_muteLabel == nullptr)
+    {
+        return;
+    }
+    int textWidth = Font::measureTextWidth(g_muteLabel->getText());
+    if (textWidth <= 0)
+    {
+        return;
+    }
+    int btnWidth = g_muteBtnMax.x - g_muteBtnMin.x;
+    int newX = g_muteBtnMin.x + (btnWidth - textWidth) / 2;
+    // Keep the existing y baseline; only the x needs to track text width.
+    ivec2 pos = g_muteLabel->getPos();
+    g_muteLabel->setPos(ivec2(newX, pos.y));
+}
+
 static void closeSignalMenu()
 {
     g_signalMenuVisible = false;
     g_signalMenuPickedIndex = -1;
 }
-constexpr int PERCORE_Y0 = 218;
-constexpr int PERCORE_Y1 = 236;
-// Full row width. The strip sits directly under the GPU bar and reads
-// as a per-core continuation without a separate label; the earlier
-// 'cores' label at x=24 collided with the 'CPU history' sparkline
-// label at y=230 (12-px gap, ~16-px glyph height).
-// Strip starts at x=84 so a "cores" label fits at x=24, mirroring the
-// CPU / RAM / GPU column above. Label color hidden when --sparklines
-// is on (the CPU history label at y=230 would collide visually if both
-// rendered at full opacity).
-constexpr int PERCORE_X0 = 84;
-constexpr int PERCORE_X1 = 936;
-constexpr int PERCORE_GAP = 4;
+// PERCORE_* geometry moved to src/PerCoreStrip.cpp alongside the
+// renderer that owns the strip.
 
 // Memory breakdown segmented bar. Sits just below the aggregate RAM bar
 // (y=136..160 in base.xml). Shows active / wired / cached / free segments
@@ -228,23 +302,12 @@ static unsigned long long g_aggregateDiskReadKbPerSec = 0;
 static unsigned long long g_aggregateDiskWriteKbPerSec = 0;
 // Aggregate network rx/tx sampled every poll. Loopback excluded.
 static NetIo g_netIo{0, 0};
-constexpr int MEMSEG_X0 = 84;
-constexpr int MEMSEG_X1 = 864;
-// Slim strip (164..172) so the breakdown reads as a continuation of
-// the RAM bar above, not a second RAM bar stacked beneath. The earlier
-// 14px height made the two bars feel like duplicate metrics; 8px keeps
-// the segment colors readable while letting the eye treat the strip
-// as a thin annotation rather than its own row.
-// Memory breakdown strip thinned to a 4px sliver (was 8px) and pinned
-// directly under the RAM bar so the System tab reads as one bar with a
-// thin annotation instead of two stacked bars.
-constexpr int MEMSEG_Y0 = 162;
-constexpr int MEMSEG_Y1 = 166;
+// MEMSEG_* geometry moved to src/MemBreakdownStrip.cpp alongside the
+// renderer that owns the strip.
 
 static ivec2 g_headerColMin[5];
 static ivec2 g_headerColMax[5];
-static ivec2 g_muteBtnMin;
-static ivec2 g_muteBtnMax;
+// g_muteBtnMin/Max declared earlier alongside recenterMuteLabel().
 static ivec2 g_exitBtnMin;
 static ivec2 g_exitBtnMax;
 
@@ -301,36 +364,22 @@ static void cacheElementPointers()
     g_cpuBar = findBarByMetric(root, "cpu");
     g_ramBar = findBarByMetric(root, "ram");
 
-    Tree<Layout> *systemNode = EventManager::findLayoutByName(root, "system");
-    if (systemNode != nullptr)
-    {
-        g_cpuReadout = nthLabelInLayout(*systemNode, 1);
-        g_ramReadout = nthLabelInLayout(*systemNode, 3);
-        g_gpuReadout = nthLabelInLayout(*systemNode, 5);
-        // The percent readouts are the heaviest piece of information on the
-        // System dashboard; UI audit wave 5 flagged them as visually equal to
-        // the static "CPU"/"RAM"/"GPU" stems. Tagging them bold double-blits
-        // the glyph surface (see Font::drawTextBold) so the numbers carry
-        // more weight without bundling a second TTF.
-        if (g_cpuReadout != nullptr)
-        {
-            g_cpuReadout->setBold(true);
-        }
-        if (g_ramReadout != nullptr)
-        {
-            g_ramReadout->setBold(true);
-        }
-        if (g_gpuReadout != nullptr)
-        {
-            g_gpuReadout->setBold(true);
-        }
-    }
     g_gpuBar = findBarByMetric(root, "gpu");
 
     Tree<Layout> *tabbarNode = EventManager::findLayoutByName(root, "tabbar");
     if (tabbarNode != nullptr)
     {
-        g_muteLabel = nthLabelInLayout(*tabbarNode, 2);
+        // Tabbar labels in document order: 0 System, 1 Processes, 2 About,
+        // 3 SOUND ON/OFF. Pre-v3 code used index 2 which silently pointed
+        // at the "About" tab label and would mutate the tab title every
+        // time the user toggled sound; nobody noticed because the alarm
+        // strings happened to overwrite "About" with comparable-width
+        // characters. Index 3 is the actual SOUND label.
+        g_muteLabel = nthLabelInLayout(*tabbarNode, 3);
+        // Recenter the SOUND label from its XML default once the TTF face is
+        // initialized so the static "SOUND ON" string ends up pixel-centered
+        // inside the button rect; subsequent toggles re-run the same logic.
+        recenterMuteLabel();
     }
 
     g_processRows.clear();
@@ -419,29 +468,9 @@ static void destroySparklines()
     g_netTxSparkline.reset();
 }
 
-static std::string formatLoadAverages()
-{
-    if (g_loadAverages.size() < 3)
-    {
-        return "Load --";
-    }
-    char buf[64];
-    std::snprintf(buf, sizeof(buf), "Load %.2f %.2f %.2f",
-                  g_loadAverages[0], g_loadAverages[1], g_loadAverages[2]);
-    return std::string(buf);
-}
-
-static void renderUptimeAndLoad(Screen &dest)
-{
-    // Dim white for the labels, accent green so it reads as a status row.
-    const vec3 dimColor = Theme::textDim();
-    Font::drawText(dest, formatUptimeString(g_uptimeSeconds), ivec2(24, 44), dimColor);
-    // Uptime + Load + Disk all share the y=44 baseline so the status
-    // row reads as a single line instead of a staircase. The earlier
-    // y=56 placement for Load predated the DISK strip and left Load
-    // ~12 px below Up, which was visible as a misaligned middle field.
-    Font::drawText(dest, formatLoadAverages(), ivec2(220, 44), dimColor);
-}
+// Uptime + Load row paint moved to src/UptimeAndLoad.cpp as Phase 1.2
+// slice 3 of the GUI evolution spec. Call site passes g_uptimeSeconds
+// and g_loadAverages explicitly via UptimeAndLoad::render(...).
 
 static std::string formatRate(unsigned long long kbPerSec)
 {
@@ -455,189 +484,21 @@ static std::string formatRate(unsigned long long kbPerSec)
     return std::to_string(kbPerSec) + " KB/s";
 }
 
-static void renderAggregateDiskIo(Screen &dest)
-{
-    // Disk I/O is now sampled but rendered as part of renderNetIo to
-    // produce a single right-aligned 'disk + net' string in the footer
-    // chrome. This function is left as a no-op so the existing call
-    // sites do not need to change; consolidating both rates into one
-    // line keeps the footer compact and predictable.
-    (void)dest;
-}
+// NetIo footer paint moved to src/NetIoFooter.cpp as Phase 1.2 slice 4
+// of the GUI evolution spec. Call site passes the three globals
+// explicitly via NetIoFooter::render(...).
 
-static void renderNetIo(Screen &dest)
-{
-    bool anyDisk = (g_aggregateDiskReadKbPerSec != 0
-                    || g_aggregateDiskWriteKbPerSec != 0);
-    bool anyNet = (g_netIo.rxKbPerSec != 0 || g_netIo.txKbPerSec != 0);
-    if (!anyDisk && !anyNet)
-    {
-        return;
-    }
-    const vec3 dim = Theme::textDim();
-    // Compact units (K/M/G) keep the worst-case string bounded: even a
-    // 10 GB/s host renders as '10.0G' (5 chars) rather than '10240.0M'
-    // (8 chars). Caps the right edge of the footer well before x=810
-    // (the EXIT button's left edge).
-    auto compact = [](unsigned long long kbPerSec) -> std::string {
-        if (kbPerSec >= 1024ULL * 1024ULL)
-        {
-            std::ostringstream oss;
-            oss.precision(1);
-            oss << std::fixed
-                << (static_cast<double>(kbPerSec) / (1024.0 * 1024.0))
-                << "G";
-            return oss.str();
-        }
-        if (kbPerSec >= 1024)
-        {
-            std::ostringstream oss;
-            oss.precision(1);
-            oss << std::fixed << (static_cast<double>(kbPerSec) / 1024.0) << "M";
-            return oss.str();
-        }
-        return std::to_string(kbPerSec) + "K";
-    };
-    std::string text;
-    if (anyDisk)
-    {
-        text = "DISK " + compact(g_aggregateDiskReadKbPerSec)
-               + "/" + compact(g_aggregateDiskWriteKbPerSec);
-    }
-    if (anyNet)
-    {
-        if (!text.empty()) text += "  ";
-        text += "NET " + compact(g_netIo.rxKbPerSec)
-                + "/" + compact(g_netIo.txKbPerSec);
-    }
-    // Worst-case string at G-scale is roughly 34 chars; at 10px/glyph
-    // that lands the right edge at ~x=800, just left of the EXIT
-    // button at x=820. Hard-clip the string at 36 chars so a future
-    // unit-format change cannot blow through the budget.
-    if (text.size() > 36)
-    {
-        text = text.substr(0, 36);
-    }
-    Font::drawText(dest, text, ivec2(460, 492), dim);
-}
+// Disk usage row paint moved to src/DiskUsageRow.cpp as Phase 1.2
+// slice 5 of the GUI evolution spec. Call site passes g_diskUsage
+// explicitly via DiskUsageRow::render(...).
 
-static void renderDiskUsage(Screen &dest)
-{
-    if (g_diskUsage.totalKb == 0)
-    {
-        return;
-    }
-    unsigned long long usedKb = (g_diskUsage.totalKb > g_diskUsage.freeKb)
-                                    ? g_diskUsage.totalKb - g_diskUsage.freeKb
-                                    : 0;
-    float pct = computeDiskUsedPct(g_diskUsage.totalKb, g_diskUsage.freeKb);
+// Memory breakdown strip paint moved to src/MemBreakdownStrip.cpp as
+// Phase 1.2 slice 6 of the GUI evolution spec. Call site passes
+// g_memBreakdown explicitly via MemBreakdownStrip::render(...).
 
-    vec3 color = Theme::textDim();
-    if (pct >= Thresholds::RED_PCT)
-    {
-        color = Thresholds::colorRed();
-    }
-    else if (pct >= Thresholds::YELLOW_PCT)
-    {
-        color = Thresholds::colorYellow();
-    }
-
-    std::string text = "DISK " + formatGbString(usedKb) + " / "
-                       + formatGbString(g_diskUsage.totalKb) + " GB ("
-                       + formatPct(pct) + "%)";
-    // Right side of the status row at y=44, mirroring the Up + Load
-    // string on the left. x=560 leaves room for a long string ("DISK
-    // 1457 / 2048 GB (71.1%)") without clipping the SOUND ON button at
-    // x=812.
-    Font::drawText(dest, text, ivec2(560, 44), color);
-}
-
-static void renderMemBreakdownStrip(Screen &dest)
-{
-    if (g_memBreakdown.totalKb == 0)
-    {
-        return;
-    }
-    const int width = MEMSEG_X1 - MEMSEG_X0;
-    if (width <= 0)
-    {
-        return;
-    }
-
-    auto segPx = [&](unsigned long long kb) {
-        // Compute as 64-bit to avoid overflowing the multiplication on
-        // large-memory hosts (256GB+).
-        unsigned long long n = static_cast<unsigned long long>(width) * kb;
-        return static_cast<int>(n / g_memBreakdown.totalKb);
-    };
-
-    const vec3 colActive = Theme::accentRed(); // red: in-use by processes
-    const vec3 colWired(0.95f, 0.66f, 0.30f);  // orange: kernel + pinned
-    const vec3 colCached(0.45f, 0.78f, 0.95f); // blue: reclaimable cache
-    const vec3 colFree(0.18f, 0.18f, 0.18f);   // dark: free
-
-    int x = MEMSEG_X0;
-    // Active
-    int aw = segPx(g_memBreakdown.activeKb);
-    if (aw > 0) { dest.drawBox(ivec2(x, MEMSEG_Y0), ivec2(x + aw, MEMSEG_Y1), colActive); x += aw; }
-    // Wired
-    int ww = segPx(g_memBreakdown.wiredKb);
-    if (ww > 0) { dest.drawBox(ivec2(x, MEMSEG_Y0), ivec2(x + ww, MEMSEG_Y1), colWired); x += ww; }
-    // Cached
-    int cw = segPx(g_memBreakdown.cachedKb);
-    if (cw > 0) { dest.drawBox(ivec2(x, MEMSEG_Y0), ivec2(x + cw, MEMSEG_Y1), colCached); x += cw; }
-    // Free fills whatever is left so rounding remainder gets absorbed visually.
-    if (x < MEMSEG_X1)
-    {
-        dest.drawBox(ivec2(x, MEMSEG_Y0), ivec2(MEMSEG_X1, MEMSEG_Y1), colFree);
-    }
-
-}
-
-static void renderPerCoreStrip(Screen &dest)
-{
-    if (g_perCoreCpu.empty())
-    {
-        return;
-    }
-    // Left-edge label sits in the same x=24 column as the CPU/RAM/GPU
-    // labels above. Hidden when --sparklines is enabled because the
-    // CPU history label at y=230 would crowd it.
-    if (!g_sparklinesEnabled)
-    {
-        const vec3 dim = Theme::textDim();
-        Font::drawText(dest, "cores", ivec2(24, 218), dim);
-    }
-    const std::size_t cores = g_perCoreCpu.size();
-    const int totalGap = PERCORE_GAP * static_cast<int>(cores - 1);
-    const int slot = (PERCORE_X1 - PERCORE_X0 - totalGap) / static_cast<int>(cores);
-    if (slot <= 0)
-    {
-        return;
-    }
-    const vec3 bg = Theme::panelBg();
-
-    for (std::size_t i = 0; i < cores; ++i)
-    {
-        int x0 = PERCORE_X0 + static_cast<int>(i) * (slot + PERCORE_GAP);
-        int x1 = x0 + slot;
-        dest.drawBox(ivec2(x0, PERCORE_Y0), ivec2(x1, PERCORE_Y1), bg);
-
-        float ratio = g_perCoreCpu[i] / 100.0f;
-        if (ratio <= 0.0f)
-        {
-            continue;
-        }
-        if (ratio > 1.0f) ratio = 1.0f;
-        int fillW = static_cast<int>(ratio * static_cast<float>(slot));
-        if (fillW <= 0)
-        {
-            continue;
-        }
-        vec3 color = Thresholds::colorForRatio(ratio);
-        dest.drawBox(ivec2(x0, PERCORE_Y0), ivec2(x0 + fillW, PERCORE_Y1), color);
-    }
-}
+// Per-core CPU strip paint moved to src/PerCoreStrip.cpp as Phase 1.2
+// slice 7 of the GUI evolution spec. Call site passes g_perCoreCpu +
+// g_sparklinesEnabled explicitly via PerCoreStrip::render(...).
 
 // Live footer string replacing the v0.1.x static "alarm threshold 80%"
 // label. Same color and y-baseline as the other footer chrome
@@ -651,173 +512,36 @@ static std::size_t g_lastProcCount = 0;
 static float g_sumCpuPct = 0.0f;
 static float g_sumMemPct = 0.0f;
 
-static void renderFooterLiveStats(Screen &dest)
-{
-    // procs N at x=370. The DISK+NET text begins at x=460. To survive
-    // a 4-digit proc count (10 chars * ~10px = 100px ending at x=470),
-    // truncate the count to a max width budget rather than printing
-    // arbitrary integers. Real-world process counts above ~9999 are
-    // already pathological on a personal machine.
-    const vec3 dim(0.5f, 0.5f, 0.5f);
-    std::size_t n = g_lastProcCount;
-    if (n > 9999) n = 9999;
-    std::string text = std::to_string(n) + " procs";
-    Font::drawText(dest, text, ivec2(370, 492), dim);
-}
+// Footer "N procs" live count moved to src/FooterLiveStats.cpp as
+// Phase 1.2 slice 8 of the GUI evolution spec. Reaches the same pixels
+// via FooterLiveStats::render(dest, g_lastProcCount).
 
-// Processes-tab aggregate strip painted above the column headers, below
-// the tab strip. Reads the cached g_lastProcCount / g_sumCpuPct /
-// g_sumMemPct that pollMetrics() refreshes each tick so the strip stays
-// in sync with the table without a second pass over the process list.
-// Total count uses accent green; the CPU/MEM sums use the dim grey the
-// rest of the footer chrome uses so the eye lands on the count first.
-static void renderProcessesSummary(Screen &dest)
-{
-    // Strip lives at y=448..464, BELOW the 15 visible data rows
-    // (y=100..400) and ABOVE the footer chrome (y=476..520). Earlier
-    // versions sat the strip at y=40..60 which physically collided
-    // with the y=8..40 tab buttons defined in base.xml; glyph
-    // descenders bled into the button outlines.
-    const vec3 stripBg(0.08f, 0.08f, 0.08f);
-    dest.drawBox(ivec2(24, 448), ivec2(936, 466), stripBg);
+// Processes-tab aggregate strip moved to src/ProcessesSummary.cpp as
+// Phase 1.2 slice 9 of the GUI evolution spec. Reaches the same pixels
+// via ProcessesSummary::render(dest, g_lastProcCount, ...).
 
-    const vec3 dim(0.65f, 0.65f, 0.65f);
-    std::size_t n = g_lastProcCount;
-    if (n > 9999) n = 9999;
-    std::string totalText = "Total: " + std::to_string(n) + " procs";
-    std::string cpuText = "Sum CPU: " + formatPct(g_sumCpuPct) + "%";
-    std::string memText = "Sum MEM: " + formatPct(g_sumMemPct) + "%";
-
-    Font::drawText(dest, totalText, ivec2(32, 452), COLOR_ACCENT_GREEN);
-    Font::drawText(dest, cpuText, ivec2(280, 452), dim);
-    Font::drawText(dest, memText, ivec2(520, 452), dim);
-
-    // Scroll position indicator. Only shown when the table is longer
-    // than the visible window so a user with 22 processes does not see
-    // a meaningless "1-15 / 22" on a static page; the moment it appears
-    // it signals "PgDown/Down arrow to scroll".
-    std::size_t windowSize = PROCESSES_VISIBLE_ROWS;
-    if (g_processVisibleCount > windowSize)
-    {
-        std::size_t firstRow = g_processScrollOffset + 1;
-        std::size_t lastRow = g_processScrollOffset + windowSize;
-        if (lastRow > g_processVisibleCount)
-        {
-            lastRow = g_processVisibleCount;
-        }
-        std::string scrollText = std::to_string(firstRow) + ".."
-                                 + std::to_string(lastRow) + " / "
-                                 + std::to_string(g_processVisibleCount);
-        Font::drawText(dest, scrollText, ivec2(760, 452), COLOR_ACCENT_GREEN);
-    }
-}
-
-// Keyboard shortcuts overlay. Painted last so it sits on top of every
-// tab and every other overlay. The panel is a near-black box with the
-// accent green used for the key glyph column and a dim grey for each
-// shortcut's description, mirroring the palette used by the signal menu
-// so the help reads as the same surface family. Lines are kept terse
-// (~10 entries) so the panel never overflows its 720x380 footprint.
-static void renderHelpOverlay(Screen &dest)
-{
-    const int panelX0 = 120;
-    const int panelY0 = 80;
-    const int panelX1 = 840;
-    const int panelY1 = 460;
-    const vec3 panelBg = Theme::bgDark();
-    const vec3 panelBorder = Theme::accentGreen();
-    dest.drawBox(ivec2(panelX0, panelY0), ivec2(panelX1, panelY1), panelBg);
-    // Four thin boxes draw the 1px border; cheaper than a stroked rect
-    // and matches the signal menu treatment.
-    dest.drawBox(ivec2(panelX0, panelY0), ivec2(panelX1, panelY0 + 1), panelBorder);
-    dest.drawBox(ivec2(panelX0, panelY1 - 1), ivec2(panelX1, panelY1), panelBorder);
-    dest.drawBox(ivec2(panelX0, panelY0), ivec2(panelX0 + 1, panelY1), panelBorder);
-    dest.drawBox(ivec2(panelX1 - 1, panelY0), ivec2(panelX1, panelY1), panelBorder);
-
-    const vec3 titleColor(1.0f, 1.0f, 1.0f);
-    const vec3 keyColor = COLOR_ACCENT_GREEN;
-    const vec3 descColor(0.65f, 0.65f, 0.65f);
-    const vec3 hintColor(0.5f, 0.5f, 0.5f);
-
-    Font::drawText(dest, "Keyboard shortcuts",
-                   ivec2(panelX0 + 24, panelY0 + 18), titleColor);
-
-    // Two-column layout: key glyph at x+24, description at x+160.
-    // Row pitch 28px gives ~10 lines comfortably inside the 380px panel.
-    const int keyX = panelX0 + 24;
-    const int descX = panelX0 + 160;
-    int row = panelY0 + 60;
-    constexpr int rowStep = 28;
-
-    Font::drawText(dest, "?", ivec2(keyX, row), keyColor);
-    Font::drawText(dest, "toggle this help", ivec2(descX, row), descColor);
-    row += rowStep;
-
-    Font::drawText(dest, "1..N", ivec2(keyX, row), keyColor);
-    Font::drawText(dest, "switch tab", ivec2(descX, row), descColor);
-    row += rowStep;
-
-    Font::drawText(dest, "/", ivec2(keyX, row), keyColor);
-    Font::drawText(dest, "filter processes by name", ivec2(descX, row), descColor);
-    row += rowStep;
-
-    Font::drawText(dest, "t", ivec2(keyX, row), keyColor);
-    Font::drawText(dest, "toggle tree mode", ivec2(descX, row), descColor);
-    row += rowStep;
-
-    Font::drawText(dest, "up / down", ivec2(keyX, row), keyColor);
-    Font::drawText(dest, "row select (auto-scroll at edge)", ivec2(descX, row), descColor);
-    row += rowStep;
-
-    Font::drawText(dest, "pgup / pgdn", ivec2(keyX, row), keyColor);
-    Font::drawText(dest, "scroll process list by a page", ivec2(descX, row), descColor);
-    row += rowStep;
-
-    Font::drawText(dest, "home / end", ivec2(keyX, row), keyColor);
-    Font::drawText(dest, "jump to top / bottom of list", ivec2(descX, row), descColor);
-    row += rowStep;
-
-    Font::drawText(dest, "wheel", ivec2(keyX, row), keyColor);
-    Font::drawText(dest, "scroll process list (3 rows/tick)", ivec2(descX, row), descColor);
-    row += rowStep;
-
-    Font::drawText(dest, "k", ivec2(keyX, row), keyColor);
-    Font::drawText(dest, "open signal / kill menu", ivec2(descX, row), descColor);
-    row += rowStep;
-
-    Font::drawText(dest, "y / enter", ivec2(keyX, row), keyColor);
-    Font::drawText(dest, "confirm action", ivec2(descX, row), descColor);
-    row += rowStep;
-
-    Font::drawText(dest, "esc", ivec2(keyX, row), keyColor);
-    Font::drawText(dest, "cancel / clear filter / dismiss", ivec2(descX, row), descColor);
-
-    Font::drawText(dest, "press ? or esc to close",
-                   ivec2(panelX0 + 24, panelY1 - 28), hintColor);
-}
+// Help overlay body moved to src/HelpOverlay.cpp as the first slice of
+// Phase 1.2 from the GUI evolution spec (PR #163). Reaches the same
+// pixels via HelpOverlay::render(dest).
 
 // Tiny accent labels at the left edge of each sparkline strip. Without
 // them three unlabeled polylines at the bottom of the System tab read as
 // abstract decoration; with them a reviewer instantly sees they're CPU
 // / RAM / GPU history. y-baseline picked to sit just above each strip.
-static void renderSparklineLabels(Screen &dest)
-{
-    const vec3 dim = Theme::textDim();
-    // One label per sparkline, painted 12px above the chart's top edge
-    // so the text sits in clear sky above the polyline fill instead of
-    // getting overwritten on every peak. Chart rects are CPU 246..286,
-    // RAM 312..352, GPU 378..418, NET 444..474.
-    Font::drawText(dest, "CPU history", ivec2(24, 230), dim);
-    Font::drawText(dest, "RAM history", ivec2(24, 296), dim);
-    Font::drawText(dest, "GPU history", ivec2(24, 362), dim);
-    Font::drawText(dest, "NET history", ivec2(24, 428), dim);
-}
+// Sparkline label paint moved to src/SparklineLabels.cpp as Phase 1.2
+// slice 2 of the GUI evolution spec. Reaches the same pixels via
+// SparklineLabels::render(dest).
 
 static void pollMetrics()
 {
     float cpuPct = SystemMetrics::readCpuPercent();
     float memPct = SystemMetrics::readMemPercent();
     float gpuPct = SystemMetrics::readGpuPercent();
+    // Stash the latest percentages so the render loop can hand them to
+    // MetricReadouts::render(...) outside of this scope.
+    g_cpuPct = cpuPct;
+    g_ramPct = memPct;
+    g_gpuPct = gpuPct;
 
     // Threshold-based fill colors mirror the per-core strip + DISK
     // readout palette: accent green idle, yellow at 60%+, red at 80%+.
@@ -838,22 +562,6 @@ static void pollMetrics()
         g_gpuBar->setValue(gpuPct);
         g_gpuBar->setFillColor(Thresholds::colorForPct(gpuPct));
     }
-    if (g_cpuReadout != nullptr)
-    {
-        g_cpuReadout->setText(formatPct(cpuPct) + "%");
-        g_cpuReadout->setColor(Thresholds::colorForPct(cpuPct));
-    }
-    if (g_ramReadout != nullptr)
-    {
-        g_ramReadout->setText(formatPct(memPct) + "%");
-        g_ramReadout->setColor(Thresholds::colorForPct(memPct));
-    }
-    if (g_gpuReadout != nullptr)
-    {
-        g_gpuReadout->setText(formatPct(gpuPct) + "%");
-        g_gpuReadout->setColor(Thresholds::colorForPct(gpuPct));
-    }
-
     if (g_cpuSparkline != nullptr)
     {
         g_cpuSparkline->push(cpuPct);
@@ -933,7 +641,7 @@ static void pollMetrics()
     }
     g_aggregateDiskReadKbPerSec = aggReadKb;
     g_aggregateDiskWriteKbPerSec = aggWriteKb;
-    // Cached for renderProcessesSummary so the strip can paint each frame
+    // Cached for ProcessesSummary::render so the strip can paint each frame
     // without rewalking the process list. Stale by at most one poll tick.
     g_sumCpuPct = sumCpuPct;
     g_sumMemPct = sumMemPct;
@@ -1187,96 +895,6 @@ static void pollMetrics()
     }
 }
 
-enum class TopSortKey
-{
-    Memory,
-    Cpu,
-    Io
-};
-
-static bool topSortByCpuDesc(const ProcessInfo &a, const ProcessInfo &b)
-{
-    return a.cpuPct > b.cpuPct;
-}
-
-static bool topSortByIoDesc(const ProcessInfo &a, const ProcessInfo &b)
-{
-    unsigned long long aIo = a.diskReadKbPerSec + a.diskWriteKbPerSec;
-    unsigned long long bIo = b.diskReadKbPerSec + b.diskWriteKbPerSec;
-    return aIo > bIo;
-}
-
-// Pick an ANSI 24-bit color escape for a percent value using the same
-// green/yellow/red threshold palette the GUI uses (see Thresholds.hpp).
-// Returns "" when colorization is off so the caller can splice it in
-// unconditionally without surrounding if/else noise.
-static const char *topColorForPct(float pct, bool colorize)
-{
-    if (!colorize)
-    {
-        return "";
-    }
-    if (pct >= 80.0f)
-    {
-        return "\033[31m"; // red
-    }
-    if (pct >= 60.0f)
-    {
-        return "\033[33m"; // yellow
-    }
-    return "\033[32m"; // green
-}
-
-// Pretty-print the top-N process table to stdout for the headless
-// `--top` and `--watch` modes. Separated so both the one-shot path
-// and the watch loop call the exact same formatter. Project rule
-// forbids lambdas in app code, so this is a free static helper.
-static void printTopProcesses(int topCount, TopSortKey sortKey, bool colorize)
-{
-    // Over-fetch by 4x so the secondary sort by cpu/io has enough
-    // candidates to choose from when the backend ordered the list by
-    // memory. topProcesses() returns by mem% desc; we re-sort here.
-    std::size_t fetchN = static_cast<std::size_t>(topCount) * 4;
-    if (fetchN < 50)
-    {
-        fetchN = 50;
-    }
-    std::vector<ProcessInfo> procs = SystemMetrics::topProcesses(fetchN);
-    if (sortKey == TopSortKey::Cpu)
-    {
-        std::sort(procs.begin(), procs.end(), topSortByCpuDesc);
-    }
-    else if (sortKey == TopSortKey::Io)
-    {
-        std::sort(procs.begin(), procs.end(), topSortByIoDesc);
-    }
-    if (procs.size() > static_cast<std::size_t>(topCount))
-    {
-        procs.resize(static_cast<std::size_t>(topCount));
-    }
-    const char *reset = colorize ? "\033[0m" : "";
-    const char *headerColor = colorize ? "\033[1m" : "";
-    std::printf("%s%-7s %-32s %6s %6s %12s%s\n",
-                headerColor, "PID", "NAME", "CPU%", "MEM%", "IO KB/s", reset);
-    for (const auto &p : procs)
-    {
-        std::string name = p.name;
-        if (name.size() > 32)
-        {
-            name.resize(32);
-        }
-        unsigned long long ioKbPerSec = p.diskReadKbPerSec + p.diskWriteKbPerSec;
-        const char *cpuC = topColorForPct(p.cpuPct, colorize);
-        const char *memC = topColorForPct(p.memPct, colorize);
-        std::printf("%-7d %-32s %s%6.1f%s %s%6.1f%s %12llu\n",
-                    p.pid, name.c_str(),
-                    cpuC, p.cpuPct, reset,
-                    memC, p.memPct, reset,
-                    ioKbPerSec);
-    }
-    std::fflush(stdout);
-}
-
 int main(int argc, char **argv)
 {
     // Optional headless screenshot mode: `coremetrics --screenshot out.bmp`
@@ -1304,7 +922,7 @@ int main(int argc, char **argv)
     // `--top-sort cpu|mem|io` re-orders the printed table by the
     // chosen column. Default is mem (matches the backend's natural
     // sort order from topProcesses(N)). Unknown values fall back to mem.
-    TopSortKey topSortKey = TopSortKey::Memory;
+    TopSortKey topSortKey = TopSortKey::Mem;
     // `--top-color auto|always|never`: colorize the --top / --watch
     // output. auto (default) checks isatty so piped output stays
     // ASCII-clean. always forces color on. never forces it off.
@@ -1332,7 +950,7 @@ int main(int argc, char **argv)
         {
             // Mirrors base.xml's footer label; bumped by the release
             // flow that touches the XML.
-            std::printf("coremetrics 0.2.26\n");
+            std::printf("coremetrics 0.3.0\n");
             return 0;
         }
         if (arg == "--help" || arg == "-h")
@@ -1348,7 +966,7 @@ int main(int argc, char **argv)
                 "  --duration SECONDS        auto-exit after N seconds (live UI)\n"
                 "\n"
                 "Headless modes:\n"
-                "  --screenshot PATH [system|processes]\n"
+                "  --screenshot PATH [system|processes|about]\n"
                 "                            render one frame to PATH and exit\n"
                 "  --export-csv PATH         dump one-shot CSV and exit\n"
                 "  --export-json PATH        dump one-shot JSON and exit\n"
@@ -1455,7 +1073,7 @@ int main(int argc, char **argv)
             }
             else
             {
-                topSortKey = TopSortKey::Memory;
+                topSortKey = TopSortKey::Mem;
             }
         }
         if (std::string(argv[i]) == "--top-color" && i + 1 < argc)
@@ -1502,7 +1120,7 @@ int main(int argc, char **argv)
         std::signal(SIGTERM, handleShutdownSignal);
         if (!watchMode)
         {
-            printTopProcesses(topCount, topSortKey, topColorize);
+            TopProcessesPrinter::print(topCount, topSortKey, topColorize);
             return 0;
         }
         // --watch: clear the terminal with the ANSI 2J + cursor home
@@ -1512,7 +1130,7 @@ int main(int argc, char **argv)
         while (!g_shutdownRequested.load())
         {
             std::printf("\033[2J\033[H");
-            printTopProcesses(topCount, topSortKey, topColorize);
+            TopProcessesPrinter::print(topCount, topSortKey, topColorize);
             SDL_Delay(static_cast<Uint32>(g_pollIntervalMs));
         }
         return 0;
@@ -1620,18 +1238,41 @@ int main(int argc, char **argv)
             EventManager::getInstance().pushEvent(std::make_unique<ShowEvent>("processes", true));
             EventManager::getInstance().processEvents(ivec2(0, 0), ivec2(RESX - 1, RESY - 1));
         }
+        else if (tab == "about")
+        {
+            EventManager::getInstance().pushEvent(std::make_unique<ShowEvent>("system", false));
+            EventManager::getInstance().pushEvent(std::make_unique<ShowEvent>("about", true));
+            EventManager::getInstance().processEvents(ivec2(0, 0), ivec2(RESX - 1, RESY - 1));
+        }
 
         shot.clear();
         LayoutManager::getInstance().render(shot, ivec2(0, 0), ivec2(RESX - 1, RESY - 1));
-        renderFooterLiveStats(shot);
-        if (tab != "processes")
+        // Active-tab indicator: keeps the headless screenshot output in
+        // sync with what the live loop paints (Pillar A5).
         {
-            renderUptimeAndLoad(shot);
-            renderDiskUsage(shot);
-            renderAggregateDiskIo(shot);
-            renderNetIo(shot);
-            renderMemBreakdownStrip(shot);
-            renderPerCoreStrip(shot);
+            int activeTabIndex = 0;
+            if (tab == "about")
+            {
+                activeTabIndex = 2;
+            }
+            else if (tab == "processes")
+            {
+                activeTabIndex = 1;
+            }
+            TabIndicator::render(shot, activeTabIndex);
+        }
+        FooterLiveStats::render(shot, g_lastProcCount);
+        if (tab == "system")
+        {
+            // Dominant Title-size CPU/RAM/GPU readouts (Pillar A2). Paints
+            // before the per-tab helpers so the smaller dim "%" sign sits
+            // above the card background without getting overdrawn.
+            MetricReadouts::render(shot, g_cpuPct, g_ramPct, g_gpuPct);
+            UptimeAndLoad::render(shot, g_uptimeSeconds, g_loadAverages);
+            DiskUsageRow::render(shot, g_diskUsage);
+            NetIoFooter::render(shot, g_aggregateDiskReadKbPerSec, g_aggregateDiskWriteKbPerSec, g_netIo);
+            MemBreakdownStrip::render(shot, g_memBreakdown);
+            PerCoreStrip::render(shot, g_perCoreCpu, g_sparklinesEnabled);
             if (g_sparklinesEnabled)
             {
                 if (g_cpuSparkline != nullptr) g_cpuSparkline->draw(shot);
@@ -1641,10 +1282,10 @@ int main(int argc, char **argv)
                 // incoming traffic is the headline number for most users.
                 if (g_netTxSparkline != nullptr) g_netTxSparkline->draw(shot);
                 if (g_netRxSparkline != nullptr) g_netRxSparkline->draw(shot);
-                renderSparklineLabels(shot);
+                SparklineLabels::render(shot);
             }
         }
-        else if (!g_filterText.empty())
+        else if (tab == "processes" && !g_filterText.empty())
         {
             const vec3 labelColor = Theme::accentGreen();
             const vec3 textColor(1.0f, 1.0f, 1.0f);
@@ -1653,7 +1294,23 @@ int main(int argc, char **argv)
         }
         if (tab == "processes")
         {
-            renderProcessesSummary(shot);
+            ProcessesSummary::render(shot,
+                                     g_lastProcCount,
+                                     g_sumCpuPct,
+                                     g_sumMemPct,
+                                     g_processScrollOffset,
+                                     g_processVisibleCount,
+                                     PROCESSES_VISIBLE_ROWS);
+            // Mirror the live loop's empty-state hint so the screenshot
+            // matches what a user sees during the boot moment (Pillar A6).
+            if (g_lastProcCount == 0)
+            {
+                EmptyStates::renderProcessesEmpty(shot);
+            }
+        }
+        else if (tab == "about")
+        {
+            AboutTab::render(shot, g_uptimeSeconds, g_perCoreCpu.size());
         }
         SDL_Surface *out = SDL_CreateSurface(RESX, RESY, SDL_PIXELFORMAT_RGBA32);
         if (out == nullptr)
@@ -1809,7 +1466,30 @@ int main(int argc, char **argv)
                     if (g_muteLabel != nullptr)
                     {
                         g_muteLabel->setText(g_alarmEnabled ? "SOUND ON" : "SOUND OFF");
+                        // The toggled string is wider/narrower than the
+                        // previous one; recenter so the label keeps an
+                        // even margin on both sides of the button rect.
+                        recenterMuteLabel();
                     }
+                }
+                else if (mx >= g_systemTabBtnMin.x && mx <= g_systemTabBtnMax.x
+                         && my >= g_systemTabBtnMin.y && my <= g_systemTabBtnMax.y)
+                {
+                    // Intercept tab-button clicks here so the three-tab fan
+                    // out (hide the two non-clicked layouts, show the
+                    // clicked one) is one atomic switch. The Button XML
+                    // schema only supports one hide per button.
+                    activateTab("system");
+                }
+                else if (mx >= g_processesTabBtnMin.x && mx <= g_processesTabBtnMax.x
+                         && my >= g_processesTabBtnMin.y && my <= g_processesTabBtnMax.y)
+                {
+                    activateTab("processes");
+                }
+                else if (mx >= g_aboutTabBtnMin.x && mx <= g_aboutTabBtnMax.x
+                         && my >= g_aboutTabBtnMin.y && my <= g_aboutTabBtnMax.y)
+                {
+                    activateTab("about");
                 }
                 else
                 {
@@ -2211,7 +1891,7 @@ int main(int argc, char **argv)
             lastPoll = now;
         }
 
-        screen.clear();
+        screen.clear(Theme::bgBase());
         // Selected-row background. Painted BEFORE the layout render so the
         // row's text (drawn by the Row widget during LayoutManager render)
         // sits on top of the highlight box rather than under it. Renders
@@ -2227,6 +1907,28 @@ int main(int argc, char **argv)
                            selectionBg);
         }
         LayoutManager::getInstance().render(screen, ivec2(0, 0), ivec2(RESX - 1, RESY - 1));
+
+        // Active-tab indicator stripe. Painted right after the layout
+        // tree so it sits on top of the tab-strip background but under
+        // the per-tab overlays below. tabIndex derives from the live
+        // layout state so the stripe always tracks the visible content
+        // layout. Pillar A5 of the modernization roadmap.
+        {
+            int activeTabIndex = 0;
+            if (aboutTabActive())
+            {
+                activeTabIndex = 2;
+            }
+            else if (processesTabActive())
+            {
+                activeTabIndex = 1;
+            }
+            TabIndicator::render(screen, activeTabIndex);
+        }
+        if (aboutTabActive())
+        {
+            AboutTab::render(screen, g_uptimeSeconds, g_perCoreCpu.size());
+        }
         {
             // Per-core strip and sparklines only paint while the System tab
             // is the active layout. On Processes, the rows occupy the same
@@ -2235,12 +1937,14 @@ int main(int argc, char **argv)
                 LayoutManager::getInstance().getRoot(), "system");
             if (systemNode != nullptr && systemNode->getData().isActive())
             {
-                renderUptimeAndLoad(screen);
-                renderDiskUsage(screen);
-                renderAggregateDiskIo(screen);
-                renderNetIo(screen);
-                renderMemBreakdownStrip(screen);
-                renderPerCoreStrip(screen);
+                // Dominant Title-size CPU/RAM/GPU readouts (Pillar A2).
+                // Mirrors the screenshot path; same System-tab gate.
+                MetricReadouts::render(screen, g_cpuPct, g_ramPct, g_gpuPct);
+                UptimeAndLoad::render(screen, g_uptimeSeconds, g_loadAverages);
+                DiskUsageRow::render(screen, g_diskUsage);
+                NetIoFooter::render(screen, g_aggregateDiskReadKbPerSec, g_aggregateDiskWriteKbPerSec, g_netIo);
+                MemBreakdownStrip::render(screen, g_memBreakdown);
+                PerCoreStrip::render(screen, g_perCoreCpu, g_sparklinesEnabled);
                 if (g_sparklinesEnabled)
                 {
                     if (g_cpuSparkline != nullptr) g_cpuSparkline->draw(screen);
@@ -2250,7 +1954,7 @@ int main(int argc, char **argv)
                     // traffic stays the visually dominant line.
                     if (g_netTxSparkline != nullptr) g_netTxSparkline->draw(screen);
                     if (g_netRxSparkline != nullptr) g_netRxSparkline->draw(screen);
-                    renderSparklineLabels(screen);
+                    SparklineLabels::render(screen);
                 }
             }
         }
@@ -2289,7 +1993,7 @@ int main(int argc, char **argv)
                                ivec2(nameCellX, rowY), color);
             }
         }
-        renderFooterLiveStats(screen);
+        FooterLiveStats::render(screen, g_lastProcCount);
 
         // Aggregate summary strip sits above the Processes table column
         // headers (y=72) so a glance at the top of the tab shows the
@@ -2297,7 +2001,27 @@ int main(int argc, char **argv)
         // the layout tree so it is not overdrawn by the table chrome.
         if (processesTabActive())
         {
-            renderProcessesSummary(screen);
+            ProcessesSummary::render(screen,
+                                     g_lastProcCount,
+                                     g_sumCpuPct,
+                                     g_sumMemPct,
+                                     g_processScrollOffset,
+                                     g_processVisibleCount,
+                                     PROCESSES_VISIBLE_ROWS);
+        }
+
+        // Empty-state hint. When the Processes tab is active but the
+        // backend has not yet returned a sample, the layout would
+        // otherwise paint a blank 16-row table with no explanation.
+        // Painted after the row chrome so it lands on top of the empty
+        // rows rather than under them. The current gate covers the
+        // boot moment only; a future revision should also fire when an
+        // active filter excludes every visible row (g_lastProcCount is
+        // set pre-filter, so a separate visible-row count is needed).
+        // Pillar A6 of the modernization roadmap.
+        if (processesTabActive() && g_lastProcCount == 0)
+        {
+            EmptyStates::renderProcessesEmpty(screen);
         }
 
         // Process-kill overlays: selected-row highlight + signal menu + the
@@ -2306,24 +2030,7 @@ int main(int argc, char **argv)
         // widget itself.
         if (processesTabActive() && (g_filterInputActive || !g_filterText.empty()))
         {
-            // Filter input strip at the top of the Processes tab, above
-            // the header row. Two-tone: accent label, white query text,
-            // a blinking cursor when input is active.
-            const vec3 labelColor = Theme::accentGreen();
-            const vec3 textColor(1.0f, 1.0f, 1.0f);
-            const vec3 hintColor = Theme::textDim();
-            std::string prefix = g_filterInputActive ? "filter> " : "filter: ";
-            std::string body = g_filterText;
-            if (g_filterInputActive && ((SDL_GetTicks() / 400) % 2) == 0)
-            {
-                body += "_";
-            }
-            Font::drawText(screen, prefix, ivec2(24, 44), labelColor);
-            Font::drawText(screen, body, ivec2(120, 44), textColor);
-            if (!g_filterInputActive && !g_filterText.empty())
-            {
-                Font::drawText(screen, "Esc clears", ivec2(800, 44), hintColor);
-            }
+            FilterStrip::render(screen, g_filterInputActive, g_filterText, SDL_GetTicks());
         }
 
         if (processesTabActive() && g_selectedRowIndex >= 0
@@ -2332,54 +2039,18 @@ int main(int argc, char **argv)
             int y0 = PROCESSES_FIRST_ROW_Y + g_selectedRowIndex * PROCESS_ROW_HEIGHT;
             int y1 = y0 + PROCESS_ROW_HEIGHT - 1;
             // Thin accent strip on the left edge of the row. Cheap to draw,
-            // does not overdraw the text in the row.
+            // does not overdraw the text in the row. Brand-blue Theme::accent()
+            // matches the active-tab indicator introduced in #210 so the strip
+            // reads as "selected by user input" rather than the load-pressure
+            // green that the old COLOR_ACCENT_GREEN was suggesting.
             screen.drawBox(ivec2(PROCESSES_ROW_X0 - 6, y0),
                            ivec2(PROCESSES_ROW_X0 - 2, y1),
-                           COLOR_ACCENT_GREEN);
+                           Theme::accent());
         }
 
         if (g_signalMenuVisible)
         {
-            // Centered panel. The overlay is small and the message is the
-            // information that matters; no decorative chrome beyond a 1px
-            // border in the accent color so it reads as an actionable
-            // foreground element.
-            const int panelX0 = 200;
-            const int panelY0 = 200;
-            const int panelX1 = 760;
-            const int panelY1 = 320;
-            const vec3 panelBg(0.08f, 0.08f, 0.08f);
-            const vec3 panelBorder = Theme::accentGreen();
-            screen.drawBox(ivec2(panelX0, panelY0), ivec2(panelX1, panelY1), panelBg);
-            // Border. 4 thin boxes is cheaper than a stroked rectangle.
-            screen.drawBox(ivec2(panelX0, panelY0), ivec2(panelX1, panelY0 + 1), panelBorder);
-            screen.drawBox(ivec2(panelX0, panelY1 - 1), ivec2(panelX1, panelY1), panelBorder);
-            screen.drawBox(ivec2(panelX0, panelY0), ivec2(panelX0 + 1, panelY1), panelBorder);
-            screen.drawBox(ivec2(panelX1 - 1, panelY0), ivec2(panelX1, panelY1), panelBorder);
-
-            const vec3 textColor(1.0f, 1.0f, 1.0f);
-            const vec3 hintColor(0.6f, 0.6f, 0.6f);
-            if (g_signalMenuPickedIndex < 0)
-            {
-                Font::drawText(screen, "Send signal to pid " + std::to_string(g_selectedPid),
-                               ivec2(panelX0 + 24, panelY0 + 18), textColor);
-                Font::drawText(screen, "1 TERM   2 KILL   3 INT   4 HUP   5 STOP   6 CONT",
-                               ivec2(panelX0 + 24, panelY0 + 50), COLOR_ACCENT_GREEN);
-                Font::drawText(screen, "Esc cancels",
-                               ivec2(panelX0 + 24, panelY1 - 30), hintColor);
-            }
-            else
-            {
-                SignalUtils::Signal sig =
-                    static_cast<SignalUtils::Signal>(g_signalMenuPickedIndex);
-                std::string prompt = std::string("Send ")
-                                     + SignalUtils::name(sig)
-                                     + " to pid " + std::to_string(g_selectedPid) + "?";
-                Font::drawText(screen, prompt,
-                               ivec2(panelX0 + 24, panelY0 + 18), textColor);
-                Font::drawText(screen, "Y / Enter = send     N / Esc = cancel",
-                               ivec2(panelX0 + 24, panelY0 + 50), COLOR_ACCENT_GREEN);
-            }
+            SignalMenuOverlay::render(screen, g_selectedPid, g_signalMenuPickedIndex);
         }
 
         if (!g_statusFlash.empty() && SDL_GetTicks() < g_statusFlashExpiryMs)
@@ -2387,7 +2058,7 @@ int main(int argc, char **argv)
             // Paint the flash over the right end of the footer status strip,
             // before the EXIT button. The accent color is reused so the flash
             // reads as part of the same status row, not a foreign popup.
-            Font::drawText(screen, g_statusFlash, ivec2(540, 492), COLOR_ACCENT_GREEN);
+            StatusFlash::render(screen, g_statusFlash);
         }
         else if (!g_statusFlash.empty())
         {
@@ -2400,7 +2071,7 @@ int main(int argc, char **argv)
         // a transient state does not break anything.
         if (g_helpOverlayVisible)
         {
-            renderHelpOverlay(screen);
+            HelpOverlay::render(screen);
         }
 
         screen.blitTo(SDL_GetWindowSurface(window));

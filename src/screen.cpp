@@ -56,6 +56,32 @@ void Screen::clear()
     SDL_FillSurfaceRect(surface, nullptr, 0);
 }
 
+static Uint8 floatToByteChannel(float v)
+{
+    const float clamped = v < 0.0f ? 0.0f : (v > 1.0f ? 1.0f : v);
+    return static_cast<Uint8>(clamped * 255.0f);
+}
+
+void Screen::clear(const Tvec3<float> &color)
+{
+    if (!surface)
+    {
+        return;
+    }
+    const SDL_PixelFormatDetails *details =
+        SDL_GetPixelFormatDetails(surface->format);
+    if (!details)
+    {
+        SDL_FillSurfaceRect(surface, nullptr, 0);
+        return;
+    }
+    const Uint32 packed = SDL_MapRGB(details, nullptr,
+                                     floatToByteChannel(color.x),
+                                     floatToByteChannel(color.y),
+                                     floatToByteChannel(color.z));
+    SDL_FillSurfaceRect(surface, nullptr, packed);
+}
+
 void Screen::blitSurface(SDL_Surface *src, const Tvec2<int> &pos)
 {
     if (!surface || !src)

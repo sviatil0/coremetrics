@@ -29,6 +29,19 @@ package "GUI elements" {
     class Button
     class Bar
     class Row
+    class Sparkline
+    class ProgressRing
+    class Gauge
+    class Donut
+    class Heatmap
+    class StackedBar
+    class Toggle
+    class Slider
+    class TabStrip
+    class Dropdown
+    class TreeView
+    class Modal
+    class Tooltip
 }
 
 package "Layout / Files" {
@@ -65,6 +78,19 @@ GUIElement <|-- "Cloneable<Derived>"
 "Cloneable<Derived>" <|-- Button
 "Cloneable<Derived>" <|-- Bar
 "Cloneable<Derived>" <|-- Row
+"Cloneable<Derived>" <|-- Sparkline
+"Cloneable<Derived>" <|-- ProgressRing
+"Cloneable<Derived>" <|-- Gauge
+"Cloneable<Derived>" <|-- Donut
+"Cloneable<Derived>" <|-- Heatmap
+"Cloneable<Derived>" <|-- StackedBar
+"Cloneable<Derived>" <|-- Toggle
+"Cloneable<Derived>" <|-- Slider
+"Cloneable<Derived>" <|-- TabStrip
+"Cloneable<Derived>" <|-- Dropdown
+"Cloneable<Derived>" <|-- TreeView
+"Cloneable<Derived>" <|-- Modal
+"Cloneable<Derived>" <|-- Tooltip
 
 Event <|-- ClickEvent
 Event <|-- ShowEvent

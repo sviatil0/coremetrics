@@ -1,4 +1,5 @@
 #include "Sparkline.hpp"
+#include "Theme.hpp"
 #include "Thresholds.hpp"
 #include "font.hpp"
 #include <algorithm>
@@ -144,17 +145,17 @@ void Sparkline::draw(Screen &screen) const
         return maxPos.x - static_cast<int>(static_cast<float>(indexFromNewest) * stepX);
     };
 
-    // Lower fill (6% tint, down from 10%) so the chart reads as line +
-    // background rather than a saturated slab when the value is flat or
-    // pinned at the top of the range. In threshold mode the fill is
-    // recomputed per segment from the segment's stroke color so tint
-    // and stroke stay in sync as the line passes 60% and 80%.
-    vec3 fillColor(color.x * 0.06f, color.y * 0.06f, color.z * 0.06f);
+    // Lower fill at 12% tint. After PR #207's palette migration the
+    // 6% tint was visually invisible against the new bgBase #1a1b26;
+    // 12% reads as a soft signal area without overwhelming the stroke.
+    vec3 fillColor(color.x * 0.12f, color.y * 0.12f, color.z * 0.12f);
 
-    // 50% horizontal midline. Dimmed back to 0.20 so the midline is
-    // visible but doesn't compete with the polyline at low values.
+    // 50% horizontal midline painted in Theme::panelBorder() so the
+    // polyline has a visible "0 baseline" reference that flows from
+    // the same palette as every other panel divider. Drawn BEFORE the
+    // fill + polyline so the data overdraws it where they cross.
     int midY = (minPos.y + maxPos.y) / 2;
-    vec3 midlineColor(0.20f, 0.20f, 0.20f);
+    vec3 midlineColor = Theme::panelBorder();
     ivec2 midA(minPos.x, midY);
     ivec2 midB(maxPos.x, midY);
     screen.drawLine(midA, midB, midlineColor);

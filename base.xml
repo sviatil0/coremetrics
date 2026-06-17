@@ -3,107 +3,196 @@
     <layout sX=0.0 sY=0.0 eX=1.0 eY=0.09 active=true name=tabbar>
         <button>
             <ivec2><x>8</x><y>8</y></ivec2>
-            <ivec2><x>402</x><y>40</y></ivec2>
-            <vec3><x>0.1</x><y>0.1</y><z>0.1</z></vec3>
+            <ivec2><x>272</x><y>40</y></ivec2>
+            <vec3><x>0.141</x><y>0.157</y><z>0.231</z></vec3>
             <target>system</target>
             <hide>processes</hide>
         </button>
         <label>
             <ivec2><x>20</x><y>14</y></ivec2>
-            <vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3>
+            <vec3><x>0.753</x><y>0.792</y><z>0.961</z></vec3>
             <text>System</text>
         </label>
 
         <button>
-            <ivec2><x>410</x><y>8</y></ivec2>
-            <ivec2><x>804</x><y>40</y></ivec2>
-            <vec3><x>0.1</x><y>0.1</y><z>0.1</z></vec3>
+            <ivec2><x>280</x><y>8</y></ivec2>
+            <ivec2><x>544</x><y>40</y></ivec2>
+            <vec3><x>0.141</x><y>0.157</y><z>0.231</z></vec3>
             <target>processes</target>
             <hide>system</hide>
         </button>
         <label>
-            <ivec2><x>422</x><y>14</y></ivec2>
-            <vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3>
+            <ivec2><x>292</x><y>14</y></ivec2>
+            <vec3><x>0.753</x><y>0.792</y><z>0.961</z></vec3>
             <text>Processes</text>
+        </label>
+
+        <button>
+            <ivec2><x>552</x><y>8</y></ivec2>
+            <ivec2><x>804</x><y>40</y></ivec2>
+            <vec3><x>0.141</x><y>0.157</y><z>0.231</z></vec3>
+            <target>about</target>
+            <hide>system</hide>
+        </button>
+        <label>
+            <ivec2><x>564</x><y>14</y></ivec2>
+            <vec3><x>0.753</x><y>0.792</y><z>0.961</z></vec3>
+            <text>About</text>
         </label>
 
         <button>
             <ivec2><x>812</x><y>8</y></ivec2>
             <ivec2><x>952</x><y>40</y></ivec2>
-            <vec3><x>0.08</x><y>0.08</y><z>0.08</z></vec3>
+            <vec3><x>0.184</x><y>0.200</y><z>0.302</z></vec3>
         </button>
+        <!-- Label x is recomputed at runtime so SOUND ON / SOUND OFF both
+             stay centered inside the 140 px wide toggle button. The hand
+             tuned x=834 here is the centered offset for the default
+             "SOUND ON" string at 20 pt Body; coremetrics.cpp updates it on
+             toggle via Font::measureTextWidth(). -->
         <label>
-            <ivec2><x>818</x><y>14</y></ivec2>
-            <vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3>
+            <ivec2><x>834</x><y>14</y></ivec2>
+            <vec3><x>0.753</x><y>0.792</y><z>0.961</z></vec3>
             <text>SOUND ON</text>
         </label>
 
         <box>
             <ivec2><x>8</x><y>44</y></ivec2>
-            <ivec2><x>952</x><y>45</y></ivec2>
-            <vec3><x>0.18</x><y>0.18</y><z>0.18</z></vec3>
+            <ivec2><x>952</x><y>46</y></ivec2>
+            <vec3><x>0.255</x><y>0.282</y><z>0.408</z></vec3>
         </box>
 
     </layout>
 
     <layout sX=0.0 sY=0.089 eX=1.0 eY=1.0 active=true name=system>
 
+        <!-- CPU card: fill + 1 px-thick edge borders on an 8 px grid. Card
+             rect (8,80) -> (952,120) wraps the bar widget at
+             (84,88) -> (864,112) with 8 px of internal padding top/bottom. -->
+        <box>
+            <ivec2><x>8</x><y>80</y></ivec2>
+            <ivec2><x>952</x><y>120</y></ivec2>
+            <vec3><x>0.141</x><y>0.157</y><z>0.231</z></vec3>
+        </box>
+        <box>
+            <ivec2><x>8</x><y>80</y></ivec2>
+            <ivec2><x>952</x><y>81</y></ivec2>
+            <vec3><x>0.255</x><y>0.282</y><z>0.408</z></vec3>
+        </box>
+        <box>
+            <ivec2><x>8</x><y>119</y></ivec2>
+            <ivec2><x>952</x><y>120</y></ivec2>
+            <vec3><x>0.255</x><y>0.282</y><z>0.408</z></vec3>
+        </box>
+        <box>
+            <ivec2><x>8</x><y>80</y></ivec2>
+            <ivec2><x>9</x><y>120</y></ivec2>
+            <vec3><x>0.255</x><y>0.282</y><z>0.408</z></vec3>
+        </box>
+        <box>
+            <ivec2><x>951</x><y>80</y></ivec2>
+            <ivec2><x>952</x><y>120</y></ivec2>
+            <vec3><x>0.255</x><y>0.282</y><z>0.408</z></vec3>
+        </box>
+
         <label>
-            <ivec2><x>24</x><y>92</y></ivec2>
-            <vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3>
+            <ivec2><x>24</x><y>96</y></ivec2>
+            <vec3><x>0.753</x><y>0.792</y><z>0.961</z></vec3>
             <text>CPU</text>
         </label>
         <bar min=0 max=100>
             <ivec2><x>84</x><y>88</y></ivec2>
             <ivec2><x>864</x><y>112</y></ivec2>
-            <vec3><x>0.871</x><y>1.0</y><z>0.608</z></vec3>
-            <vec3><x>0.12</x><y>0.12</y><z>0.12</z></vec3>
+            <vec3><x>0.620</x><y>0.808</y><z>0.416</z></vec3>
+            <vec3><x>0.184</x><y>0.200</y><z>0.302</z></vec3>
             <metric>cpu</metric>
         </bar>
-        <!-- bold readout: CPU percent, wired via Label::setBold in cacheElementPointers -->
-        <label>
-            <ivec2><x>876</x><y>92</y></ivec2>
-            <vec3><x>0.871</x><y>1.0</y><z>0.608</z></vec3>
-            <text>0.0%</text>
-        </label>
+        <!-- CPU percent readout painted programmatically at Title size
+             (28 pt) by MetricReadouts::render(...). Pillar A2 wire-up. -->
+
+        <!-- RAM card: same shape as CPU card, shifted to bar row at 136. -->
+        <box>
+            <ivec2><x>8</x><y>128</y></ivec2>
+            <ivec2><x>952</x><y>168</y></ivec2>
+            <vec3><x>0.141</x><y>0.157</y><z>0.231</z></vec3>
+        </box>
+        <box>
+            <ivec2><x>8</x><y>128</y></ivec2>
+            <ivec2><x>952</x><y>129</y></ivec2>
+            <vec3><x>0.255</x><y>0.282</y><z>0.408</z></vec3>
+        </box>
+        <box>
+            <ivec2><x>8</x><y>167</y></ivec2>
+            <ivec2><x>952</x><y>168</y></ivec2>
+            <vec3><x>0.255</x><y>0.282</y><z>0.408</z></vec3>
+        </box>
+        <box>
+            <ivec2><x>8</x><y>128</y></ivec2>
+            <ivec2><x>9</x><y>168</y></ivec2>
+            <vec3><x>0.255</x><y>0.282</y><z>0.408</z></vec3>
+        </box>
+        <box>
+            <ivec2><x>951</x><y>128</y></ivec2>
+            <ivec2><x>952</x><y>168</y></ivec2>
+            <vec3><x>0.255</x><y>0.282</y><z>0.408</z></vec3>
+        </box>
 
         <label>
-            <ivec2><x>24</x><y>140</y></ivec2>
-            <vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3>
+            <ivec2><x>24</x><y>144</y></ivec2>
+            <vec3><x>0.753</x><y>0.792</y><z>0.961</z></vec3>
             <text>RAM</text>
         </label>
         <bar min=0 max=100>
             <ivec2><x>84</x><y>136</y></ivec2>
             <ivec2><x>864</x><y>160</y></ivec2>
-            <vec3><x>0.871</x><y>1.0</y><z>0.608</z></vec3>
-            <vec3><x>0.12</x><y>0.12</y><z>0.12</z></vec3>
+            <vec3><x>0.620</x><y>0.808</y><z>0.416</z></vec3>
+            <vec3><x>0.184</x><y>0.200</y><z>0.302</z></vec3>
             <metric>ram</metric>
         </bar>
-        <!-- bold readout: RAM percent, wired via Label::setBold in cacheElementPointers -->
-        <label>
-            <ivec2><x>876</x><y>140</y></ivec2>
-            <vec3><x>0.871</x><y>1.0</y><z>0.608</z></vec3>
-            <text>0.0%</text>
-        </label>
+        <!-- RAM percent readout painted programmatically at Title size
+             (28 pt) by MetricReadouts::render(...). Pillar A2 wire-up. -->
+
+        <!-- GPU card: same shape as CPU card, shifted to bar row at 184. -->
+        <box>
+            <ivec2><x>8</x><y>176</y></ivec2>
+            <ivec2><x>952</x><y>216</y></ivec2>
+            <vec3><x>0.141</x><y>0.157</y><z>0.231</z></vec3>
+        </box>
+        <box>
+            <ivec2><x>8</x><y>176</y></ivec2>
+            <ivec2><x>952</x><y>177</y></ivec2>
+            <vec3><x>0.255</x><y>0.282</y><z>0.408</z></vec3>
+        </box>
+        <box>
+            <ivec2><x>8</x><y>215</y></ivec2>
+            <ivec2><x>952</x><y>216</y></ivec2>
+            <vec3><x>0.255</x><y>0.282</y><z>0.408</z></vec3>
+        </box>
+        <box>
+            <ivec2><x>8</x><y>176</y></ivec2>
+            <ivec2><x>9</x><y>216</y></ivec2>
+            <vec3><x>0.255</x><y>0.282</y><z>0.408</z></vec3>
+        </box>
+        <box>
+            <ivec2><x>951</x><y>176</y></ivec2>
+            <ivec2><x>952</x><y>216</y></ivec2>
+            <vec3><x>0.255</x><y>0.282</y><z>0.408</z></vec3>
+        </box>
 
         <label>
-            <ivec2><x>24</x><y>188</y></ivec2>
-            <vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3>
+            <ivec2><x>24</x><y>192</y></ivec2>
+            <vec3><x>0.753</x><y>0.792</y><z>0.961</z></vec3>
             <text>GPU</text>
         </label>
         <bar min=0 max=100>
             <ivec2><x>84</x><y>184</y></ivec2>
             <ivec2><x>864</x><y>208</y></ivec2>
-            <vec3><x>0.871</x><y>1.0</y><z>0.608</z></vec3>
-            <vec3><x>0.12</x><y>0.12</y><z>0.12</z></vec3>
+            <vec3><x>0.620</x><y>0.808</y><z>0.416</z></vec3>
+            <vec3><x>0.184</x><y>0.200</y><z>0.302</z></vec3>
             <metric>gpu</metric>
         </bar>
-        <!-- bold readout: GPU percent, wired via Label::setBold in cacheElementPointers -->
-        <label>
-            <ivec2><x>876</x><y>188</y></ivec2>
-            <vec3><x>0.871</x><y>1.0</y><z>0.608</z></vec3>
-            <text>0.0%</text>
-        </label>
+        <!-- GPU percent readout painted programmatically at Title size
+             (28 pt) by MetricReadouts::render(...). Pillar A2 wire-up. -->
 
     </layout>
 
@@ -116,60 +205,118 @@
             <cell weight=0.12>CPU%</cell>
             <cell weight=0.12>MEM%</cell>
             <cell weight=0.24>DISK I/O</cell>
-            <vec3><x>0.871</x><y>1.0</y><z>0.608</z></vec3>
+            <vec3><x>0.620</x><y>0.808</y><z>0.416</z></vec3>
         </row>
         <box>
             <ivec2><x>24</x><y>90</y></ivec2>
             <ivec2><x>936</x><y>91</y></ivec2>
-            <vec3><x>0.22</x><y>0.22</y><z>0.22</z></vec3>
+            <vec3><x>0.255</x><y>0.282</y><z>0.408</z></vec3>
         </box>
-        <row><ivec2><x>24</x><y>100</y></ivec2><ivec2><x>936</x><y>120</y></ivec2><cell weight=0.10></cell><cell weight=0.42></cell><cell weight=0.12></cell><cell weight=0.12></cell><cell weight=0.24></cell><vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3></row>
-        <row><ivec2><x>24</x><y>120</y></ivec2><ivec2><x>936</x><y>140</y></ivec2><cell weight=0.10></cell><cell weight=0.42></cell><cell weight=0.12></cell><cell weight=0.12></cell><cell weight=0.24></cell><vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3></row>
-        <row><ivec2><x>24</x><y>140</y></ivec2><ivec2><x>936</x><y>160</y></ivec2><cell weight=0.10></cell><cell weight=0.42></cell><cell weight=0.12></cell><cell weight=0.12></cell><cell weight=0.24></cell><vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3></row>
-        <row><ivec2><x>24</x><y>160</y></ivec2><ivec2><x>936</x><y>180</y></ivec2><cell weight=0.10></cell><cell weight=0.42></cell><cell weight=0.12></cell><cell weight=0.12></cell><cell weight=0.24></cell><vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3></row>
-        <row><ivec2><x>24</x><y>180</y></ivec2><ivec2><x>936</x><y>200</y></ivec2><cell weight=0.10></cell><cell weight=0.42></cell><cell weight=0.12></cell><cell weight=0.12></cell><cell weight=0.24></cell><vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3></row>
-        <row><ivec2><x>24</x><y>200</y></ivec2><ivec2><x>936</x><y>220</y></ivec2><cell weight=0.10></cell><cell weight=0.42></cell><cell weight=0.12></cell><cell weight=0.12></cell><cell weight=0.24></cell><vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3></row>
-        <row><ivec2><x>24</x><y>220</y></ivec2><ivec2><x>936</x><y>240</y></ivec2><cell weight=0.10></cell><cell weight=0.42></cell><cell weight=0.12></cell><cell weight=0.12></cell><cell weight=0.24></cell><vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3></row>
-        <row><ivec2><x>24</x><y>240</y></ivec2><ivec2><x>936</x><y>260</y></ivec2><cell weight=0.10></cell><cell weight=0.42></cell><cell weight=0.12></cell><cell weight=0.12></cell><cell weight=0.24></cell><vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3></row>
-        <row><ivec2><x>24</x><y>260</y></ivec2><ivec2><x>936</x><y>280</y></ivec2><cell weight=0.10></cell><cell weight=0.42></cell><cell weight=0.12></cell><cell weight=0.12></cell><cell weight=0.24></cell><vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3></row>
-        <row><ivec2><x>24</x><y>280</y></ivec2><ivec2><x>936</x><y>300</y></ivec2><cell weight=0.10></cell><cell weight=0.42></cell><cell weight=0.12></cell><cell weight=0.12></cell><cell weight=0.24></cell><vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3></row>
-        <row><ivec2><x>24</x><y>300</y></ivec2><ivec2><x>936</x><y>320</y></ivec2><cell weight=0.10></cell><cell weight=0.42></cell><cell weight=0.12></cell><cell weight=0.12></cell><cell weight=0.24></cell><vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3></row>
-        <row><ivec2><x>24</x><y>320</y></ivec2><ivec2><x>936</x><y>340</y></ivec2><cell weight=0.10></cell><cell weight=0.42></cell><cell weight=0.12></cell><cell weight=0.12></cell><cell weight=0.24></cell><vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3></row>
-        <row><ivec2><x>24</x><y>340</y></ivec2><ivec2><x>936</x><y>360</y></ivec2><cell weight=0.10></cell><cell weight=0.42></cell><cell weight=0.12></cell><cell weight=0.12></cell><cell weight=0.24></cell><vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3></row>
-        <row><ivec2><x>24</x><y>360</y></ivec2><ivec2><x>936</x><y>380</y></ivec2><cell weight=0.10></cell><cell weight=0.42></cell><cell weight=0.12></cell><cell weight=0.12></cell><cell weight=0.24></cell><vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3></row>
-        <row><ivec2><x>24</x><y>380</y></ivec2><ivec2><x>936</x><y>400</y></ivec2><cell weight=0.10></cell><cell weight=0.42></cell><cell weight=0.12></cell><cell weight=0.12></cell><cell weight=0.24></cell><vec3><x>1.0</x><y>1.0</y><z>1.0</z></vec3></row>
+        <box><ivec2><x>24</x><y>120</y></ivec2><ivec2><x>936</x><y>140</y></ivec2><vec3><x>0.184</x><y>0.200</y><z>0.302</z></vec3></box>
+        <box><ivec2><x>24</x><y>160</y></ivec2><ivec2><x>936</x><y>180</y></ivec2><vec3><x>0.184</x><y>0.200</y><z>0.302</z></vec3></box>
+        <box><ivec2><x>24</x><y>200</y></ivec2><ivec2><x>936</x><y>220</y></ivec2><vec3><x>0.184</x><y>0.200</y><z>0.302</z></vec3></box>
+        <box><ivec2><x>24</x><y>240</y></ivec2><ivec2><x>936</x><y>260</y></ivec2><vec3><x>0.184</x><y>0.200</y><z>0.302</z></vec3></box>
+        <box><ivec2><x>24</x><y>280</y></ivec2><ivec2><x>936</x><y>300</y></ivec2><vec3><x>0.184</x><y>0.200</y><z>0.302</z></vec3></box>
+        <box><ivec2><x>24</x><y>320</y></ivec2><ivec2><x>936</x><y>340</y></ivec2><vec3><x>0.184</x><y>0.200</y><z>0.302</z></vec3></box>
+        <box><ivec2><x>24</x><y>360</y></ivec2><ivec2><x>936</x><y>380</y></ivec2><vec3><x>0.184</x><y>0.200</y><z>0.302</z></vec3></box>
+        <row><ivec2><x>24</x><y>100</y></ivec2><ivec2><x>936</x><y>120</y></ivec2><cell weight=0.10></cell><cell weight=0.42></cell><cell weight=0.12></cell><cell weight=0.12></cell><cell weight=0.24></cell><vec3><x>0.753</x><y>0.792</y><z>0.961</z></vec3></row>
+        <row><ivec2><x>24</x><y>120</y></ivec2><ivec2><x>936</x><y>140</y></ivec2><cell weight=0.10></cell><cell weight=0.42></cell><cell weight=0.12></cell><cell weight=0.12></cell><cell weight=0.24></cell><vec3><x>0.753</x><y>0.792</y><z>0.961</z></vec3></row>
+        <row><ivec2><x>24</x><y>140</y></ivec2><ivec2><x>936</x><y>160</y></ivec2><cell weight=0.10></cell><cell weight=0.42></cell><cell weight=0.12></cell><cell weight=0.12></cell><cell weight=0.24></cell><vec3><x>0.753</x><y>0.792</y><z>0.961</z></vec3></row>
+        <row><ivec2><x>24</x><y>160</y></ivec2><ivec2><x>936</x><y>180</y></ivec2><cell weight=0.10></cell><cell weight=0.42></cell><cell weight=0.12></cell><cell weight=0.12></cell><cell weight=0.24></cell><vec3><x>0.753</x><y>0.792</y><z>0.961</z></vec3></row>
+        <row><ivec2><x>24</x><y>180</y></ivec2><ivec2><x>936</x><y>200</y></ivec2><cell weight=0.10></cell><cell weight=0.42></cell><cell weight=0.12></cell><cell weight=0.12></cell><cell weight=0.24></cell><vec3><x>0.753</x><y>0.792</y><z>0.961</z></vec3></row>
+        <row><ivec2><x>24</x><y>200</y></ivec2><ivec2><x>936</x><y>220</y></ivec2><cell weight=0.10></cell><cell weight=0.42></cell><cell weight=0.12></cell><cell weight=0.12></cell><cell weight=0.24></cell><vec3><x>0.753</x><y>0.792</y><z>0.961</z></vec3></row>
+        <row><ivec2><x>24</x><y>220</y></ivec2><ivec2><x>936</x><y>240</y></ivec2><cell weight=0.10></cell><cell weight=0.42></cell><cell weight=0.12></cell><cell weight=0.12></cell><cell weight=0.24></cell><vec3><x>0.753</x><y>0.792</y><z>0.961</z></vec3></row>
+        <row><ivec2><x>24</x><y>240</y></ivec2><ivec2><x>936</x><y>260</y></ivec2><cell weight=0.10></cell><cell weight=0.42></cell><cell weight=0.12></cell><cell weight=0.12></cell><cell weight=0.24></cell><vec3><x>0.753</x><y>0.792</y><z>0.961</z></vec3></row>
+        <row><ivec2><x>24</x><y>260</y></ivec2><ivec2><x>936</x><y>280</y></ivec2><cell weight=0.10></cell><cell weight=0.42></cell><cell weight=0.12></cell><cell weight=0.12></cell><cell weight=0.24></cell><vec3><x>0.753</x><y>0.792</y><z>0.961</z></vec3></row>
+        <row><ivec2><x>24</x><y>280</y></ivec2><ivec2><x>936</x><y>300</y></ivec2><cell weight=0.10></cell><cell weight=0.42></cell><cell weight=0.12></cell><cell weight=0.12></cell><cell weight=0.24></cell><vec3><x>0.753</x><y>0.792</y><z>0.961</z></vec3></row>
+        <row><ivec2><x>24</x><y>300</y></ivec2><ivec2><x>936</x><y>320</y></ivec2><cell weight=0.10></cell><cell weight=0.42></cell><cell weight=0.12></cell><cell weight=0.12></cell><cell weight=0.24></cell><vec3><x>0.753</x><y>0.792</y><z>0.961</z></vec3></row>
+        <row><ivec2><x>24</x><y>320</y></ivec2><ivec2><x>936</x><y>340</y></ivec2><cell weight=0.10></cell><cell weight=0.42></cell><cell weight=0.12></cell><cell weight=0.12></cell><cell weight=0.24></cell><vec3><x>0.753</x><y>0.792</y><z>0.961</z></vec3></row>
+        <row><ivec2><x>24</x><y>340</y></ivec2><ivec2><x>936</x><y>360</y></ivec2><cell weight=0.10></cell><cell weight=0.42></cell><cell weight=0.12></cell><cell weight=0.12></cell><cell weight=0.24></cell><vec3><x>0.753</x><y>0.792</y><z>0.961</z></vec3></row>
+        <row><ivec2><x>24</x><y>360</y></ivec2><ivec2><x>936</x><y>380</y></ivec2><cell weight=0.10></cell><cell weight=0.42></cell><cell weight=0.12></cell><cell weight=0.12></cell><cell weight=0.24></cell><vec3><x>0.753</x><y>0.792</y><z>0.961</z></vec3></row>
+        <row><ivec2><x>24</x><y>380</y></ivec2><ivec2><x>936</x><y>400</y></ivec2><cell weight=0.10></cell><cell weight=0.42></cell><cell weight=0.12></cell><cell weight=0.12></cell><cell weight=0.24></cell><vec3><x>0.753</x><y>0.792</y><z>0.961</z></vec3></row>
+    </layout>
+
+    <layout sX=0.0 sY=0.089 eX=1.0 eY=1.0 active=false name=about>
+
+        <!-- Static "About CoreMetrics" header. Painted by the XML at the
+             top of the About tab so the dynamic Host + Runtime rows below
+             (rendered programmatically by AboutTab::render) read as
+             children of a stable title. -->
+        <label>
+            <ivec2><x>24</x><y>80</y></ivec2>
+            <vec3><x>0.478</x><y>0.635</y><z>0.969</z></vec3>
+            <text>CoreMetrics</text>
+        </label>
+        <label>
+            <ivec2><x>24</x><y>108</y></ivec2>
+            <vec3><x>0.604</x><y>0.647</y><z>0.808</z></vec3>
+            <text>v0.3.0</text>
+        </label>
+        <label>
+            <ivec2><x>24</x><y>128</y></ivec2>
+            <vec3><x>0.604</x><y>0.647</y><z>0.808</z></vec3>
+            <text>Custom C++23 GUI on SDL3</text>
+        </label>
+        <label>
+            <ivec2><x>24</x><y>148</y></ivec2>
+            <vec3><x>0.604</x><y>0.647</y><z>0.808</z></vec3>
+            <text>Footprint: 1.6 MB binary  ~60 MB resident</text>
+        </label>
+
+        <!-- License + source row near the bottom of the tab. -->
+        <label>
+            <ivec2><x>24</x><y>432</y></ivec2>
+            <vec3><x>0.478</x><y>0.635</y><z>0.969</z></vec3>
+            <text>License</text>
+        </label>
+        <label>
+            <ivec2><x>24</x><y>452</y></ivec2>
+            <vec3><x>0.604</x><y>0.647</y><z>0.808</z></vec3>
+            <text>LGPL-2.1</text>
+        </label>
+        <label>
+            <ivec2><x>320</x><y>432</y></ivec2>
+            <vec3><x>0.478</x><y>0.635</y><z>0.969</z></vec3>
+            <text>Source</text>
+        </label>
+        <label>
+            <ivec2><x>320</x><y>452</y></ivec2>
+            <vec3><x>0.604</x><y>0.647</y><z>0.808</z></vec3>
+            <text>github.com/sviatil0/coremetrics</text>
+        </label>
+
     </layout>
 
         <button>
             <ivec2><x>836</x><y>482</y></ivec2>
             <ivec2><x>936</x><y>516</y></ivec2>
-            <vec3><x>0.55</x><y>0.18</y><z>0.18</z></vec3>
+            <vec3><x>0.604</x><y>0.247</y><z>0.318</z></vec3>
         </button>
         <label>
             <ivec2><x>866</x><y>494</y></ivec2>
-            <vec3><x>1.0</x><y>0.92</y><z>0.92</z></vec3>
+            <vec3><x>0.969</x><y>0.918</y><z>0.918</z></vec3>
             <text>EXIT</text>
         </label>
 
         <box>
             <ivec2><x>8</x><y>478</y></ivec2>
-            <ivec2><x>952</x><y>479</y></ivec2>
-            <vec3><x>0.18</x><y>0.18</y><z>0.18</z></vec3>
+            <ivec2><x>952</x><y>480</y></ivec2>
+            <vec3><x>0.255</x><y>0.282</y><z>0.408</z></vec3>
         </box>
 
         <label>
             <ivec2><x>24</x><y>492</y></ivec2>
-            <vec3><x>0.871</x><y>1.0</y><z>0.608</z></vec3>
+            <vec3><x>0.620</x><y>0.808</y><z>0.416</z></vec3>
             <text>coremetrics</text>
         </label>
         <label>
             <ivec2><x>148</x><y>492</y></ivec2>
-            <vec3><x>0.5</x><y>0.5</y><z>0.5</z></vec3>
-            <text>v0.2.26</text>
+            <vec3><x>0.604</x><y>0.647</y><z>0.808</z></vec3>
+            <text>v0.3.0</text>
         </label>
         <label>
             <ivec2><x>240</x><y>492</y></ivec2>
-            <vec3><x>0.5</x><y>0.5</y><z>0.5</z></vec3>
+            <vec3><x>0.604</x><y>0.647</y><z>0.808</z></vec3>
             <text>POLL_PLACEHOLDER</text>
         </label>
 
