@@ -37,6 +37,7 @@
 #include "HelpOverlay.hpp"
 #include "SparklineLabels.hpp"
 #include "UptimeAndLoad.hpp"
+#include "NetIoFooter.hpp"
 #include "Thresholds.hpp"
 #include "Theme.hpp"
 #include "AssetPath.hpp"
@@ -438,61 +439,9 @@ static std::string formatRate(unsigned long long kbPerSec)
     return std::to_string(kbPerSec) + " KB/s";
 }
 
-static void renderNetIo(Screen &dest)
-{
-    bool anyDisk = (g_aggregateDiskReadKbPerSec != 0
-                    || g_aggregateDiskWriteKbPerSec != 0);
-    bool anyNet = (g_netIo.rxKbPerSec != 0 || g_netIo.txKbPerSec != 0);
-    if (!anyDisk && !anyNet)
-    {
-        return;
-    }
-    const vec3 dim = Theme::textDim();
-    // Compact units (K/M/G) keep the worst-case string bounded: even a
-    // 10 GB/s host renders as '10.0G' (5 chars) rather than '10240.0M'
-    // (8 chars). Caps the right edge of the footer well before x=810
-    // (the EXIT button's left edge).
-    auto compact = [](unsigned long long kbPerSec) -> std::string {
-        if (kbPerSec >= 1024ULL * 1024ULL)
-        {
-            std::ostringstream oss;
-            oss.precision(1);
-            oss << std::fixed
-                << (static_cast<double>(kbPerSec) / (1024.0 * 1024.0))
-                << "G";
-            return oss.str();
-        }
-        if (kbPerSec >= 1024)
-        {
-            std::ostringstream oss;
-            oss.precision(1);
-            oss << std::fixed << (static_cast<double>(kbPerSec) / 1024.0) << "M";
-            return oss.str();
-        }
-        return std::to_string(kbPerSec) + "K";
-    };
-    std::string text;
-    if (anyDisk)
-    {
-        text = "DISK " + compact(g_aggregateDiskReadKbPerSec)
-               + "/" + compact(g_aggregateDiskWriteKbPerSec);
-    }
-    if (anyNet)
-    {
-        if (!text.empty()) text += "  ";
-        text += "NET " + compact(g_netIo.rxKbPerSec)
-                + "/" + compact(g_netIo.txKbPerSec);
-    }
-    // Worst-case string at G-scale is roughly 34 chars; at 10px/glyph
-    // that lands the right edge at ~x=800, just left of the EXIT
-    // button at x=820. Hard-clip the string at 36 chars so a future
-    // unit-format change cannot blow through the budget.
-    if (text.size() > 36)
-    {
-        text = text.substr(0, 36);
-    }
-    Font::drawText(dest, text, ivec2(460, 492), dim);
-}
+// NetIo footer paint moved to src/NetIoFooter.cpp as Phase 1.2 slice 4
+// of the GUI evolution spec. Call site passes the three globals
+// explicitly via NetIoFooter::render(...).
 
 static void renderDiskUsage(Screen &dest)
 {
@@ -1512,7 +1461,7 @@ int main(int argc, char **argv)
         {
             UptimeAndLoad::render(shot, g_uptimeSeconds, g_loadAverages);
             renderDiskUsage(shot);
-            renderNetIo(shot);
+            NetIoFooter::render(shot, g_aggregateDiskReadKbPerSec, g_aggregateDiskWriteKbPerSec, g_netIo);
             renderMemBreakdownStrip(shot);
             renderPerCoreStrip(shot);
             if (g_sparklinesEnabled)
@@ -2120,7 +2069,7 @@ int main(int argc, char **argv)
             {
                 UptimeAndLoad::render(screen, g_uptimeSeconds, g_loadAverages);
                 renderDiskUsage(screen);
-                renderNetIo(screen);
+                NetIoFooter::render(screen, g_aggregateDiskReadKbPerSec, g_aggregateDiskWriteKbPerSec, g_netIo);
                 renderMemBreakdownStrip(screen);
                 renderPerCoreStrip(screen);
                 if (g_sparklinesEnabled)
