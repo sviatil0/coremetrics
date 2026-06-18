@@ -1,0 +1,10 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.version.1.6.0.schema.json
+# Submitted to microsoft/winget-pkgs as
+# manifests/s/sviatil0/coremetrics/<version>/.
+# TODO: bump PackageVersion on every release; rest of fields can stay.
+
+PackageIdentifier: sviatil0.coremetrics
+PackageVersion: 0.2.18
+DefaultLocale: en-US
+ManifestType: version
+ManifestVersion: 1.6.0

@@ -30,7 +30,7 @@ jobs:
     continue-on-error: ${{ matrix.allow-failure }}
 
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
 
     - name: Install dependencies (Linux)
       if: runner.os == 'Linux'
@@ -46,7 +46,7 @@ jobs:
 
     - name: Setup SDL3 (Linux)
       if: runner.os == 'Linux'
-      uses: libsdl-org/setup-sdl@main
+      uses: libsdl-org/setup-sdl@a966470e7d9b6a5c93eec3f08d5dac370325c860  # main@2026-05-15
       with:
         install-linux-dependencies: true
         version: 3-latest
@@ -55,7 +55,7 @@ jobs:
 
     - name: Setup SDL3 (Windows)
       if: runner.os == 'Windows'
-      uses: libsdl-org/setup-sdl@main
+      uses: libsdl-org/setup-sdl@a966470e7d9b6a5c93eec3f08d5dac370325c860  # main@2026-05-15
       with:
         version: 3-latest
         version-sdl-ttf: 3-latest
@@ -213,7 +213,7 @@ jobs:
 
     - name: Upload smoke screenshots
       if: always()
-      uses: actions/upload-artifact@v7
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
       with:
         name: smoke-screenshots-${{ matrix.os }}
         path: smoke/*.png
@@ -230,7 +230,7 @@ jobs:
     continue-on-error: true
 
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
 
     - name: Install dependencies
       run: |
@@ -238,7 +238,7 @@ jobs:
         sudo apt-get install -y build-essential pkg-config libfreetype-dev libharfbuzz-dev
 
     - name: Setup SDL3
-      uses: libsdl-org/setup-sdl@main
+      uses: libsdl-org/setup-sdl@a966470e7d9b6a5c93eec3f08d5dac370325c860  # main@2026-05-15
       with:
         install-linux-dependencies: true
         version: 3-latest
@@ -278,7 +278,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
 
     - name: Install dependencies
       run: |
@@ -286,7 +286,7 @@ jobs:
         sudo apt-get install -y lcov build-essential pkg-config libfreetype-dev libharfbuzz-dev
 
     - name: Setup SDL3
-      uses: libsdl-org/setup-sdl@main
+      uses: libsdl-org/setup-sdl@a966470e7d9b6a5c93eec3f08d5dac370325c860  # main@2026-05-15
       with:
         install-linux-dependencies: true
         version: 3-latest
@@ -305,7 +305,7 @@ jobs:
                       LDFLAGS="$(pkg-config --libs sdl3 sdl3-ttf sdl3-image) $RPATHS"
 
     - name: Upload to Codecov
-      uses: codecov/codecov-action@v7
+      uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f  # v7.0.0
       with:
         files: coverage.lcov
         fail_ci_if_error: false

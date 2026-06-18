@@ -2,6 +2,7 @@
 #include <atomic>
 #include <csignal>
 #include <cstdio>
+#include <cstdint>
 #include <cstdlib>
 #ifndef _WIN32
 #include <unistd.h>
@@ -43,9 +44,9 @@
 #include "MemBreakdownStrip.hpp"
 #include "PerCoreStrip.hpp"
 #include "FooterLiveStats.hpp"
+#include "SelfStats.hpp"
 #include "ProcessesSummary.hpp"
 #include "SignalMenuOverlay.hpp"
-#include "TopProcessesPrinter.hpp"
 #include "FilterStrip.hpp"
 #include "StatusFlash.hpp"
 #include "Thresholds.hpp"
@@ -53,11 +54,15 @@
 #include "AssetPath.hpp"
 #include "SignalUtils.hpp"
 #include "KillLog.hpp"
-#include "Exporter.hpp"
 #include "Settings.hpp"
 #include "TabIndicator.hpp"
 #include "EmptyStates.hpp"
 #include "AboutTab.hpp"
+#include "KeyboardEvents.hpp"
+#include "MouseEvents.hpp"
+#include "MetricsPoller.hpp"
+#include "HeadlessRunner.hpp"
+#include "ArgParse.hpp"
 
 constexpr int RESX = 960;
 constexpr int RESY = 540;
@@ -65,69 +70,117 @@ constexpr int PROCESS_ROW_HEIGHT = 20;
 // Default poll interval is 500ms; overridable at startup via the
 // --poll-ms <N> CLI flag (clamped to [100, 10000] so the UI cannot
 // be told to repaint faster than the OS can serve samples or so slow
-// the chrome looks frozen).
-static Uint64 g_pollIntervalMs = 500;
-constexpr Uint64 POLL_INTERVAL_MIN_MS = 100;
-constexpr Uint64 POLL_INTERVAL_MAX_MS = 10000;
+// the chrome looks frozen). Defined in src/HeadlessRunner.cpp (Phase
+// 1.2 slice 16) so the tests binary (which links every src/*.cpp
+// object but not the coremetrics.cpp TU) resolves the symbol via
+// HeadlessRunner.o. coremetrics.cpp still owns the writers: the
+// Settings::load() seed, the --poll-ms argv override, and the
+// Settings::save() persist on clean exit.
+extern std::uint64_t g_pollIntervalMs;
+// Bound constants live in src/ProcessUtils.cpp alongside the
+// clampPollIntervalMs() helper that uses them.
 
-constexpr float ALARM_THRESHOLD = 80.0f;
-static const std::string ALARM_SOUND_PATH = AssetPath::resolve("assets/click.wav");
+// ALARM_THRESHOLD / ALARM_SOUND_PATH moved to src/MetricsPoller.cpp
+// (Phase 1.2 slice 15) alongside the alarm rising-edge detector that
+// owns the only call site for them.
 
-static Bar *g_cpuBar = nullptr;
-static Bar *g_ramBar = nullptr;
-static Bar *g_gpuBar = nullptr;
+// Bar widget pointers. Defined in src/MetricsPoller.cpp (Phase 1.2
+// slice 15) so the tests binary (which links every src/*.cpp object
+// but not the coremetrics.cpp TU) resolves the symbols the poller
+// references. buildScene() / cacheElementPointers() in this TU is
+// still the sole writer of the pointer values; the poller drives
+// setValue / setFillColor each tick.
+extern Bar *g_cpuBar;
+extern Bar *g_ramBar;
+extern Bar *g_gpuBar;
 // Latest sampled percentages, kept at file scope so the render loop can
-// hand them to MetricReadouts::render(...) outside of pollMetrics().
-// The XML labels that used to display these were removed when the
-// readouts moved to programmatic Title-size paint (Pillar A2 wire-up).
-static float g_cpuPct = 0.0f;
-static float g_ramPct = 0.0f;
-static float g_gpuPct = 0.0f;
-static Label *g_muteLabel = nullptr;
-static Label *g_pollLabel = nullptr;
-static std::vector<Row *> g_processRows;
+// hand them to MetricReadouts::render(...) outside of the poller. The
+// XML labels that used to display these were removed when the readouts
+// moved to programmatic Title-size paint (Pillar A2 wire-up). Defined
+// in src/MetricsPoller.cpp (Phase 1.2 slice 15) so the writer owns the
+// data; this TU consults them every frame to paint the System tab.
+extern float g_cpuPct;
+extern float g_ramPct;
+extern float g_gpuPct;
+// Defined in src/MouseEvents.cpp (Phase 1.2 slice 14). The mouse
+// handler swaps its text between "SOUND ON" and "SOUND OFF" when
+// the user toggles the alarm; buildScene() in this TU assigns the
+// pointer once the scene tree is loaded.
+extern Label *g_muteLabel;
+// Footer 'poll Xms' label pointer. Defined in src/HeadlessRunner.cpp
+// (Phase 1.2 slice 16) alongside the cacheElementPointers() helper
+// that is its sole writer.
+extern Label *g_pollLabel;
+// Defined in src/KeyboardEvents.cpp (Phase 1.2 slice 13) so the live-UI
+// state-machine globals all live next to the handler that owns them.
+extern std::vector<Row *> g_processRows;
 
-static bool g_alarmEnabled = true;
-static bool g_cpuAlarmActive = false;
-static bool g_ramAlarmActive = false;
-static bool g_gpuAlarmActive = false;
+// Defined in src/MouseEvents.cpp (Phase 1.2 slice 14). The mouse
+// handler is the sole user-driven writer (SOUND button toggle); the
+// alarm-flash sites in this TU still read it every tick.
+extern bool g_alarmEnabled;
+// Alarm rising-edge detector state. Defined in src/MetricsPoller.cpp
+// (Phase 1.2 slice 15) where poll() is the only reader + writer.
 
 // Set by SIGINT/SIGTERM and checked by the main loop. The main loop also
 // exits on its own once an optional --duration is exceeded; this flag covers
-// Ctrl-C from a terminal and `kill` from a parent process or CI.
-static std::atomic<bool> g_shutdownRequested{false};
+// Ctrl-C from a terminal and `kill` from a parent process or CI. Defined
+// in src/MouseEvents.cpp so the EXIT button click can set it from that TU
+// without a duplicate-symbol clash.
+extern std::atomic<bool> g_shutdownRequested;
 
 static void handleShutdownSignal(int)
 {
     g_shutdownRequested.store(true);
 }
 
-static SortColumn g_sortColumn = SORT_MEM;
-static bool g_sortAscending = false;
-static Row *g_headerRow = nullptr;
+// Defined in src/MouseEvents.cpp (Phase 1.2 slice 14). The mouse
+// handler writes them when the user clicks a Processes-table header;
+// the sort comparator, render path, and Settings save/load all read.
+extern SortColumn g_sortColumn;
+extern bool g_sortAscending;
+// Same TU. buildScene() in this TU assigns the pointer once the
+// header row is built; updateHeaderSortGlyph() consults it on every
+// header click to repaint the active column's direction glyph.
+extern Row *g_headerRow;
 
 // Sparklines are moonshot UI: a rolling time-series chart per metric drawn
 // over the System tab's lower half. Behind a flag (--sparklines) so the
 // default install matches the audit baseline; with the flag the System tab
-// gains 3 live polylines fed by RingBuffer<float> samples.
-static bool g_sparklinesEnabled = false;
-constexpr std::size_t SPARKLINE_CAPACITY = 64;
-static std::unique_ptr<Sparkline> g_cpuSparkline;
-static std::unique_ptr<Sparkline> g_ramSparkline;
-static std::unique_ptr<Sparkline> g_gpuSparkline;
+// gains 3 live polylines fed by RingBuffer<float> samples. Defined in
+// src/HeadlessRunner.cpp (Phase 1.2 slice 16) so the screenshot mode and
+// the tests binary both resolve the symbol without depending on
+// coremetrics.o; the CLI parser in main() still writes the flag via the
+// extern below when --sparklines is passed on the command line.
+extern bool g_sparklinesEnabled;
+// SPARKLINE_CAPACITY + NET_SPARKLINE_MAX_KBPS moved to
+// src/HeadlessRunner.cpp (Phase 1.2 slice 16) alongside
+// buildSparklines() which is their sole caller.
+//
+// Sparkline owners. Defined in src/MetricsPoller.cpp (Phase 1.2
+// slice 15) so the tests link, mirroring the bar pointers above.
+// buildSparklines() / destroySparklines() in src/HeadlessRunner.cpp
+// (slice 16) are still the sole writers of the unique_ptr itself;
+// the poller pushes a new sample into each polyline every tick.
+extern std::unique_ptr<Sparkline> g_cpuSparkline;
+extern std::unique_ptr<Sparkline> g_ramSparkline;
+extern std::unique_ptr<Sparkline> g_gpuSparkline;
 // Network throughput history: two polylines overlaid in the same rect
 // directly below the GPU strip. rx in accent green, tx in orange so a
 // reviewer can read incoming vs outgoing traffic at a glance without a
 // legend. y-range fixed at 0..2048 KB/s so the chart stays a stable
 // comparison surface across ticks (samples are clamped, not stretched).
-static std::unique_ptr<Sparkline> g_netRxSparkline;
-static std::unique_ptr<Sparkline> g_netTxSparkline;
-constexpr float NET_SPARKLINE_MAX_KBPS = 2048.0f;
+// Net sparklines, defined in src/MetricsPoller.cpp (Phase 1.2 slice
+// 15) for the same tests-link reason as the CPU/RAM/GPU triple above.
+extern std::unique_ptr<Sparkline> g_netRxSparkline;
+extern std::unique_ptr<Sparkline> g_netTxSparkline;
 
 // Per-logical-CPU utilization for the small strip below the aggregate bars.
 // Refreshed every poll. Empty on Windows (backend not implemented yet) and
-// on the very first poll (no prior tick sample to diff against).
-static std::vector<float> g_perCoreCpu;
+// on the very first poll (no prior tick sample to diff against). Defined
+// in src/MetricsPoller.cpp (Phase 1.2 slice 15) where poll() refreshes it
+// each tick; this TU still consults it from the render pass + AboutTab.
+extern std::vector<float> g_perCoreCpu;
 
 // Process kill flow state.
 //
@@ -142,71 +195,84 @@ constexpr int PROCESSES_ROW_X0 = 24;
 constexpr int PROCESSES_ROW_X1 = 936;
 constexpr int PROCESSES_VISIBLE_ROWS = 15;
 
-static int g_selectedPid = -1;
-static int g_selectedRowIndex = -1;
-static std::vector<int> g_visiblePids;
+// Defined in src/KeyboardEvents.cpp so the live-UI state lives next to
+// the handler that mutates it. coremetrics.cpp still reads + writes
+// these from the mouse handler, polling loop, and CLI / scene setup.
+extern int g_selectedPid;
+extern int g_selectedRowIndex;
+extern std::vector<int> g_visiblePids;
 // First-row index in the fetched process list. PgDown/PgUp shift the
 // visible window by PROCESSES_VISIBLE_ROWS; up/down arrow at the edge
 // of the visible window scrolls by one. Stays clamped to
 // [0, max(0, procCount - dataRowCount)] so the bottom row of data
 // fills the last visible slot even on overscroll.
-static std::size_t g_processScrollOffset = 0;
+extern std::size_t g_processScrollOffset;
 // Snapshot of the most recent procs.size() after filter+truncate, set
 // by pollMetrics for the key handler so PgDown / arrow keys can clamp
 // against the actual table length without recomputing.
-static std::size_t g_processVisibleCount = 0;
+extern std::size_t g_processVisibleCount;
 // Per-visible-row glyph overlay state for tree mode. When non-empty,
 // the prefix string contains the indent spaces + '+ ' or '- ' that
 // should be re-painted in color over the white text the Row already
 // drew. Same length as g_visiblePids; empty string means no glyph
 // (leaf row or flat mode). Parallel bool flags whether the row is
 // collapsed (true => grey '+') or expanded (false => green '-').
-static std::vector<std::string> g_rowGlyphPrefix;
-static std::vector<bool> g_rowGlyphCollapsed;
+// Defined in src/MetricsPoller.cpp (Phase 1.2 slice 15). The poller
+// writes the parallel arrays during the tree-mode flatten pass; this
+// TU's render path reads them to repaint the leading '+ ' / '- '
+// glyph in green/grey on top of the Row widget's white text.
+extern std::vector<std::string> g_rowGlyphPrefix;
+extern std::vector<bool> g_rowGlyphCollapsed;
 
-static bool g_signalMenuVisible = false;
-static int g_signalMenuPickedIndex = -1; // -1 = picking, 0..5 = awaiting confirm
+// Defined in src/KeyboardEvents.cpp. closeSignalMenu() below resets
+// them; the menu render path reads them every frame.
+extern bool g_signalMenuVisible;
+extern int g_signalMenuPickedIndex; // -1 = picking, 0..5 = awaiting confirm
 
-static std::string g_statusFlash;
-static Uint64 g_statusFlashExpiryMs = 0;
-constexpr Uint64 STATUS_FLASH_DURATION_MS = 2500;
+// Defined in src/KeyboardEvents.cpp alongside flashStatus(). The
+// renderer below reads them every tick to decide whether to paint
+// the "sent TERM -> pid N" footer line.
+extern std::string g_statusFlash;
+extern Uint64 g_statusFlashExpiryMs;
 
 // Process search/filter. '/' on the Processes tab enters input mode.
 // g_filterText is the case-insensitive substring matched against process
 // names; an empty string disables filtering. g_filterInputActive tracks
 // whether keystrokes append to the filter (input mode) or trigger the
 // usual row navigation (filter applied but no longer being edited).
-static std::string g_filterText;
-static bool g_filterInputActive = false;
+// Defined in src/KeyboardEvents.cpp. coremetrics.cpp still consults
+// the text + flag when filtering the row table each tick.
+extern std::string g_filterText;
+extern bool g_filterInputActive;
 
 // Tree mode: when on, the Processes table groups parent/child pairs
 // depth-first and indents the name cell with tree connectors. Toggled
 // by 't' on the Processes tab. When off the table sorts by the active
 // column the way it has since the SAFE wave.
-static bool g_treeMode = false;
+// Defined in src/KeyboardEvents.cpp. Tree-mode tick reads the flag
+// each poll to decide whether to flatten parent/child rows.
+extern bool g_treeMode;
 // Per-pid collapse state for tree mode. Pids in this set hide their
 // descendants in the flattened row list; pressing 'space' on a row
 // toggles membership. Initial state: empty (everything expanded).
 // Kept across tree-mode toggles so the user's layout sticks.
-static std::unordered_set<int> g_collapsedPids;
+// Defined in src/KeyboardEvents.cpp.
+extern std::unordered_set<int> g_collapsedPids;
 
 // Help overlay: a translucent-feel dark panel listing every hotkey,
 // toggled by '?' and dismissed with '?' or Esc. Painted last in the
 // render pass so it sits on top of every tab and every other overlay.
-static bool g_helpOverlayVisible = false;
+// Defined in src/KeyboardEvents.cpp; consulted at render time here.
+extern bool g_helpOverlayVisible;
 
-static void flashStatus(const std::string &text)
-{
-    g_statusFlash = text;
-    g_statusFlashExpiryMs = SDL_GetTicks() + STATUS_FLASH_DURATION_MS;
-}
+// Defined in src/KeyboardEvents.cpp; declared here so callers in
+// this TU (mouse handler, scene builder, alarm flash sites) can
+// post status flashes without duplicating the body.
+void flashStatus(const std::string &text);
 
-static bool processesTabActive()
-{
-    Tree<Layout> *node = EventManager::findLayoutByName(
-        LayoutManager::getInstance().getRoot(), "processes");
-    return node != nullptr && node->getData().isActive();
-}
+// Defined in src/KeyboardEvents.cpp; declared here so the mouse
+// handler and the polling loop can guard tab-specific behavior.
+bool processesTabActive();
 
 static bool aboutTabActive()
 {
@@ -223,62 +289,32 @@ static bool aboutTabActive()
 // in the main loop (the same pattern the EXIT and SOUND buttons
 // already use) and toggle the layout active flags directly. The cached
 // rects stay in lockstep with base.xml by reviewer convention.
-static ivec2 g_systemTabBtnMin = ivec2(8, 8);
-static ivec2 g_systemTabBtnMax = ivec2(272, 40);
-static ivec2 g_processesTabBtnMin = ivec2(280, 8);
-static ivec2 g_processesTabBtnMax = ivec2(544, 40);
-static ivec2 g_aboutTabBtnMin = ivec2(552, 8);
-static ivec2 g_aboutTabBtnMax = ivec2(804, 40);
+//
+// Defined in src/MouseEvents.cpp (Phase 1.2 slice 14) so the handler
+// that hit-tests them owns the data. buildScene() in this TU still
+// initializes the EXIT, SOUND, and header column rects each launch.
+extern ivec2 g_systemTabBtnMin;
+extern ivec2 g_systemTabBtnMax;
+extern ivec2 g_processesTabBtnMin;
+extern ivec2 g_processesTabBtnMax;
+extern ivec2 g_aboutTabBtnMin;
+extern ivec2 g_aboutTabBtnMax;
 
-static void activateTab(const std::string &name)
-{
-    Tree<Layout> &root = LayoutManager::getInstance().getRoot();
-    const char *all[] = {"system", "processes", "about"};
-    for (const char *n : all)
-    {
-        Tree<Layout> *node = EventManager::findLayoutByName(root, n);
-        if (node != nullptr)
-        {
-            node->getData().setActive(std::string(n) == name);
-        }
-    }
-}
+// SOUND toggle button rect. Initialized in buildScene(). Defined in
+// src/MouseEvents.cpp (Phase 1.2 slice 14) alongside the other
+// hit-test rects; recenterMuteLabel() reads it via the same extern.
+extern ivec2 g_muteBtnMin;
+extern ivec2 g_muteBtnMax;
 
-// SOUND toggle button rect. Initialized in buildScene(). Declared here
-// (ahead of the other tab-bar geometry) so recenterMuteLabel() can read
-// it directly without a forward declaration.
-static ivec2 g_muteBtnMin;
-static ivec2 g_muteBtnMax;
+// Defined in src/MouseEvents.cpp (Phase 1.2 slice 14) alongside the
+// SOUND button click path that toggles the label. Forward-declared
+// here so buildScene() can re-center the label after assigning
+// g_muteLabel for the first time.
+void recenterMuteLabel();
 
-// Recenter the SOUND ON / SOUND OFF label inside the mute toggle button.
-// The hand-tuned baseline in base.xml is centered for the default "SOUND ON"
-// string at 20 pt Body; toggling to "SOUND OFF" adds one glyph and would
-// otherwise leave the label visibly off-center. Measures the current label
-// text and centers it inside g_muteBtnMin..g_muteBtnMax. No-op if the label
-// or TTF face is not ready (headless / pre-init paths).
-static void recenterMuteLabel()
-{
-    if (g_muteLabel == nullptr)
-    {
-        return;
-    }
-    int textWidth = Font::measureTextWidth(g_muteLabel->getText());
-    if (textWidth <= 0)
-    {
-        return;
-    }
-    int btnWidth = g_muteBtnMax.x - g_muteBtnMin.x;
-    int newX = g_muteBtnMin.x + (btnWidth - textWidth) / 2;
-    // Keep the existing y baseline; only the x needs to track text width.
-    ivec2 pos = g_muteLabel->getPos();
-    g_muteLabel->setPos(ivec2(newX, pos.y));
-}
-
-static void closeSignalMenu()
-{
-    g_signalMenuVisible = false;
-    g_signalMenuPickedIndex = -1;
-}
+// Defined in src/KeyboardEvents.cpp; declared here so the mouse
+// handler can dismiss the menu when the click misses the panel.
+void closeSignalMenu();
 // PERCORE_* geometry moved to src/PerCoreStrip.cpp alongside the
 // renderer that owns the strip.
 
@@ -286,203 +322,63 @@ static void closeSignalMenu()
 // (y=136..160 in base.xml). Shows active / wired / cached / free segments
 // at the same horizontal extent so they read as a continuation. htop
 // colors: active = red, wired = orange, cached = blue, free = dark.
-static MemBreakdown g_memBreakdown{0, 0, 0, 0, 0};
-static unsigned long long g_uptimeSeconds = 0;
-static std::vector<float> g_loadAverages;
+// All six snapshot globals below are defined in src/MetricsPoller.cpp
+// (Phase 1.2 slice 15) where poll() refreshes them each tick; this TU
+// consults them from the render pass to paint the System tab strips.
+extern MemBreakdown g_memBreakdown;
+extern unsigned long long g_uptimeSeconds;
+extern std::vector<float> g_loadAverages;
 // Root volume capacity sampled every poll. UI shows
 // "DISK <used>/<total> GB (NN%)" with the same yellow/red threshold
 // recolor as the RAM bar so a full root volume reads as visually
 // urgent. Zero totalKb means the backend failed; the strip is hidden.
-static DiskUsage g_diskUsage{0, 0};
+extern DiskUsage g_diskUsage;
 // Aggregate disk I/O rate summed across the top-N processes the
 // backend returned. Shown on the System tab as 'I/O R X.X MB/s
 // W Y.Y MB/s' so reviewers see system-wide disk pressure without
 // scanning the per-process table.
-static unsigned long long g_aggregateDiskReadKbPerSec = 0;
-static unsigned long long g_aggregateDiskWriteKbPerSec = 0;
+extern unsigned long long g_aggregateDiskReadKbPerSec;
+extern unsigned long long g_aggregateDiskWriteKbPerSec;
 // Aggregate network rx/tx sampled every poll. Loopback excluded.
-static NetIo g_netIo{0, 0};
+extern NetIo g_netIo;
 // MEMSEG_* geometry moved to src/MemBreakdownStrip.cpp alongside the
 // renderer that owns the strip.
 
-static ivec2 g_headerColMin[5];
-static ivec2 g_headerColMax[5];
+// Defined in src/MouseEvents.cpp (Phase 1.2 slice 14). buildScene()
+// in this TU initializes them once the scene tree is loaded; the
+// mouse handler reads them every click.
+extern ivec2 g_headerColMin[5];
+extern ivec2 g_headerColMax[5];
 // g_muteBtnMin/Max declared earlier alongside recenterMuteLabel().
-static ivec2 g_exitBtnMin;
-static ivec2 g_exitBtnMax;
+extern ivec2 g_exitBtnMin;
+extern ivec2 g_exitBtnMax;
 
-static bool compareProcesses(const ProcessInfo &a, const ProcessInfo &b)
-{
-    return compareProcessByColumn(a, b, g_sortColumn, g_sortAscending);
-}
+// compareProcesses() moved to src/MetricsPoller.cpp (Phase 1.2 slice 15)
+// alongside the std::sort call site that is its only consumer.
 
-// Repaint the Processes-tab header row so the active sort column carries
-// a trailing direction glyph (' ^' ascending, ' v' descending) and the
-// other four columns stay clean. Called on initial scene build and on
-// every header click so the indicator is sticky across polls, not only
-// visible immediately after the user clicked.
-static void updateHeaderSortGlyph()
-{
-    if (g_headerRow == nullptr)
-    {
-        return;
-    }
-    const char *arrow = g_sortAscending ? " ^" : " v";
-    std::vector<std::string> hdr = {"PID", "NAME", "CPU%", "MEM%", "DISK I/O"};
-    hdr[static_cast<int>(g_sortColumn)] += arrow;
-    g_headerRow->setCells(hdr);
-}
+// Defined in src/MouseEvents.cpp (Phase 1.2 slice 14) alongside the
+// header-row click path that drives the sort toggle. Forward-declared
+// here so buildScene() can paint the initial glyph after the header
+// row pointer is wired up.
+void updateHeaderSortGlyph();
 
-static void buildScene()
-{
-    LayoutManager &manager = LayoutManager::getInstance();
-    GUIFile g;
-    g.readFile(AssetPath::resolve("base.xml"), manager);
-
-    g_muteBtnMin = ivec2(812, 8);
-    g_muteBtnMax = ivec2(952, 40);
-
-    g_exitBtnMin = ivec2(820, 478);
-    g_exitBtnMax = ivec2(944, 520);
-
-    int rowY = 64;
-    std::vector<float> weights = {0.10f, 0.42f, 0.12f, 0.12f, 0.24f};
-    int headerRowWidth = 936 - 24;
-    int colX = 24;
-    for (int c = 0; c < 5; ++c)
-    {
-        int colW = static_cast<int>(weights[c] * static_cast<float>(headerRowWidth));
-        g_headerColMin[c] = ivec2(colX, rowY);
-        g_headerColMax[c] = ivec2(colX + colW, rowY + PROCESS_ROW_HEIGHT);
-        colX += colW;
-    }
-}
-
-static void cacheElementPointers()
-{
-    Tree<Layout> &root = LayoutManager::getInstance().getRoot();
-    g_cpuBar = findBarByMetric(root, "cpu");
-    g_ramBar = findBarByMetric(root, "ram");
-
-    g_gpuBar = findBarByMetric(root, "gpu");
-
-    Tree<Layout> *tabbarNode = EventManager::findLayoutByName(root, "tabbar");
-    if (tabbarNode != nullptr)
-    {
-        // Tabbar labels in document order: 0 System, 1 Processes, 2 About,
-        // 3 SOUND ON/OFF. Pre-v3 code used index 2 which silently pointed
-        // at the "About" tab label and would mutate the tab title every
-        // time the user toggled sound; nobody noticed because the alarm
-        // strings happened to overwrite "About" with comparable-width
-        // characters. Index 3 is the actual SOUND label.
-        g_muteLabel = nthLabelInLayout(*tabbarNode, 3);
-        // Recenter the SOUND label from its XML default once the TTF face is
-        // initialized so the static "SOUND ON" string ends up pixel-centered
-        // inside the button rect; subsequent toggles re-run the same logic.
-        recenterMuteLabel();
-    }
-
-    g_processRows.clear();
-    collectRows(root, g_processRows);
-
-    if (!g_processRows.empty())
-    {
-        g_headerRow = g_processRows.front();
-        // Seed the header with the current sort glyph so the indicator is
-        // visible from the first frame, not only after the user clicks a
-        // header. Keeps the screenshot/headless renders honest too.
-        updateHeaderSortGlyph();
-    }
-
-    // Find the footer 'POLL_PLACEHOLDER' label so the displayed poll
-    // interval can track the --poll-ms override at runtime. Walk every
-    // layout in the tree because the footer labels could end up at any
-    // depth depending on base.xml structure.
-    std::vector<Tree<Layout> *> stack;
-    stack.push_back(&root);
-    while (!stack.empty() && g_pollLabel == nullptr)
-    {
-        Tree<Layout> *node = stack.back();
-        stack.pop_back();
-        for (const auto &element : node->getData().elements)
-        {
-            Label *lbl = dynamic_cast<Label *>(element.get());
-            if (lbl != nullptr && lbl->getText() == "POLL_PLACEHOLDER")
-            {
-                g_pollLabel = lbl;
-                break;
-            }
-        }
-        for (auto &child : node->getChildren())
-        {
-            stack.push_back(child.get());
-        }
-    }
-    if (g_pollLabel != nullptr)
-    {
-        g_pollLabel->setText("poll " + std::to_string(g_pollIntervalMs) + "ms");
-    }
-}
-
-static void buildSparklines()
-{
-    // Stacked sparklines in the System tab's empty lower half. Each row spans
-    // the same horizontal range as the bars above (x in [24, 864]) and
-    // matches the same accent color, so the polyline reads as a continuation
-    // of its bar. Heights are 56px / row with 12px gaps.
-    const vec3 accent = Theme::accentGreen();
-    // Sparkline stack: 4 charts at 40px each with a 14px label band above
-    // each chart. Labels live at chart-top minus 12px so they sit cleanly
-    // above the polyline instead of being overwritten by the fill. Tick
-    // labels ("100" / "0") render at maxPos.x + 4 in the 80px right
-    // gutter (chart maxPos.x = 864, screen width = 960). 0 tick now sits
-    // 4px BELOW the chart (maxPos.y + 4) so it never sits inside the
-    // polyline fill area.
-    g_cpuSparkline = std::make_unique<Sparkline>(
-        ivec2(24, 246), ivec2(864, 286), accent, 0.0f, 100.0f, SPARKLINE_CAPACITY);
-    g_cpuSparkline->setThresholdMode(true);
-    g_ramSparkline = std::make_unique<Sparkline>(
-        ivec2(24, 312), ivec2(864, 352), accent, 0.0f, 100.0f, SPARKLINE_CAPACITY);
-    g_ramSparkline->setThresholdMode(true);
-    g_gpuSparkline = std::make_unique<Sparkline>(
-        ivec2(24, 378), ivec2(864, 418), accent, 0.0f, 100.0f, SPARKLINE_CAPACITY);
-    g_gpuSparkline->setThresholdMode(true);
-    // tx (orange) is constructed first so it renders behind the rx
-    // (green) line in the draw pass; incoming traffic reads as more
-    // important. NET strip ends at y=474 leaving 8px clear of the
-    // y=482..516 EXIT button + footer chrome.
-    const vec3 netTx(0.95f, 0.65f, 0.30f);
-    const vec3 netRx(0.5f, 0.85f, 0.5f);
-    g_netTxSparkline = std::make_unique<Sparkline>(
-        ivec2(24, 444), ivec2(864, 474), netTx, 0.0f, NET_SPARKLINE_MAX_KBPS, SPARKLINE_CAPACITY);
-    g_netRxSparkline = std::make_unique<Sparkline>(
-        ivec2(24, 444), ivec2(864, 474), netRx, 0.0f, NET_SPARKLINE_MAX_KBPS, SPARKLINE_CAPACITY);
-}
-
-static void destroySparklines()
-{
-    g_cpuSparkline.reset();
-    g_ramSparkline.reset();
-    g_gpuSparkline.reset();
-    g_netRxSparkline.reset();
-    g_netTxSparkline.reset();
-}
+// Scene-build helpers moved to src/HeadlessRunner.cpp (Phase 1.2 slice
+// 16) so the screenshot runner and the live UI path both reach the
+// same definitions. coremetrics.cpp forward-declares them below and
+// calls them from main(); the bodies live next to runScreenshotMode()
+// which is the other caller. destroySparklines() moved with them so
+// the four helpers stay in lockstep.
+void buildScene();
+void cacheElementPointers();
+void buildSparklines();
+void destroySparklines();
 
 // Uptime + Load row paint moved to src/UptimeAndLoad.cpp as Phase 1.2
 // slice 3 of the GUI evolution spec. Call site passes g_uptimeSeconds
 // and g_loadAverages explicitly via UptimeAndLoad::render(...).
 
-static std::string formatRate(unsigned long long kbPerSec)
-{
-    if (kbPerSec >= 1024)
-    {
-        std::ostringstream oss;
-        oss.precision(1);
-        oss << std::fixed << (static_cast<double>(kbPerSec) / 1024.0) << " MB/s";
-        return oss.str();
-    }
-    return std::to_string(kbPerSec) + " KB/s";
-}
+// Old formatRate(kbPerSec) helper deleted; superseded by the
+// compact-rate formatter inside src/NetIoFooter.cpp (slice 4 extract).
 
 // NetIo footer paint moved to src/NetIoFooter.cpp as Phase 1.2 slice 4
 // of the GUI evolution spec. Call site passes the three globals
@@ -503,14 +399,15 @@ static std::string formatRate(unsigned long long kbPerSec)
 // Live footer string replacing the v0.1.x static "alarm threshold 80%"
 // label. Same color and y-baseline as the other footer chrome
 // (coremetrics / v0.2.0 / poll 500ms) so it reads as a continuation.
-// Latest process count is set by pollMetrics().
-static std::size_t g_lastProcCount = 0;
+// Latest process count is set by MetricsPoller::poll(). Defined in
+// src/MetricsPoller.cpp (Phase 1.2 slice 15).
+extern std::size_t g_lastProcCount;
 // Latest summed CPU% / MEM% across the topProcesses sample. Maintained
-// alongside g_lastProcCount in pollMetrics() and read by the Processes
-// tab summary strip so a reviewer can eyeball aggregate pressure without
-// summing the visible table.
-static float g_sumCpuPct = 0.0f;
-static float g_sumMemPct = 0.0f;
+// alongside g_lastProcCount by MetricsPoller::poll() and read by the
+// Processes tab summary strip so a reviewer can eyeball aggregate
+// pressure without summing the visible table.
+extern float g_sumCpuPct;
+extern float g_sumMemPct;
 
 // Footer "N procs" live count moved to src/FooterLiveStats.cpp as
 // Phase 1.2 slice 8 of the GUI evolution spec. Reaches the same pixels
@@ -532,402 +429,15 @@ static float g_sumMemPct = 0.0f;
 // slice 2 of the GUI evolution spec. Reaches the same pixels via
 // SparklineLabels::render(dest).
 
-static void pollMetrics()
-{
-    float cpuPct = SystemMetrics::readCpuPercent();
-    float memPct = SystemMetrics::readMemPercent();
-    float gpuPct = SystemMetrics::readGpuPercent();
-    // Stash the latest percentages so the render loop can hand them to
-    // MetricReadouts::render(...) outside of this scope.
-    g_cpuPct = cpuPct;
-    g_ramPct = memPct;
-    g_gpuPct = gpuPct;
-
-    // Threshold-based fill colors mirror the per-core strip + DISK
-    // readout palette: accent green idle, yellow at 60%+, red at 80%+.
-    // Re-colors all three bars consistently so the System tab reads
-    // 'pressure rising' across CPU / RAM / GPU at a glance.
-    if (g_cpuBar != nullptr)
-    {
-        g_cpuBar->setValue(cpuPct);
-        g_cpuBar->setFillColor(Thresholds::colorForPct(cpuPct));
-    }
-    if (g_ramBar != nullptr)
-    {
-        g_ramBar->setValue(memPct);
-        g_ramBar->setFillColor(Thresholds::colorForPct(memPct));
-    }
-    if (g_gpuBar != nullptr)
-    {
-        g_gpuBar->setValue(gpuPct);
-        g_gpuBar->setFillColor(Thresholds::colorForPct(gpuPct));
-    }
-    if (g_cpuSparkline != nullptr)
-    {
-        g_cpuSparkline->push(cpuPct);
-    }
-    if (g_ramSparkline != nullptr)
-    {
-        g_ramSparkline->push(memPct);
-    }
-    if (g_gpuSparkline != nullptr)
-    {
-        g_gpuSparkline->push(gpuPct);
-    }
-
-    g_perCoreCpu = SystemMetrics::readPerCoreCpu();
-    g_memBreakdown = SystemMetrics::readMemBreakdown();
-    g_uptimeSeconds = SystemMetrics::readUptimeSeconds();
-    g_loadAverages = SystemMetrics::readLoadAverages();
-    g_diskUsage = SystemMetrics::readDiskUsage();
-
-    bool cpuNowAlarm = cpuPct >= ALARM_THRESHOLD;
-    bool ramNowAlarm = memPct >= ALARM_THRESHOLD;
-    bool gpuNowAlarm = gpuPct >= ALARM_THRESHOLD;
-    if (g_alarmEnabled)
-    {
-        if (cpuNowAlarm && !g_cpuAlarmActive)
-        {
-            EventManager::getInstance().pushEvent(std::make_unique<SoundEvent>(ALARM_SOUND_PATH));
-        }
-        if (ramNowAlarm && !g_ramAlarmActive)
-        {
-            EventManager::getInstance().pushEvent(std::make_unique<SoundEvent>(ALARM_SOUND_PATH));
-        }
-        if (gpuNowAlarm && !g_gpuAlarmActive)
-        {
-            EventManager::getInstance().pushEvent(std::make_unique<SoundEvent>(ALARM_SOUND_PATH));
-        }
-    }
-    g_cpuAlarmActive = cpuNowAlarm;
-    g_ramAlarmActive = ramNowAlarm;
-    g_gpuAlarmActive = gpuNowAlarm;
-
-    if (g_processRows.size() <= 1)
-    {
-        return;
-    }
-
-    std::size_t dataRowCount = g_processRows.size() - 1;
-    // Tree mode walks the parent/child graph; if parents fall outside the
-    // top-N memory window the chain breaks and most rows render at depth 0,
-    // so we fetch a much larger sample when tree mode is on. Flat mode's
-    // 3x over-fetch is enough for the substring filter alone.
-    std::size_t fetchN = g_treeMode ? std::max<std::size_t>(500, dataRowCount * 30)
-                                    : dataRowCount * 3;
-    std::vector<ProcessInfo> procs = SystemMetrics::topProcesses(fetchN);
-    // Captured before filter/truncate so the live footer count reflects
-    // what the backend actually returned (after any over-fetch), which
-    // is the most useful single number a reviewer can see: "this system
-    // monitor is watching N processes right now."
-    g_lastProcCount = procs.size();
-    // Aggregate disk-I/O throughput summed across every process the
-    // backend returned this round. Renders as 'R X.X MB/s  W Y.Y MB/s'
-    // text strip on the System tab so users see system-wide disk
-    // pressure at a glance instead of having to scan the Processes
-    // table. Best-effort: only counts processes the backend surfaced
-    // (top fetchN by memory), which captures the loudest writers in
-    // practice without needing /proc/diskstats or PDH PhysicalDisk.
-    unsigned long long aggReadKb = 0;
-    unsigned long long aggWriteKb = 0;
-    float sumCpuPct = 0.0f;
-    float sumMemPct = 0.0f;
-    for (const auto &p : procs)
-    {
-        aggReadKb += p.diskReadKbPerSec;
-        aggWriteKb += p.diskWriteKbPerSec;
-        sumCpuPct += p.cpuPct;
-        sumMemPct += p.memPct;
-    }
-    g_aggregateDiskReadKbPerSec = aggReadKb;
-    g_aggregateDiskWriteKbPerSec = aggWriteKb;
-    // Cached for ProcessesSummary::render so the strip can paint each frame
-    // without rewalking the process list. Stale by at most one poll tick.
-    g_sumCpuPct = sumCpuPct;
-    g_sumMemPct = sumMemPct;
-    // Sample aggregate net I/O on the same cadence as the rest of the
-    // System tab data. First call returns zeros (no prior sample).
-    g_netIo = SystemMetrics::readNetIo();
-    // Feed the same sample into the rx/tx polylines so the NET history
-    // strip mirrors the live footer 'NET R/T' readout one tick later.
-    if (g_netRxSparkline != nullptr)
-    {
-        g_netRxSparkline->push(static_cast<float>(g_netIo.rxKbPerSec));
-    }
-    if (g_netTxSparkline != nullptr)
-    {
-        g_netTxSparkline->push(static_cast<float>(g_netIo.txKbPerSec));
-    }
-    // Parallel array of indent depths produced when tree mode flattens
-    // the parent/child graph; stays empty in flat mode. Same length as
-    // procs after the sort+filter+truncate pass below.
-    std::vector<int> procDepth;
-    // Parallel flag: row has at least one child in the current sample,
-    // so its name cell should carry a '+' or '-' collapse glyph. Stays
-    // empty in flat mode. Same length policy as procDepth.
-    std::vector<bool> procHasChildren;
-    if (g_treeMode)
-    {
-        // Build a parent -> children index. Roots are entries whose parentPid
-        // isn't itself a pid we have a record for. Children inside each
-        // bucket sort by memPct desc so the heaviest child surfaces first.
-        std::unordered_map<int, std::vector<std::size_t>> childIndices;
-        std::unordered_set<int> knownPids;
-        knownPids.reserve(procs.size());
-        for (const auto &p : procs)
-        {
-            knownPids.insert(p.pid);
-        }
-        for (std::size_t i = 0; i < procs.size(); ++i)
-        {
-            childIndices[procs[i].parentPid].push_back(i);
-        }
-        for (auto &kv : childIndices)
-        {
-            std::sort(kv.second.begin(), kv.second.end(),
-                [&procs](std::size_t a, std::size_t b) {
-                    return procs[a].memPct > procs[b].memPct;
-                });
-        }
-
-        std::vector<ProcessInfo> flat;
-        flat.reserve(procs.size());
-        procDepth.reserve(procs.size());
-        procHasChildren.reserve(procs.size());
-
-        // Iterative DFS so we don't recurse into a kernel-thread chain that
-        // could be thousands deep on weird hosts.
-        std::vector<std::pair<std::size_t, int>> stack;
-        for (std::size_t i = 0; i < procs.size(); ++i)
-        {
-            if (knownPids.find(procs[i].parentPid) == knownPids.end())
-            {
-                stack.push_back({i, 0});
-            }
-        }
-        // Roots also sort by mem desc so the densest tree surfaces first.
-        std::sort(stack.begin(), stack.end(),
-            [&procs](const std::pair<std::size_t, int> &a,
-                     const std::pair<std::size_t, int> &b) {
-                return procs[a.first].memPct > procs[b.first].memPct;
-            });
-        std::vector<bool> emitted(procs.size(), false);
-        while (!stack.empty())
-        {
-            auto [idx, depth] = stack.back();
-            stack.pop_back();
-            if (emitted[idx])
-            {
-                continue;
-            }
-            emitted[idx] = true;
-            flat.push_back(procs[idx]);
-            procDepth.push_back(depth);
-            // Cache whether this pid has any child in the current sample
-            // so the render loop can decide whether to draw a +/- glyph.
-            // Checked against childIndices BEFORE the collapse short-circuit
-            // so collapsed parents still get a glyph (the '+').
-            auto childIt = childIndices.find(procs[idx].pid);
-            bool hasChildren = (childIt != childIndices.end()
-                                && !childIt->second.empty());
-            procHasChildren.push_back(hasChildren);
-            // Skip descendants when this pid is in the collapsed set so
-            // 'space' on a row hides the subtree without dropping the row
-            // itself. Set is empty by default => fully expanded tree.
-            if (g_collapsedPids.count(procs[idx].pid) != 0)
-            {
-                continue;
-            }
-            if (hasChildren)
-            {
-                // Push in reverse so the highest-mem child is popped first.
-                for (auto rit = childIt->second.rbegin(); rit != childIt->second.rend(); ++rit)
-                {
-                    if (!emitted[*rit])
-                    {
-                        stack.push_back({*rit, depth + 1});
-                    }
-                }
-            }
-        }
-        // Append any procs the DFS missed (cycles, ppid pointing at an
-        // already-emitted node, etc.) at depth 0 so the table never
-        // silently drops rows.
-        for (std::size_t i = 0; i < procs.size(); ++i)
-        {
-            if (!emitted[i])
-            {
-                flat.push_back(procs[i]);
-                procDepth.push_back(0);
-                procHasChildren.push_back(false);
-            }
-        }
-        procs = std::move(flat);
-    }
-    else
-    {
-        std::sort(procs.begin(), procs.end(), compareProcesses);
-    }
-    if (!g_filterText.empty())
-    {
-        std::vector<ProcessInfo> kept;
-        kept.reserve(procs.size());
-        for (const auto &p : procs)
-        {
-            if (processNameMatchesFilter(p.name, g_filterText))
-            {
-                kept.push_back(p);
-            }
-        }
-        procs = std::move(kept);
-    }
-    // Stash the post-filter size before truncating so the scroll
-    // clamp + the "N more below" indicator can use it.
-    g_processVisibleCount = procs.size();
-    // Clamp the scroll offset against the current table length so a
-    // shrinking window of matching processes never leaves a stale
-    // offset pointing past the end.
-    if (g_processVisibleCount <= dataRowCount)
-    {
-        g_processScrollOffset = 0;
-    }
-    else
-    {
-        std::size_t maxOffset = g_processVisibleCount - dataRowCount;
-        if (g_processScrollOffset > maxOffset)
-        {
-            g_processScrollOffset = maxOffset;
-        }
-    }
-    // Slice the visible window of dataRowCount entries starting at
-    // g_processScrollOffset so up/down + PgUp/PgDown move through the
-    // full process list instead of being capped at the first page.
-    if (g_processScrollOffset > 0)
-    {
-        procs.erase(procs.begin(),
-                    procs.begin() + static_cast<std::ptrdiff_t>(g_processScrollOffset));
-    }
-    if (procs.size() > dataRowCount)
-    {
-        procs.resize(dataRowCount);
-    }
-
-    g_visiblePids.clear();
-    g_visiblePids.reserve(procs.size());
-    g_rowGlyphPrefix.assign(procs.size(), std::string());
-    g_rowGlyphCollapsed.assign(procs.size(), false);
-
-    for (std::size_t i = 0; i < dataRowCount; ++i)
-    {
-        Row *row = g_processRows[i + 1];
-        if (row == nullptr)
-        {
-            continue;
-        }
-        if (i < procs.size())
-        {
-            const ProcessInfo &info = procs[i];
-            g_visiblePids.push_back(info.pid);
-            // Tree mode: prefix the NAME cell with indent + connector so
-            // the parent/child relationship is visible. Cap depth at 6 to
-            // avoid pushing the name out of its column on a deeply nested
-            // chain (which is rare in practice). Nodes that have children
-            // get a '+ ' (collapsed) or '- ' (expanded) glyph in the
-            // indent area; leaf rows fall back to the previous '|- '
-            // connector so the parent/child line stays readable.
-            std::string nameCell = info.name;
-            if (g_treeMode && i < procDepth.size())
-            {
-                int depth = procDepth[i];
-                if (depth > 6) depth = 6;
-                std::string prefix;
-                for (int d = 0; d < depth; ++d)
-                {
-                    prefix += "  ";
-                }
-                bool hasChildren = (i < procHasChildren.size()) && procHasChildren[i];
-                bool collapsed = (g_collapsedPids.count(info.pid) != 0);
-                if (hasChildren)
-                {
-                    prefix += collapsed ? "+ " : "- ";
-                    // Stash the colored-overlay prefix so the render
-                    // pass can repaint the glyph in green/grey on top
-                    // of the Row's default white text.
-                    g_rowGlyphPrefix[i] = prefix;
-                    g_rowGlyphCollapsed[i] = collapsed;
-                }
-                else if (depth > 0)
-                {
-                    prefix += "|- ";
-                }
-                nameCell = prefix + info.name;
-            }
-            std::vector<std::string> cells = {
-                std::to_string(info.pid),
-                nameCell,
-                formatPct(info.cpuPct),
-                formatPct(info.memPct),
-                formatDiskIo(info.diskReadKbPerSec, info.diskWriteKbPerSec)
-            };
-            row->setCells(cells);
-        }
-        else
-        {
-            row->setCells({"", "", "", "", ""});
-        }
-    }
-
-    // After a re-poll the visible row index for the selected pid may have
-    // moved or the pid may have exited. Re-anchor the highlight so up/down
-    // navigation keeps making sense.
-    if (g_selectedPid >= 0)
-    {
-        auto it = std::find(g_visiblePids.begin(), g_visiblePids.end(), g_selectedPid);
-        if (it == g_visiblePids.end())
-        {
-            g_selectedPid = -1;
-            g_selectedRowIndex = -1;
-        }
-        else
-        {
-            g_selectedRowIndex = static_cast<int>(it - g_visiblePids.begin());
-        }
-    }
-}
+// pollMetrics() moved to src/MetricsPoller.cpp as Phase 1.2 slice 15
+// of the modernization roadmap. The previous 362-line in-place body
+// is now MetricsPoller::poll(); every call site below dispatches
+// through that namespace function. The poller owns the metric
+// snapshot globals it produces (g_cpuPct, g_memBreakdown, etc.) and
+// consults the scene widget pointers + live-UI state via extern.
 
 int main(int argc, char **argv)
 {
-    // Optional headless screenshot mode: `coremetrics --screenshot out.bmp`
-    // renders one frame to an offscreen surface and saves it, no window needed.
-    std::string screenshotPath;
-    // Optional `--duration <seconds>` cleanly exits the live UI after N
-    // seconds. Useful for backgrounded smoke tests and screenshot capture
-    // pipelines that need a guaranteed-finite run. 0 means "run forever".
-    double durationSeconds = 0.0;
-    // Optional `--export-csv <path>` / `--export-json <path>` write one
-    // sample of the live aggregates plus the top-N process list to a flat
-    // file and exit. Both run before SDL_Init so they need no display.
-    std::string exportCsvPath;
-    std::string exportJsonPath;
-    // `--top N` prints the top N processes by memory % to stdout as a
-    // plain text table and exits. Lets the binary be piped into shell
-    // tools without scraping a screenshot or a CSV file. N is clamped
-    // to [1, 999]; default 20 if the value is missing or unparseable.
-    int topCount = 0;
-    // `--watch` switches --top from one-shot to live tail-style: the
-    // table re-prints every poll interval, clearing the terminal first
-    // so the latest snapshot replaces the previous one in place. Ctrl-C
-    // exits cleanly via the existing SIGINT handler.
-    bool watchMode = false;
-    // `--top-sort cpu|mem|io` re-orders the printed table by the
-    // chosen column. Default is mem (matches the backend's natural
-    // sort order from topProcesses(N)). Unknown values fall back to mem.
-    TopSortKey topSortKey = TopSortKey::Mem;
-    // `--top-color auto|always|never`: colorize the --top / --watch
-    // output. auto (default) checks isatty so piped output stays
-    // ASCII-clean. always forces color on. never forces it off.
-    int topColorMode = 0; // 0=auto, 1=always, 2=never
-
     // Hydrate persisted preferences before argv parsing so any CLI
     // flag the user supplies this run overrides the saved value.
     // Settings::load is a no-op on a fresh install with no config file
@@ -940,169 +450,54 @@ int main(int argc, char **argv)
                    g_collapsedPids);
     g_sortColumn = static_cast<SortColumn>(loadedSortColumn);
 
-    // --help / -h print the same flag reference the manpage carries.
-    // --version / -V print a one-line semver string. Both exit 0
-    // before any other state is touched.
-    for (int i = 1; i < argc; ++i)
+    // CLI parsing moved to src/ArgParse.cpp (Phase 1.2 slice 17) so
+    // main() can focus on dispatching the parsed Result into the
+    // right runner. The parser owns the --help / --version short
+    // circuit and returns exitCode >= 0 in that case; main() forwards
+    // the code straight back. Everything else lands in the Result
+    // struct and main() propagates it into the live-UI globals
+    // after Settings::load so a flag this run overrides the saved
+    // value, exactly the way the old in-place loops behaved.
+    ArgParse::Result args = ArgParse::parse(argc, argv);
+    if (args.exitCode >= 0)
     {
-        std::string arg = argv[i];
-        if (arg == "--version" || arg == "-V")
-        {
-            // Mirrors base.xml's footer label; bumped by the release
-            // flow that touches the XML.
-            std::printf("coremetrics 0.3.0\n");
-            return 0;
-        }
-        if (arg == "--help" || arg == "-h")
-        {
-            std::printf(
-                "Usage: coremetrics [options]\n"
-                "\n"
-                "Live UI flags:\n"
-                "  --sparklines              show CPU/RAM/GPU/NET history sparklines\n"
-                "  --tree                    open Processes tab in parent/child tree mode\n"
-                "  --filter PATTERN          seed the Processes-tab name filter\n"
-                "  --poll-ms N               refresh cadence in ms (clamped 100..10000)\n"
-                "  --duration SECONDS        auto-exit after N seconds (live UI)\n"
-                "\n"
-                "Headless modes:\n"
-                "  --screenshot PATH [system|processes|about]\n"
-                "                            render one frame to PATH and exit\n"
-                "  --export-csv PATH         dump one-shot CSV and exit\n"
-                "  --export-json PATH        dump one-shot JSON and exit\n"
-                "  --top N                   print top-N processes to stdout and exit\n"
-                "  --watch                   used with --top: re-print every poll interval\n"
-                "  --top-sort cpu|mem|io     re-order --top output (default mem)\n"
-                "  --top-color auto|always|never\n"
-                "                            colorize --top output (default auto via isatty)\n"
-                "\n"
-                "Other:\n"
-                "  -h, --help                print this help and exit\n"
-                "  -V, --version             print version and exit\n"
-                "\n"
-                "See coremetrics(1) for the full manpage and key bindings.\n"
-            );
-            return 0;
-        }
+        return args.exitCode;
     }
 
-    for (int i = 1; i < argc; ++i)
+    // Apply CLI overrides on top of the Settings::load seed. The
+    // parser only writes pollIntervalMs > 0 when --poll-ms was
+    // supplied (and parsed to a positive number after the clamp),
+    // so the saved-setting cadence survives when the flag is
+    // absent. The sparkline / tree / filter flags are write-once:
+    // the parser sets them true only when the flag is present, so
+    // an unrelated launch keeps the saved/default value.
+    if (args.pollIntervalMs > 0)
     {
-        if (std::string(argv[i]) == "--screenshot" && i + 1 < argc)
-        {
-            screenshotPath = argv[i + 1];
-        }
-        if (std::string(argv[i]) == "--duration" && i + 1 < argc)
-        {
-            durationSeconds = std::atof(argv[i + 1]);
-            if (durationSeconds < 0.0)
-            {
-                durationSeconds = 0.0;
-            }
-        }
-        if (std::string(argv[i]) == "--sparklines")
-        {
-            g_sparklinesEnabled = true;
-        }
-        // --tree opens the Processes tab in parent/child indented hierarchy
-        // mode, same as pressing 't' on that tab interactively. Lets the
-        // screenshot pipeline capture tree mode without simulating keystrokes.
-        if (std::string(argv[i]) == "--tree")
-        {
-            g_treeMode = true;
-        }
-        // --filter <substring> seeds the Processes-tab name filter so the
-        // screenshot pipeline can demonstrate search. Case-insensitive
-        // substring match against process names, applied during pollMetrics.
-        if (std::string(argv[i]) == "--filter" && i + 1 < argc)
-        {
-            g_filterText = argv[i + 1];
-        }
-        // --poll-ms <N> overrides the default 500ms refresh cadence.
-        // Validation + clamp delegated to ProcessUtils so the same
-        // logic gets unit coverage and negative / non-numeric inputs
-        // fall back to the default instead of wrapping.
-        if (std::string(argv[i]) == "--poll-ms" && i + 1 < argc)
-        {
-            g_pollIntervalMs = static_cast<Uint64>(
-                clampPollIntervalMs(argv[i + 1], g_pollIntervalMs));
-        }
-        // --export-csv <path> / --export-json <path>: one-shot dump of the
-        // live aggregates + top-N process list, written to `path` and then
-        // the process exits 0. Lets external tools consume CoreMetrics data
-        // without scraping screenshots.
-        if (std::string(argv[i]) == "--export-csv" && i + 1 < argc)
-        {
-            exportCsvPath = argv[i + 1];
-        }
-        if (std::string(argv[i]) == "--export-json" && i + 1 < argc)
-        {
-            exportJsonPath = argv[i + 1];
-        }
-        if (std::string(argv[i]) == "--top")
-        {
-            int parsed = 20;
-            if (i + 1 < argc)
-            {
-                parsed = std::atoi(argv[i + 1]);
-                if (parsed < 1)
-                {
-                    parsed = 20;
-                }
-                if (parsed > 999)
-                {
-                    parsed = 999;
-                }
-            }
-            topCount = parsed;
-        }
-        if (std::string(argv[i]) == "--watch")
-        {
-            watchMode = true;
-        }
-        if (std::string(argv[i]) == "--top-sort" && i + 1 < argc)
-        {
-            std::string key = argv[i + 1];
-            if (key == "cpu")
-            {
-                topSortKey = TopSortKey::Cpu;
-            }
-            else if (key == "io")
-            {
-                topSortKey = TopSortKey::Io;
-            }
-            else
-            {
-                topSortKey = TopSortKey::Mem;
-            }
-        }
-        if (std::string(argv[i]) == "--top-color" && i + 1 < argc)
-        {
-            std::string mode = argv[i + 1];
-            if (mode == "always")
-            {
-                topColorMode = 1;
-            }
-            else if (mode == "never")
-            {
-                topColorMode = 2;
-            }
-            else
-            {
-                topColorMode = 0;
-            }
-        }
+        g_pollIntervalMs = args.pollIntervalMs;
+    }
+    if (args.sparklinesEnabled)
+    {
+        g_sparklinesEnabled = true;
+    }
+    if (args.treeMode)
+    {
+        g_treeMode = true;
+    }
+    if (!args.seedFilter.empty())
+    {
+        g_filterText = args.seedFilter;
     }
 
-    // Resolve the auto color mode by checking whether stdout is a TTY.
-    // Pipes and CI logs get plain text; an interactive terminal gets
-    // the threshold-colored CPU% / MEM% cells.
+    // Resolve the auto color mode by checking whether stdout is a
+    // TTY. Pipes and CI logs get plain text; an interactive terminal
+    // gets the threshold-colored CPU% / MEM% cells. Result encoding:
+    // 0 = force off, 1 = auto (default), 2 = force on.
     bool topColorize = false;
-    if (topColorMode == 1)
+    if (args.topColorize == 2)
     {
         topColorize = true;
     }
-    else if (topColorMode == 0)
+    else if (args.topColorize == 1)
     {
         topColorize = (isatty(fileno(stdout)) != 0);
     }
@@ -1111,245 +506,48 @@ int main(int argc, char **argv)
     // fixed-width text table to stdout (PID/NAME/CPU%/MEM%/IO) and
     // exits 0. Reads metrics with the same backend the live UI uses
     // so output reflects the same numbers a user would see on screen.
-    if (topCount > 0)
+    // Dispatched to HeadlessRunner as of Phase 1.2 slice 16.
+    if (args.topCount > 0)
     {
-        // Install the signal handler before the loop so Ctrl-C exits
-        // cleanly out of --watch instead of leaving a half-cleared
-        // terminal. The same flag the GUI main loop watches.
-        std::signal(SIGINT, handleShutdownSignal);
-        std::signal(SIGTERM, handleShutdownSignal);
-        if (!watchMode)
-        {
-            TopProcessesPrinter::print(topCount, topSortKey, topColorize);
-            return 0;
-        }
-        // --watch: clear the terminal with the ANSI 2J + cursor home
-        // sequence then re-print. Cheap, no curses, works in any
-        // terminal emulator. Uses g_pollIntervalMs (defaults 500 ms,
-        // overridable via --poll-ms) so the cadence matches the GUI.
-        while (!g_shutdownRequested.load())
-        {
-            std::printf("\033[2J\033[H");
-            TopProcessesPrinter::print(topCount, topSortKey, topColorize);
-            SDL_Delay(static_cast<Uint32>(g_pollIntervalMs));
-        }
-        return 0;
+        return HeadlessRunner::runTopMode(args.topCount,
+                                          args.topSortKey,
+                                          topColorize,
+                                          args.watchMode,
+                                          g_pollIntervalMs);
     }
 
     // Export path runs before SDL_Init: no window, no audio, no font.
     // SystemMetrics calls are pure platform queries so they work fine
-    // headless. If both flags are present we honor both.
-    if (!exportCsvPath.empty() || !exportJsonPath.empty())
+    // headless. If both flags are present we honor both. Dispatched to
+    // HeadlessRunner as of Phase 1.2 slice 16.
+    if (!args.exportCsvPath.empty() || !args.exportJsonPath.empty())
     {
-        int exportStatus = 0;
-        if (!exportCsvPath.empty())
-        {
-            if (!Exporter::writeCsv(exportCsvPath))
-            {
-                std::cerr << "Failed to write CSV export to "
-                          << exportCsvPath << '\n';
-                exportStatus = 1;
-            }
-            else
-            {
-                std::cout << "Wrote CSV export to " << exportCsvPath << '\n';
-            }
-        }
-        if (!exportJsonPath.empty())
-        {
-            if (!Exporter::writeJson(exportJsonPath))
-            {
-                std::cerr << "Failed to write JSON export to "
-                          << exportJsonPath << '\n';
-                exportStatus = 1;
-            }
-            else
-            {
-                std::cout << "Wrote JSON export to " << exportJsonPath << '\n';
-            }
-        }
-        return exportStatus;
+        return HeadlessRunner::runExportMode(args.exportCsvPath,
+                                             args.exportJsonPath);
     }
+
+    // The --screenshot path owns its own SDL_Init(VIDEO) + SDL_Quit
+    // inside HeadlessRunner. The optional second positional that
+    // selects the tab to capture (system / processes / about) is
+    // already in args.screenshotTab; empty falls back to "system"
+    // inside the runner.
+    if (!args.screenshotPath.empty())
+    {
+        return HeadlessRunner::runScreenshotMode(args.screenshotPath,
+                                                 args.screenshotTab);
+    }
+
+    double durationSeconds = args.durationSeconds;
 
     std::signal(SIGINT, handleShutdownSignal);
     std::signal(SIGTERM, handleShutdownSignal);
 
-    // Headless --screenshot does not play sound, so initializing the
-    // SDL audio subsystem is wasted work and on macOS the AudioQueue
-    // background thread races the screenshot teardown, producing a
-    // sporadic EXC_BAD_ACCESS in pthread_mutex_lock during static
-    // destructors after the PNG has already been written. Init only
-    // VIDEO in the screenshot path; the live path still inits both.
-    Uint32 sdlInitFlags = SDL_INIT_VIDEO;
-    if (screenshotPath.empty())
-    {
-        sdlInitFlags |= SDL_INIT_AUDIO;
-    }
-    if (!SDL_Init(sdlInitFlags))
+    // Live UI path keeps SDL_INIT_VIDEO + SDL_INIT_AUDIO; the audio
+    // subsystem is required for the alarm-flash SoundEvent path.
+    if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO))
     {
         std::cerr << "Failed to init SDL: " << SDL_GetError() << '\n';
         return -1;
-    }
-
-    if (!screenshotPath.empty())
-    {
-        // Optional second arg selects the tab: --screenshot out.bmp processes
-        std::string tab = "system";
-        for (int i = 1; i < argc - 1; ++i)
-        {
-            if (std::string(argv[i]) == "--screenshot" && i + 2 < argc)
-            {
-                tab = argv[i + 2];
-            }
-        }
-
-        Screen shot(RESX, RESY);
-        buildScene();
-        cacheElementPointers();
-        if (g_sparklinesEnabled)
-        {
-            buildSparklines();
-            // Prime the sparklines so a single headless --screenshot frame has
-            // enough history to draw a visible polyline. 64 samples at 50ms
-            // each (~3.2s) fills the rolling window exactly and also gives the
-            // per-process CPU% delta a wide enough sampling window that idle
-            // processes still register measurable ticks.
-            for (std::size_t i = 0; i < SPARKLINE_CAPACITY; ++i)
-            {
-                pollMetrics();
-                SDL_Delay(50);
-            }
-        }
-        else
-        {
-            // Per-process CPU% is a delta between two samples. 1.1s was too
-            // tight: many processes accumulate sub-tick activity in that
-            // window and round to 0.0% in the shot. 3s captures everything
-            // that is doing real work without making the screenshot path
-            // feel sluggish.
-            pollMetrics();
-            SDL_Delay(3000);
-        }
-        pollMetrics();
-
-        if (tab == "processes")
-        {
-            EventManager::getInstance().pushEvent(std::make_unique<ShowEvent>("system", false));
-            EventManager::getInstance().pushEvent(std::make_unique<ShowEvent>("processes", true));
-            EventManager::getInstance().processEvents(ivec2(0, 0), ivec2(RESX - 1, RESY - 1));
-        }
-        else if (tab == "about")
-        {
-            EventManager::getInstance().pushEvent(std::make_unique<ShowEvent>("system", false));
-            EventManager::getInstance().pushEvent(std::make_unique<ShowEvent>("about", true));
-            EventManager::getInstance().processEvents(ivec2(0, 0), ivec2(RESX - 1, RESY - 1));
-        }
-
-        shot.clear();
-        LayoutManager::getInstance().render(shot, ivec2(0, 0), ivec2(RESX - 1, RESY - 1));
-        // Active-tab indicator: keeps the headless screenshot output in
-        // sync with what the live loop paints (Pillar A5).
-        {
-            int activeTabIndex = 0;
-            if (tab == "about")
-            {
-                activeTabIndex = 2;
-            }
-            else if (tab == "processes")
-            {
-                activeTabIndex = 1;
-            }
-            TabIndicator::render(shot, activeTabIndex);
-        }
-        FooterLiveStats::render(shot, g_lastProcCount);
-        if (tab == "system")
-        {
-            // Dominant Title-size CPU/RAM/GPU readouts (Pillar A2). Paints
-            // before the per-tab helpers so the smaller dim "%" sign sits
-            // above the card background without getting overdrawn.
-            MetricReadouts::render(shot, g_cpuPct, g_ramPct, g_gpuPct);
-            UptimeAndLoad::render(shot, g_uptimeSeconds, g_loadAverages);
-            DiskUsageRow::render(shot, g_diskUsage);
-            NetIoFooter::render(shot, g_aggregateDiskReadKbPerSec, g_aggregateDiskWriteKbPerSec, g_netIo);
-            MemBreakdownStrip::render(shot, g_memBreakdown);
-            PerCoreStrip::render(shot, g_perCoreCpu, g_sparklinesEnabled);
-            if (g_sparklinesEnabled)
-            {
-                if (g_cpuSparkline != nullptr) g_cpuSparkline->draw(shot);
-                if (g_ramSparkline != nullptr) g_ramSparkline->draw(shot);
-                if (g_gpuSparkline != nullptr) g_gpuSparkline->draw(shot);
-                // tx (orange) first so the rx (green) line reads on top;
-                // incoming traffic is the headline number for most users.
-                if (g_netTxSparkline != nullptr) g_netTxSparkline->draw(shot);
-                if (g_netRxSparkline != nullptr) g_netRxSparkline->draw(shot);
-                SparklineLabels::render(shot);
-            }
-        }
-        else if (tab == "processes" && !g_filterText.empty())
-        {
-            const vec3 labelColor = Theme::accentGreen();
-            const vec3 textColor(1.0f, 1.0f, 1.0f);
-            Font::drawText(shot, "filter: ", ivec2(24, 44), labelColor);
-            Font::drawText(shot, g_filterText, ivec2(120, 44), textColor);
-        }
-        if (tab == "processes")
-        {
-            ProcessesSummary::render(shot,
-                                     g_lastProcCount,
-                                     g_sumCpuPct,
-                                     g_sumMemPct,
-                                     g_processScrollOffset,
-                                     g_processVisibleCount,
-                                     PROCESSES_VISIBLE_ROWS);
-            // Mirror the live loop's empty-state hint so the screenshot
-            // matches what a user sees during the boot moment (Pillar A6).
-            if (g_lastProcCount == 0)
-            {
-                EmptyStates::renderProcessesEmpty(shot);
-            }
-        }
-        else if (tab == "about")
-        {
-            AboutTab::render(shot, g_uptimeSeconds, g_perCoreCpu.size());
-        }
-        SDL_Surface *out = SDL_CreateSurface(RESX, RESY, SDL_PIXELFORMAT_RGBA32);
-        if (out == nullptr)
-        {
-            std::cerr << "Failed to create screenshot surface: " << SDL_GetError() << '\n';
-            SDL_Quit();
-            return -3;
-        }
-        shot.blitTo(out);
-
-        // Pick the writer by extension so the same flag produces what the
-        // README expects (PNG hero images) without forcing callers to run an
-        // external converter step. Falls back to BMP for any other suffix.
-        auto endsWith = [](const std::string &s, const std::string &suffix)
-        {
-            return s.size() >= suffix.size()
-                   && s.compare(s.size() - suffix.size(), suffix.size(), suffix) == 0;
-        };
-        bool saved = false;
-        if (endsWith(screenshotPath, ".png") || endsWith(screenshotPath, ".PNG"))
-        {
-            saved = IMG_SavePNG(out, screenshotPath.c_str());
-        }
-        else
-        {
-            saved = SDL_SaveBMP(out, screenshotPath.c_str());
-        }
-        if (!saved)
-        {
-            std::cerr << "Failed to save screenshot: " << SDL_GetError() << '\n';
-        }
-        else
-        {
-            std::cout << "Saved screenshot to " << screenshotPath << '\n';
-        }
-        SDL_DestroySurface(out);
-        Font::shutdown();
-        SDL_Quit();
-        return 0;
     }
 
     SDL_Window *window = SDL_CreateWindow("CoreMetrics", RESX, RESY, SDL_WINDOW_RESIZABLE);
@@ -1377,7 +575,7 @@ int main(int argc, char **argv)
     {
         buildSparklines();
     }
-    pollMetrics();
+    MetricsPoller::poll();
 
     Uint64 lastPoll = SDL_GetTicks();
     Uint64 startTicks = SDL_GetTicks();
@@ -1410,177 +608,12 @@ int main(int argc, char **argv)
             }
             case SDL_EVENT_MOUSE_BUTTON_DOWN:
             {
-                float clickX = 0.0f;
-                float clickY = 0.0f;
-                SDL_GetMouseState(&clickX, &clickY);
-                int winW = 0;
-                int winH = 0;
-                SDL_GetWindowSize(window, &winW, &winH);
-                if (winW <= 0 || winH <= 0)
-                {
-                    winW = RESX;
-                    winH = RESY;
-                }
-
-                float srcAspect = static_cast<float>(RESX) / static_cast<float>(RESY);
-                float dstAspect = static_cast<float>(winW) / static_cast<float>(winH);
-                int viewW = winW;
-                int viewH = winH;
-                int viewX = 0;
-                int viewY = 0;
-                if (dstAspect > srcAspect)
-                {
-                    viewH = winH;
-                    viewW = static_cast<int>(static_cast<float>(winH) * srcAspect);
-                    viewX = (winW - viewW) / 2;
-                }
-                else
-                {
-                    viewW = winW;
-                    viewH = static_cast<int>(static_cast<float>(winW) / srcAspect);
-                    viewY = (winH - viewH) / 2;
-                }
-
-                float relX = clickX - static_cast<float>(viewX);
-                float relY = clickY - static_cast<float>(viewY);
-                if (viewW <= 0 || viewH <= 0)
-                {
-                    break;
-                }
-                int mx = static_cast<int>(relX * static_cast<float>(RESX) / static_cast<float>(viewW));
-                int my = static_cast<int>(relY * static_cast<float>(RESY) / static_cast<float>(viewH));
-                if (mx < 0 || my < 0 || mx >= RESX || my >= RESY)
-                {
-                    break;
-                }
-
-                if (mx >= g_exitBtnMin.x && mx <= g_exitBtnMax.x
-                    && my >= g_exitBtnMin.y && my <= g_exitBtnMax.y)
-                {
-                    end = true;
-                }
-                else if (mx >= g_muteBtnMin.x && mx <= g_muteBtnMax.x
-                         && my >= g_muteBtnMin.y && my <= g_muteBtnMax.y)
-                {
-                    g_alarmEnabled = !g_alarmEnabled;
-                    if (g_muteLabel != nullptr)
-                    {
-                        g_muteLabel->setText(g_alarmEnabled ? "SOUND ON" : "SOUND OFF");
-                        // The toggled string is wider/narrower than the
-                        // previous one; recenter so the label keeps an
-                        // even margin on both sides of the button rect.
-                        recenterMuteLabel();
-                    }
-                }
-                else if (mx >= g_systemTabBtnMin.x && mx <= g_systemTabBtnMax.x
-                         && my >= g_systemTabBtnMin.y && my <= g_systemTabBtnMax.y)
-                {
-                    // Intercept tab-button clicks here so the three-tab fan
-                    // out (hide the two non-clicked layouts, show the
-                    // clicked one) is one atomic switch. The Button XML
-                    // schema only supports one hide per button.
-                    activateTab("system");
-                }
-                else if (mx >= g_processesTabBtnMin.x && mx <= g_processesTabBtnMax.x
-                         && my >= g_processesTabBtnMin.y && my <= g_processesTabBtnMax.y)
-                {
-                    activateTab("processes");
-                }
-                else if (mx >= g_aboutTabBtnMin.x && mx <= g_aboutTabBtnMax.x
-                         && my >= g_aboutTabBtnMin.y && my <= g_aboutTabBtnMax.y)
-                {
-                    activateTab("about");
-                }
-                else
-                {
-                    bool headerHit = false;
-                    for (int c = 0; c < 5; ++c)
-                    {
-                        if (mx >= g_headerColMin[c].x && mx <= g_headerColMax[c].x
-                            && my >= g_headerColMin[c].y && my <= g_headerColMax[c].y)
-                        {
-                            SortColumn clicked = static_cast<SortColumn>(c);
-                            if (g_sortColumn == clicked)
-                            {
-                                g_sortAscending = !g_sortAscending;
-                            }
-                            else
-                            {
-                                g_sortColumn = clicked;
-                                g_sortAscending = false;
-                            }
-                            updateHeaderSortGlyph();
-                            headerHit = true;
-                            break;
-                        }
-                    }
-                    if (!headerHit)
-                    {
-                        // If the click landed on a Processes data row, take
-                        // the click as a row selection instead of letting
-                        // the EventManager route it to the layout tree. The
-                        // row widget itself does not own click handling, so
-                        // there is nothing else competing for this region.
-                        bool consumedAsRowSelect = false;
-                        if (processesTabActive()
-                            && mx >= PROCESSES_ROW_X0 && mx <= PROCESSES_ROW_X1
-                            && my >= PROCESSES_FIRST_ROW_Y
-                            && my < PROCESSES_FIRST_ROW_Y + PROCESSES_VISIBLE_ROWS * PROCESS_ROW_HEIGHT)
-                        {
-                            int row = (my - PROCESSES_FIRST_ROW_Y) / PROCESS_ROW_HEIGHT;
-                            if (row >= 0 && row < static_cast<int>(g_visiblePids.size()))
-                            {
-                                g_selectedRowIndex = row;
-                                g_selectedPid = g_visiblePids[row];
-                                consumedAsRowSelect = true;
-                            }
-                        }
-                        if (!consumedAsRowSelect)
-                        {
-                            EventManager::getInstance().pushEvent(std::make_unique<ClickEvent>(mx, my));
-                        }
-                    }
-                }
+                MouseEvents::handleButtonDown(event.button);
                 break;
             }
             case SDL_EVENT_MOUSE_WHEEL:
             {
-                // Mouse-wheel scroll on the Processes tab moves the
-                // visible window through the process list. y is the
-                // vertical wheel delta (positive = scroll up). Each
-                // wheel tick shifts by 3 rows so a comfortable wrist
-                // motion covers most of the visible window.
-                if (processesTabActive())
-                {
-                    constexpr std::size_t WHEEL_ROWS_PER_TICK = 3;
-                    constexpr std::size_t WINDOW = PROCESSES_VISIBLE_ROWS;
-                    int delta = static_cast<int>(event.wheel.y);
-                    if (delta > 0)
-                    {
-                        std::size_t step = static_cast<std::size_t>(delta) * WHEEL_ROWS_PER_TICK;
-                        if (g_processScrollOffset >= step)
-                        {
-                            g_processScrollOffset -= step;
-                        }
-                        else
-                        {
-                            g_processScrollOffset = 0;
-                        }
-                    }
-                    else if (delta < 0)
-                    {
-                        std::size_t step = static_cast<std::size_t>(-delta) * WHEEL_ROWS_PER_TICK;
-                        if (g_processVisibleCount > WINDOW)
-                        {
-                            std::size_t maxOffset = g_processVisibleCount - WINDOW;
-                            g_processScrollOffset += step;
-                            if (g_processScrollOffset > maxOffset)
-                            {
-                                g_processScrollOffset = maxOffset;
-                            }
-                        }
-                    }
-                }
+                MouseEvents::handleWheel(event.wheel);
                 break;
             }
             case SDL_EVENT_TEXT_INPUT:
@@ -1597,286 +630,7 @@ int main(int argc, char **argv)
             }
             case SDL_EVENT_KEY_DOWN:
             {
-                SDL_Keycode key = event.key.key;
-
-                // '?' toggles the keyboard shortcuts overlay. Lives before
-                // every other handler so it works on any tab and even with
-                // another overlay underneath; the help panel is read-only
-                // chrome and never consumes a follow-up keystroke besides
-                // its own dismiss.
-                if (key == SDLK_QUESTION)
-                {
-                    g_helpOverlayVisible = !g_helpOverlayVisible;
-                    break;
-                }
-
-                // Esc and N close the signal menu without sending; if no
-                // menu is open Esc clears the selection (the htop default).
-                if (key == SDLK_ESCAPE)
-                {
-                    if (g_helpOverlayVisible)
-                    {
-                        // Esc on help overlay: dismiss only. Don't fall
-                        // through to clearing selection or filter so the
-                        // user can dismiss without side effects.
-                        g_helpOverlayVisible = false;
-                        break;
-                    }
-                    if (g_signalMenuVisible)
-                    {
-                        closeSignalMenu();
-                    }
-                    else if (g_filterInputActive)
-                    {
-                        // Esc while editing: drop the filter entirely so
-                        // a typo or accidental '/' isn't sticky.
-                        g_filterInputActive = false;
-                        g_filterText.clear();
-                        SDL_StopTextInput(window);
-                    }
-                    else if (!g_filterText.empty())
-                    {
-                        // Esc with filter applied but not editing: clear
-                        // the filter, mirrors htop F3.
-                        g_filterText.clear();
-                    }
-                    else
-                    {
-                        g_selectedPid = -1;
-                        g_selectedRowIndex = -1;
-                    }
-                    break;
-                }
-
-                // Backspace in filter input mode edits the filter; outside
-                // input mode it does nothing (no other use).
-                if (g_filterInputActive && key == SDLK_BACKSPACE)
-                {
-                    if (!g_filterText.empty())
-                    {
-                        g_filterText.pop_back();
-                    }
-                    break;
-                }
-
-                // Enter commits the filter and exits input mode; the
-                // filter stays applied and Up/Down + 'k' resume working.
-                if (g_filterInputActive && (key == SDLK_RETURN || key == SDLK_KP_ENTER))
-                {
-                    g_filterInputActive = false;
-                    SDL_StopTextInput(window);
-                    break;
-                }
-
-                // While the user is editing the filter, do NOT let other
-                // bindings (Up/Down/k/1-6) fire underneath; that would be
-                // surprising and the SDL_StartTextInput path may have
-                // already enqueued the keystroke as text.
-                if (g_filterInputActive)
-                {
-                    break;
-                }
-
-                if (g_signalMenuVisible)
-                {
-                    if (g_signalMenuPickedIndex < 0)
-                    {
-                        // Picking phase: 1..6 chooses a signal, anything
-                        // else is ignored so a stray keystroke cannot send.
-                        if (key >= SDLK_1 && key <= SDLK_6)
-                        {
-                            g_signalMenuPickedIndex = static_cast<int>(key - SDLK_1);
-                        }
-                    }
-                    else
-                    {
-                        // Confirm phase: Y / Enter sends, N / Esc cancels.
-                        if (key == SDLK_Y || key == SDLK_RETURN || key == SDLK_KP_ENTER)
-                        {
-                            SignalUtils::Signal sig =
-                                static_cast<SignalUtils::Signal>(g_signalMenuPickedIndex);
-                            SignalUtils::SendStatus s = SignalUtils::send(g_selectedPid, sig);
-                            std::string label = std::string(SignalUtils::name(sig))
-                                                 + " -> " + std::to_string(g_selectedPid);
-                            switch (s)
-                            {
-                            case SignalUtils::SendStatus::Ok:
-                                flashStatus("sent " + label);
-                                // Audit trail: one line per successful kill so a
-                                // user can later reconstruct which signal landed
-                                // on which pid. Best-effort and silent on I/O
-                                // failure so the live UI never blocks on disk.
-                                KillLog::append(g_selectedPid,
-                                                (g_selectedRowIndex >= 0
-                                                 && g_selectedRowIndex + 1 < static_cast<int>(g_processRows.size())
-                                                 && g_processRows[g_selectedRowIndex + 1] != nullptr
-                                                 && g_processRows[g_selectedRowIndex + 1]->getCells().size() > 1)
-                                                    ? g_processRows[g_selectedRowIndex + 1]->getCells()[1]
-                                                    : std::string{},
-                                                SignalUtils::name(sig));
-                                break;
-                            case SignalUtils::SendStatus::NoSuchProcess:
-                                flashStatus(label + " : no such process");
-                                break;
-                            case SignalUtils::SendStatus::PermissionDenied:
-                                flashStatus(label + " : permission denied");
-                                break;
-                            case SignalUtils::SendStatus::InvalidSignal:
-                                flashStatus(label + " : invalid signal");
-                                break;
-                            case SignalUtils::SendStatus::InvalidPid:
-                                flashStatus(label + " : refused (pid <= 1)");
-                                break;
-                            case SignalUtils::SendStatus::Unsupported:
-                                flashStatus(label + " : windows: not implemented");
-                                break;
-                            }
-                            closeSignalMenu();
-                        }
-                        else if (key == SDLK_N)
-                        {
-                            closeSignalMenu();
-                        }
-                    }
-                    break;
-                }
-
-                // No menu open: arrow keys move row selection; 'k' opens
-                // the menu when a row is selected and the Processes tab
-                // is active.
-                if (!processesTabActive())
-                {
-                    break;
-                }
-                if (key == SDLK_UP || key == SDLK_DOWN)
-                {
-                    if (g_visiblePids.empty())
-                    {
-                        break;
-                    }
-                    int next = g_selectedRowIndex;
-                    if (next < 0)
-                    {
-                        next = 0;
-                    }
-                    else if (key == SDLK_UP)
-                    {
-                        if (next > 0)
-                        {
-                            next -= 1;
-                        }
-                        else if (g_processScrollOffset > 0)
-                        {
-                            // Already at top visible row; scroll the
-                            // window up by one so the previous off-screen
-                            // process becomes the new selection on the
-                            // next poll tick.
-                            g_processScrollOffset -= 1;
-                        }
-                    }
-                    else
-                    {
-                        int max = static_cast<int>(g_visiblePids.size()) - 1;
-                        if (next < max)
-                        {
-                            next += 1;
-                        }
-                        else if (g_processVisibleCount
-                                 > g_processScrollOffset + g_visiblePids.size())
-                        {
-                            // Already at bottom visible row; scroll the
-                            // window down by one so the next off-screen
-                            // process becomes the new selection.
-                            g_processScrollOffset += 1;
-                        }
-                    }
-                    g_selectedRowIndex = next;
-                    g_selectedPid = g_visiblePids[next];
-                }
-                else if (key == SDLK_PAGEUP)
-                {
-                    if (g_processScrollOffset >= PROCESSES_VISIBLE_ROWS)
-                    {
-                        g_processScrollOffset -= PROCESSES_VISIBLE_ROWS;
-                    }
-                    else
-                    {
-                        g_processScrollOffset = 0;
-                    }
-                }
-                else if (key == SDLK_PAGEDOWN)
-                {
-                    std::size_t dataRowCount = PROCESSES_VISIBLE_ROWS;
-                    if (g_processVisibleCount > dataRowCount)
-                    {
-                        std::size_t maxOffset = g_processVisibleCount - dataRowCount;
-                        g_processScrollOffset += PROCESSES_VISIBLE_ROWS;
-                        if (g_processScrollOffset > maxOffset)
-                        {
-                            g_processScrollOffset = maxOffset;
-                        }
-                    }
-                }
-                else if (key == SDLK_HOME)
-                {
-                    g_processScrollOffset = 0;
-                    if (!g_visiblePids.empty())
-                    {
-                        g_selectedRowIndex = 0;
-                        g_selectedPid = g_visiblePids.front();
-                    }
-                }
-                else if (key == SDLK_END)
-                {
-                    std::size_t dataRowCount = PROCESSES_VISIBLE_ROWS;
-                    if (g_processVisibleCount > dataRowCount)
-                    {
-                        g_processScrollOffset = g_processVisibleCount - dataRowCount;
-                    }
-                    else
-                    {
-                        g_processScrollOffset = 0;
-                    }
-                }
-                else if (key == SDLK_K && g_selectedPid >= 0)
-                {
-                    g_signalMenuVisible = true;
-                    g_signalMenuPickedIndex = -1;
-                }
-                else if (key == SDLK_SLASH)
-                {
-                    // '/' on Processes tab enters filter input mode. If
-                    // a filter is already applied, re-enter with the
-                    // existing text so the user can keep typing.
-                    g_filterInputActive = true;
-                    SDL_StartTextInput(window);
-                }
-                else if (key == SDLK_T)
-                {
-                    // 't' toggles tree mode. When the user is editing a
-                    // filter the key path was already swallowed above, so
-                    // the toggle only fires when input is idle.
-                    g_treeMode = !g_treeMode;
-                    flashStatus(g_treeMode ? "tree mode on" : "tree mode off");
-                }
-                else if (key == SDLK_SPACE && g_treeMode && g_selectedPid >= 0)
-                {
-                    // Space collapses/expands the subtree rooted at the
-                    // selected pid. State lives in g_collapsedPids and is
-                    // consulted by the tree-mode flattener; the next poll
-                    // hides (or restores) the descendants.
-                    auto it = g_collapsedPids.find(g_selectedPid);
-                    if (it == g_collapsedPids.end())
-                    {
-                        g_collapsedPids.insert(g_selectedPid);
-                        flashStatus("collapsed pid " + std::to_string(g_selectedPid));
-                    }
-                    else
-                    {
-                        g_collapsedPids.erase(it);
-                        flashStatus("expanded pid " + std::to_string(g_selectedPid));
-                    }
-                }
+                KeyboardEvents::handle(event.key);
                 break;
             }
             }
@@ -1887,7 +641,7 @@ int main(int argc, char **argv)
         Uint64 now = SDL_GetTicks();
         if (now - lastPoll >= g_pollIntervalMs)
         {
-            pollMetrics();
+            MetricsPoller::poll();
             lastPoll = now;
         }
 
@@ -1994,6 +748,11 @@ int main(int argc, char **argv)
             }
         }
         FooterLiveStats::render(screen, g_lastProcCount);
+        // Self-monitoring lives on the About tab only. The footer row
+        // is already crowded with NetIoFooter's DISK / NET output and a
+        // caption-size badge here either collided or sat under the NET
+        // history polyline; the About tab gives the same numbers a
+        // proper section without the layout fight (Pillar E).
 
         // Aggregate summary strip sits above the Processes table column
         // headers (y=72) so a glance at the top of the tab shows the

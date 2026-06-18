@@ -26,13 +26,15 @@
 
 ![CoreMetrics demo](assets/coremetrics-demo.gif)
 
-*Alternating System and Processes tabs, rendered by the binary's own headless `--screenshot` mode and stitched into the loop above. Each frame is a real CoreMetrics paint, not a mockup. Higher-fidelity `assets/coremetrics-demo.mp4` is also checked in.*
+*Alternating System / Processes / About tabs, rendered by the binary's own headless `--screenshot` mode and stitched into the loop above. Each frame is a real CoreMetrics paint, not a mockup. Higher-fidelity `assets/coremetrics-demo.mp4` is also checked in.*
 
 </div>
 
 ## Lightweight by design
 
 CoreMetrics is a graphical system monitor that ships in **1.6 MB on disk** and holds **~60 MB resident** at steady state. The custom rasterizer + SDL3 surfaces strategy keeps the runtime footprint closer to a terminal tool than to a stock GUI app.
+
+The app **shows its own footprint live**: the About tab paints a "Self" section with current RSS, peak RSS, CPU %, process uptime, and binary size on disk so every screenshot doubles as evidence of the claim.
 
 | Tool | Type | Binary | Resident RAM | Notes |
 |---|---|---|---|---|
@@ -76,28 +78,74 @@ Detailed comparison: [docs/COMPARISON.md](docs/COMPARISON.md).
 
 ## Install (prebuilt)
 
-No build toolchain required.
+No build toolchain required. CoreMetrics scaffolding ships to every major package manager; channels marked *(coming soon)* are wired up in `packaging/` but waiting on a one-time manual submission. See [docs/PACKAGING.md](docs/PACKAGING.md) for the full matrix.
+
+### macOS
 
 ```bash
-# macOS (Homebrew, Apple Silicon)
+# Homebrew (tap)
 brew tap sviatil0/coremetrics
 brew install coremetrics
 
-# Debian / Ubuntu (installs from the local .deb; no apt repository is configured yet)
+# MacPorts (coming soon)
+sudo port install coremetrics
+```
+
+### Linux
+
+```bash
+# Debian / Ubuntu (.deb from the GitHub Release)
 curl -L https://github.com/sviatil0/coremetrics/releases/latest/download/coremetrics_amd64.deb -o /tmp/coremetrics.deb
 sudo apt install /tmp/coremetrics.deb
 
-# Arch Linux (AUR)
+# Fedora / RHEL / openSUSE (.rpm from the GitHub Release)
+sudo rpm -i https://github.com/sviatil0/coremetrics/releases/latest/download/coremetrics-x86_64.rpm
+
+# Arch Linux (AUR, prebuilt)
 yay -S coremetrics-bin
 
-# Any platform (tarball, replace v0.3.0 with the latest release tag)
-curl -LO https://github.com/sviatil0/coremetrics/releases/download/v0.3.0/coremetrics-v0.3.0-macos-arm64.tar.gz
-tar xf coremetrics-v0.3.0-macos-arm64.tar.gz
-cd coremetrics-v0.3.0-macos-arm64
+# Snap (coming soon, pending first snapcraft register)
+sudo snap install coremetrics
+
+# Flatpak / Flathub (coming soon, pending first submission)
+flatpak install flathub io.github.sviatil0.coremetrics
+```
+
+### Windows
+
+```powershell
+# winget (coming soon, pending first winget-pkgs PR)
+winget install sviatil0.coremetrics
+
+# Chocolatey (coming soon, pending community.chocolatey.org moderation)
+choco install coremetrics
+
+# Scoop (coming soon, push to scoop bucket)
+scoop install coremetrics
+```
+
+### Nix / NixOS
+
+```bash
+# From this repo's flake (no PR to nixpkgs yet)
+nix run github:sviatil0/coremetrics?dir=packaging/nix
+```
+
+### Any platform (raw tarball / zip)
+
+```bash
+# Replace v0.2.18 with the latest release tag
+curl -LO https://github.com/sviatil0/coremetrics/releases/download/v0.2.18/coremetrics-v0.2.18-macos-arm64.tar.gz
+tar xf coremetrics-v0.2.18-macos-arm64.tar.gz
+cd coremetrics-v0.2.18-macos-arm64
 ./coremetrics
 ```
 
-The Homebrew formula pulls SDL3 + SDL3_ttf + SDL3_image as dependencies. The `.deb` declares the equivalent apt dependencies. The tarball assumes SDL3 is already installed.
+```powershell
+# Windows: download the .zip from the GitHub Release, unzip, run coremetrics.exe
+```
+
+The Homebrew formula pulls SDL3 + SDL3_ttf + SDL3_image as dependencies. The `.deb` and `.rpm` declare the equivalent runtime depends. POSIX tarballs assume SDL3 is already installed; the Windows `.zip` bundles `SDL3.dll`, `SDL3_ttf.dll`, and `SDL3_image.dll` next to the binary.
 
 ## Quickstart (from source)
 

@@ -88,7 +88,9 @@ void testFindLayoutByName()
     Tree<Layout> *child3 = manager.addChild(
         child1,
         Layout(vec2(0.5f, 1.0f), vec2(1.0f, 1.0f), true, "third"));
-    Tree<Layout> *child4 = manager.addChild(
+    // Fourth child kept in the tree (no local handle needed) so the
+    // search exercises a node beyond the matching one.
+    manager.addChild(
         child2,
         Layout(vec2(0.5f, 1.0f), vec2(1.0f, 1.0f), true, "fourth"));
 

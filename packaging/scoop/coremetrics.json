@@ -1,0 +1,38 @@
+{
+  "version": "0.2.18",
+  "description": "Cross-platform desktop system metrics monitor (CPU / RAM / GPU / processes), built on a from-scratch C++23 GUI on raw SDL3 surfaces.",
+  "homepage": "https://github.com/sviatil0/coremetrics",
+  "license": "LGPL-2.1-only",
+  "notes": [
+    "CoreMetrics ships with bundled SDL3.dll / SDL3_ttf.dll / SDL3_image.dll inside the zip.",
+    "Run `coremetrics` from any terminal once installed; Scoop puts the shim on PATH."
+  ],
+  "architecture": {
+    "64bit": {
+      "url": "https://github.com/sviatil0/coremetrics/releases/download/v0.2.18/coremetrics-v0.2.18-windows-x86_64.zip",
+      "hash": "REPLACE_WITH_WINDOWS_ZIP_SHA256"
+    }
+  },
+  "extract_dir": "coremetrics-v0.2.18-windows-x86_64",
+  "bin": "coremetrics.exe",
+  "shortcuts": [
+    [
+      "coremetrics.exe",
+      "CoreMetrics"
+    ]
+  ],
+  "checkver": {
+    "github": "https://github.com/sviatil0/coremetrics"
+  },
+  "autoupdate": {
+    "architecture": {
+      "64bit": {
+        "url": "https://github.com/sviatil0/coremetrics/releases/download/v$version/coremetrics-v$version-windows-x86_64.zip"
+      }
+    },
+    "extract_dir": "coremetrics-v$version-windows-x86_64",
+    "hash": {
+      "url": "$url.sha256"
+    }
+  }
+}
