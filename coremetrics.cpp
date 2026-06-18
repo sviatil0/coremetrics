@@ -59,6 +59,7 @@
 #include "EmptyStates.hpp"
 #include "AboutTab.hpp"
 #include "KeyboardEvents.hpp"
+#include "MouseEvents.hpp"
 
 constexpr int RESX = 960;
 constexpr int RESY = 540;
@@ -84,30 +85,45 @@ static Bar *g_gpuBar = nullptr;
 static float g_cpuPct = 0.0f;
 static float g_ramPct = 0.0f;
 static float g_gpuPct = 0.0f;
-static Label *g_muteLabel = nullptr;
+// Defined in src/MouseEvents.cpp (Phase 1.2 slice 14). The mouse
+// handler swaps its text between "SOUND ON" and "SOUND OFF" when
+// the user toggles the alarm; buildScene() in this TU assigns the
+// pointer once the scene tree is loaded.
+extern Label *g_muteLabel;
 static Label *g_pollLabel = nullptr;
 // Defined in src/KeyboardEvents.cpp (Phase 1.2 slice 13) so the live-UI
 // state-machine globals all live next to the handler that owns them.
 extern std::vector<Row *> g_processRows;
 
-static bool g_alarmEnabled = true;
+// Defined in src/MouseEvents.cpp (Phase 1.2 slice 14). The mouse
+// handler is the sole user-driven writer (SOUND button toggle); the
+// alarm-flash sites in this TU still read it every tick.
+extern bool g_alarmEnabled;
 static bool g_cpuAlarmActive = false;
 static bool g_ramAlarmActive = false;
 static bool g_gpuAlarmActive = false;
 
 // Set by SIGINT/SIGTERM and checked by the main loop. The main loop also
 // exits on its own once an optional --duration is exceeded; this flag covers
-// Ctrl-C from a terminal and `kill` from a parent process or CI.
-static std::atomic<bool> g_shutdownRequested{false};
+// Ctrl-C from a terminal and `kill` from a parent process or CI. Defined
+// in src/MouseEvents.cpp so the EXIT button click can set it from that TU
+// without a duplicate-symbol clash.
+extern std::atomic<bool> g_shutdownRequested;
 
 static void handleShutdownSignal(int)
 {
     g_shutdownRequested.store(true);
 }
 
-static SortColumn g_sortColumn = SORT_MEM;
-static bool g_sortAscending = false;
-static Row *g_headerRow = nullptr;
+// Defined in src/MouseEvents.cpp (Phase 1.2 slice 14). The mouse
+// handler writes them when the user clicks a Processes-table header;
+// the sort comparator, render path, and Settings save/load all read.
+extern SortColumn g_sortColumn;
+extern bool g_sortAscending;
+// Same TU. buildScene() in this TU assigns the pointer once the
+// header row is built; updateHeaderSortGlyph() consults it on every
+// header click to repaint the active column's direction glyph.
+extern Row *g_headerRow;
 
 // Sparklines are moonshot UI: a rolling time-series chart per metric drawn
 // over the System tab's lower half. Behind a flag (--sparklines) so the
@@ -235,56 +251,28 @@ static bool aboutTabActive()
 // in the main loop (the same pattern the EXIT and SOUND buttons
 // already use) and toggle the layout active flags directly. The cached
 // rects stay in lockstep with base.xml by reviewer convention.
-static ivec2 g_systemTabBtnMin = ivec2(8, 8);
-static ivec2 g_systemTabBtnMax = ivec2(272, 40);
-static ivec2 g_processesTabBtnMin = ivec2(280, 8);
-static ivec2 g_processesTabBtnMax = ivec2(544, 40);
-static ivec2 g_aboutTabBtnMin = ivec2(552, 8);
-static ivec2 g_aboutTabBtnMax = ivec2(804, 40);
+//
+// Defined in src/MouseEvents.cpp (Phase 1.2 slice 14) so the handler
+// that hit-tests them owns the data. buildScene() in this TU still
+// initializes the EXIT, SOUND, and header column rects each launch.
+extern ivec2 g_systemTabBtnMin;
+extern ivec2 g_systemTabBtnMax;
+extern ivec2 g_processesTabBtnMin;
+extern ivec2 g_processesTabBtnMax;
+extern ivec2 g_aboutTabBtnMin;
+extern ivec2 g_aboutTabBtnMax;
 
-static void activateTab(const std::string &name)
-{
-    Tree<Layout> &root = LayoutManager::getInstance().getRoot();
-    const char *all[] = {"system", "processes", "about"};
-    for (const char *n : all)
-    {
-        Tree<Layout> *node = EventManager::findLayoutByName(root, n);
-        if (node != nullptr)
-        {
-            node->getData().setActive(std::string(n) == name);
-        }
-    }
-}
+// SOUND toggle button rect. Initialized in buildScene(). Defined in
+// src/MouseEvents.cpp (Phase 1.2 slice 14) alongside the other
+// hit-test rects; recenterMuteLabel() reads it via the same extern.
+extern ivec2 g_muteBtnMin;
+extern ivec2 g_muteBtnMax;
 
-// SOUND toggle button rect. Initialized in buildScene(). Declared here
-// (ahead of the other tab-bar geometry) so recenterMuteLabel() can read
-// it directly without a forward declaration.
-static ivec2 g_muteBtnMin;
-static ivec2 g_muteBtnMax;
-
-// Recenter the SOUND ON / SOUND OFF label inside the mute toggle button.
-// The hand-tuned baseline in base.xml is centered for the default "SOUND ON"
-// string at 20 pt Body; toggling to "SOUND OFF" adds one glyph and would
-// otherwise leave the label visibly off-center. Measures the current label
-// text and centers it inside g_muteBtnMin..g_muteBtnMax. No-op if the label
-// or TTF face is not ready (headless / pre-init paths).
-static void recenterMuteLabel()
-{
-    if (g_muteLabel == nullptr)
-    {
-        return;
-    }
-    int textWidth = Font::measureTextWidth(g_muteLabel->getText());
-    if (textWidth <= 0)
-    {
-        return;
-    }
-    int btnWidth = g_muteBtnMax.x - g_muteBtnMin.x;
-    int newX = g_muteBtnMin.x + (btnWidth - textWidth) / 2;
-    // Keep the existing y baseline; only the x needs to track text width.
-    ivec2 pos = g_muteLabel->getPos();
-    g_muteLabel->setPos(ivec2(newX, pos.y));
-}
+// Defined in src/MouseEvents.cpp (Phase 1.2 slice 14) alongside the
+// SOUND button click path that toggles the label. Forward-declared
+// here so buildScene() can re-center the label after assigning
+// g_muteLabel for the first time.
+void recenterMuteLabel();
 
 // Defined in src/KeyboardEvents.cpp; declared here so the mouse
 // handler can dismiss the menu when the click misses the panel.
@@ -315,33 +303,25 @@ static NetIo g_netIo{0, 0};
 // MEMSEG_* geometry moved to src/MemBreakdownStrip.cpp alongside the
 // renderer that owns the strip.
 
-static ivec2 g_headerColMin[5];
-static ivec2 g_headerColMax[5];
+// Defined in src/MouseEvents.cpp (Phase 1.2 slice 14). buildScene()
+// in this TU initializes them once the scene tree is loaded; the
+// mouse handler reads them every click.
+extern ivec2 g_headerColMin[5];
+extern ivec2 g_headerColMax[5];
 // g_muteBtnMin/Max declared earlier alongside recenterMuteLabel().
-static ivec2 g_exitBtnMin;
-static ivec2 g_exitBtnMax;
+extern ivec2 g_exitBtnMin;
+extern ivec2 g_exitBtnMax;
 
 static bool compareProcesses(const ProcessInfo &a, const ProcessInfo &b)
 {
     return compareProcessByColumn(a, b, g_sortColumn, g_sortAscending);
 }
 
-// Repaint the Processes-tab header row so the active sort column carries
-// a trailing direction glyph (' ^' ascending, ' v' descending) and the
-// other four columns stay clean. Called on initial scene build and on
-// every header click so the indicator is sticky across polls, not only
-// visible immediately after the user clicked.
-static void updateHeaderSortGlyph()
-{
-    if (g_headerRow == nullptr)
-    {
-        return;
-    }
-    const char *arrow = g_sortAscending ? " ^" : " v";
-    std::vector<std::string> hdr = {"PID", "NAME", "CPU%", "MEM%", "DISK I/O"};
-    hdr[static_cast<int>(g_sortColumn)] += arrow;
-    g_headerRow->setCells(hdr);
-}
+// Defined in src/MouseEvents.cpp (Phase 1.2 slice 14) alongside the
+// header-row click path that drives the sort toggle. Forward-declared
+// here so buildScene() can paint the initial glyph after the header
+// row pointer is wired up.
+void updateHeaderSortGlyph();
 
 static void buildScene()
 {
@@ -1411,177 +1391,12 @@ int main(int argc, char **argv)
             }
             case SDL_EVENT_MOUSE_BUTTON_DOWN:
             {
-                float clickX = 0.0f;
-                float clickY = 0.0f;
-                SDL_GetMouseState(&clickX, &clickY);
-                int winW = 0;
-                int winH = 0;
-                SDL_GetWindowSize(window, &winW, &winH);
-                if (winW <= 0 || winH <= 0)
-                {
-                    winW = RESX;
-                    winH = RESY;
-                }
-
-                float srcAspect = static_cast<float>(RESX) / static_cast<float>(RESY);
-                float dstAspect = static_cast<float>(winW) / static_cast<float>(winH);
-                int viewW = winW;
-                int viewH = winH;
-                int viewX = 0;
-                int viewY = 0;
-                if (dstAspect > srcAspect)
-                {
-                    viewH = winH;
-                    viewW = static_cast<int>(static_cast<float>(winH) * srcAspect);
-                    viewX = (winW - viewW) / 2;
-                }
-                else
-                {
-                    viewW = winW;
-                    viewH = static_cast<int>(static_cast<float>(winW) / srcAspect);
-                    viewY = (winH - viewH) / 2;
-                }
-
-                float relX = clickX - static_cast<float>(viewX);
-                float relY = clickY - static_cast<float>(viewY);
-                if (viewW <= 0 || viewH <= 0)
-                {
-                    break;
-                }
-                int mx = static_cast<int>(relX * static_cast<float>(RESX) / static_cast<float>(viewW));
-                int my = static_cast<int>(relY * static_cast<float>(RESY) / static_cast<float>(viewH));
-                if (mx < 0 || my < 0 || mx >= RESX || my >= RESY)
-                {
-                    break;
-                }
-
-                if (mx >= g_exitBtnMin.x && mx <= g_exitBtnMax.x
-                    && my >= g_exitBtnMin.y && my <= g_exitBtnMax.y)
-                {
-                    end = true;
-                }
-                else if (mx >= g_muteBtnMin.x && mx <= g_muteBtnMax.x
-                         && my >= g_muteBtnMin.y && my <= g_muteBtnMax.y)
-                {
-                    g_alarmEnabled = !g_alarmEnabled;
-                    if (g_muteLabel != nullptr)
-                    {
-                        g_muteLabel->setText(g_alarmEnabled ? "SOUND ON" : "SOUND OFF");
-                        // The toggled string is wider/narrower than the
-                        // previous one; recenter so the label keeps an
-                        // even margin on both sides of the button rect.
-                        recenterMuteLabel();
-                    }
-                }
-                else if (mx >= g_systemTabBtnMin.x && mx <= g_systemTabBtnMax.x
-                         && my >= g_systemTabBtnMin.y && my <= g_systemTabBtnMax.y)
-                {
-                    // Intercept tab-button clicks here so the three-tab fan
-                    // out (hide the two non-clicked layouts, show the
-                    // clicked one) is one atomic switch. The Button XML
-                    // schema only supports one hide per button.
-                    activateTab("system");
-                }
-                else if (mx >= g_processesTabBtnMin.x && mx <= g_processesTabBtnMax.x
-                         && my >= g_processesTabBtnMin.y && my <= g_processesTabBtnMax.y)
-                {
-                    activateTab("processes");
-                }
-                else if (mx >= g_aboutTabBtnMin.x && mx <= g_aboutTabBtnMax.x
-                         && my >= g_aboutTabBtnMin.y && my <= g_aboutTabBtnMax.y)
-                {
-                    activateTab("about");
-                }
-                else
-                {
-                    bool headerHit = false;
-                    for (int c = 0; c < 5; ++c)
-                    {
-                        if (mx >= g_headerColMin[c].x && mx <= g_headerColMax[c].x
-                            && my >= g_headerColMin[c].y && my <= g_headerColMax[c].y)
-                        {
-                            SortColumn clicked = static_cast<SortColumn>(c);
-                            if (g_sortColumn == clicked)
-                            {
-                                g_sortAscending = !g_sortAscending;
-                            }
-                            else
-                            {
-                                g_sortColumn = clicked;
-                                g_sortAscending = false;
-                            }
-                            updateHeaderSortGlyph();
-                            headerHit = true;
-                            break;
-                        }
-                    }
-                    if (!headerHit)
-                    {
-                        // If the click landed on a Processes data row, take
-                        // the click as a row selection instead of letting
-                        // the EventManager route it to the layout tree. The
-                        // row widget itself does not own click handling, so
-                        // there is nothing else competing for this region.
-                        bool consumedAsRowSelect = false;
-                        if (processesTabActive()
-                            && mx >= PROCESSES_ROW_X0 && mx <= PROCESSES_ROW_X1
-                            && my >= PROCESSES_FIRST_ROW_Y
-                            && my < PROCESSES_FIRST_ROW_Y + PROCESSES_VISIBLE_ROWS * PROCESS_ROW_HEIGHT)
-                        {
-                            int row = (my - PROCESSES_FIRST_ROW_Y) / PROCESS_ROW_HEIGHT;
-                            if (row >= 0 && row < static_cast<int>(g_visiblePids.size()))
-                            {
-                                g_selectedRowIndex = row;
-                                g_selectedPid = g_visiblePids[row];
-                                consumedAsRowSelect = true;
-                            }
-                        }
-                        if (!consumedAsRowSelect)
-                        {
-                            EventManager::getInstance().pushEvent(std::make_unique<ClickEvent>(mx, my));
-                        }
-                    }
-                }
+                MouseEvents::handleButtonDown(event.button);
                 break;
             }
             case SDL_EVENT_MOUSE_WHEEL:
             {
-                // Mouse-wheel scroll on the Processes tab moves the
-                // visible window through the process list. y is the
-                // vertical wheel delta (positive = scroll up). Each
-                // wheel tick shifts by 3 rows so a comfortable wrist
-                // motion covers most of the visible window.
-                if (processesTabActive())
-                {
-                    constexpr std::size_t WHEEL_ROWS_PER_TICK = 3;
-                    constexpr std::size_t WINDOW = PROCESSES_VISIBLE_ROWS;
-                    int delta = static_cast<int>(event.wheel.y);
-                    if (delta > 0)
-                    {
-                        std::size_t step = static_cast<std::size_t>(delta) * WHEEL_ROWS_PER_TICK;
-                        if (g_processScrollOffset >= step)
-                        {
-                            g_processScrollOffset -= step;
-                        }
-                        else
-                        {
-                            g_processScrollOffset = 0;
-                        }
-                    }
-                    else if (delta < 0)
-                    {
-                        std::size_t step = static_cast<std::size_t>(-delta) * WHEEL_ROWS_PER_TICK;
-                        if (g_processVisibleCount > WINDOW)
-                        {
-                            std::size_t maxOffset = g_processVisibleCount - WINDOW;
-                            g_processScrollOffset += step;
-                            if (g_processScrollOffset > maxOffset)
-                            {
-                                g_processScrollOffset = maxOffset;
-                            }
-                        }
-                    }
-                }
+                MouseEvents::handleWheel(event.wheel);
                 break;
             }
             case SDL_EVENT_TEXT_INPUT:
