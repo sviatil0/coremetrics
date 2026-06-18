@@ -27,7 +27,7 @@ jobs:
       tag: ${{ steps.tag.outputs.tag }}
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
 
       - name: Extract tag (Unix)
         id: tag
@@ -57,7 +57,7 @@ jobs:
 
       - name: Setup SDL3 (Linux)
         if: runner.os == 'Linux'
-        uses: libsdl-org/setup-sdl@main
+        uses: libsdl-org/setup-sdl@a966470e7d9b6a5c93eec3f08d5dac370325c860  # main@2026-05-15
         with:
           install-linux-dependencies: true
           version: 3-latest
@@ -66,7 +66,7 @@ jobs:
 
       - name: Setup SDL3 (Windows)
         if: runner.os == 'Windows'
-        uses: libsdl-org/setup-sdl@main
+        uses: libsdl-org/setup-sdl@a966470e7d9b6a5c93eec3f08d5dac370325c860  # main@2026-05-15
         with:
           version: 3-latest
           version-sdl-ttf: 3-latest
@@ -239,7 +239,7 @@ jobs:
 
       - name: Upload artifacts (Unix)
         if: runner.os != 'Windows'
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
           name: coremetrics-${{ steps.plat.outputs.suffix }}
           path: |
@@ -250,7 +250,7 @@ jobs:
 
       - name: Upload artifacts (Windows)
         if: runner.os == 'Windows'
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
           name: coremetrics-${{ steps.plat_win.outputs.suffix }}
           path: |
@@ -281,10 +281,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
 
       - name: Download artifacts
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
         with:
           path: dist
 
@@ -299,7 +299,7 @@ jobs:
           ls -la release-assets
 
       - name: Create or update GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65  # v2.6.2
         with:
           name: ${{ github.ref_name }}
           draft: false
