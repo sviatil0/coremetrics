@@ -35,7 +35,7 @@ namespace ArgParse
             {
                 // Mirrors base.xml's footer label; bumped by the release
                 // flow that touches the XML.
-                std::printf("coremetrics 0.3.0\n");
+                std::printf("coremetrics 0.4.0\n");
                 result.exitCode = 0;
                 return result;
             }
