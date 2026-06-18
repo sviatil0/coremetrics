@@ -9,6 +9,35 @@
 #include <cctype>
 #include <locale>
 #include <typeinfo>
+#include <stdexcept>
+
+namespace
+{
+    // H2 (security audit 2026-06-18): cap recurseLayout depth so a pathological
+    // base.xml with deeply nested <layout> blocks cannot blow the C++ call stack.
+    constexpr int kMaxLayoutDepth = 16;
+
+    // H1 (security audit 2026-06-18): std::stof throws std::invalid_argument or
+    // std::out_of_range on malformed input. A hostile or corrupt base.xml used
+    // to crash the process at start-up. This helper swallows the exception,
+    // logs a one-line warning to stderr and returns a documented sane default.
+    // It is the single sanctioned float-extraction entry point in this TU; all
+    // call sites in GUIFile route through it.
+    float safeStof(const std::string &raw, const char *fieldName, float fallback = 0.0f)
+    {
+        try
+        {
+            return std::stof(raw);
+        }
+        catch (const std::exception &ex)
+        {
+            std::cerr << "GUIFile: failed to parse float for " << fieldName
+                      << " (value='" << raw << "'): " << ex.what()
+                      << "; using fallback " << fallback << '\n';
+            return fallback;
+        }
+    }
+}
 
 std::string GUIFile::getContent(const std::string &source, const std::string &tag, size_t &pos)
 {
@@ -57,8 +86,8 @@ vec2 GUIFile::parseVec2(const std::string &block, size_t &p)
         return vec2(0, 0);
     }
     size_t innerPos = 0;
-    float x = std::stof(getContent(v, "x", innerPos));
-    float y = std::stof(getContent(v, "y", innerPos));
+    float x = safeStof(getContent(v, "x", innerPos), "vec2.x");
+    float y = safeStof(getContent(v, "y", innerPos), "vec2.y");
     return vec2(x, y);
 }
 
@@ -74,9 +103,9 @@ vec3 GUIFile::parseVec3(const std::string &block, size_t &p)
         return vec3(0, 0, 0);
     }
     size_t innerPos = 0;
-    float x = std::stof(getContent(v, "x", innerPos));
-    float y = std::stof(getContent(v, "y", innerPos));
-    float z = std::stof(getContent(v, "z", innerPos));
+    float x = safeStof(getContent(v, "x", innerPos), "vec3.x");
+    float y = safeStof(getContent(v, "y", innerPos), "vec3.y");
+    float z = safeStof(getContent(v, "z", innerPos), "vec3.z");
     return vec3(x, y, z);
 }
 
@@ -88,8 +117,8 @@ float GUIFile::extractFloat(const std::string& block, const std::string& key)
     pos += key.length() + 1;
 
     size_t end = block.find_first_of(" >", pos);
-    
-    return std::stof(block.substr(pos, end - pos));
+
+    return safeStof(block.substr(pos, end - pos), key.c_str());
 }
 
 Layout GUIFile::parseLayout(const std::string &block)
@@ -119,8 +148,18 @@ Layout GUIFile::parseLayout(const std::string &block)
     return Layout(vec2(sx, sy), vec2(ex, ey), active, name);
 }
 
-Tree<Layout>* GUIFile::recurseLayout(const std::string& block, Tree<Layout>* parent, int i, LayoutManager& manager)
+Tree<Layout>* GUIFile::recurseLayout(const std::string& block, Tree<Layout>* parent, int depth, LayoutManager& manager)
 {
+    // H2 (security audit 2026-06-18): refuse to recurse beyond kMaxLayoutDepth so
+    // a pathological base.xml cannot exhaust the call stack. The caller still
+    // gets the materialised parent; only further nesting is dropped.
+    if (depth > kMaxLayoutDepth)
+    {
+        std::cerr << "GUIFile: layout nesting exceeds kMaxLayoutDepth ("
+                  << kMaxLayoutDepth << "); truncating subtree.\n";
+        return parent;
+    }
+
     Layout currLayout = parseLayout(block);
     Tree<Layout>* node = manager.addChild(parent, std::move(currLayout));
 
@@ -136,12 +175,12 @@ Tree<Layout>* GUIFile::recurseLayout(const std::string& block, Tree<Layout>* par
     {
         size_t startPos = workingBlock.find("<layout", layoutPos);
         std::string childBlock = getContent(workingBlock, "layout", layoutPos);
-        if (childBlock == "") 
+        if (childBlock == "")
         {
             break;
         }
 
-        recurseLayout(childBlock, node, i+1, manager);
+        recurseLayout(childBlock, node, depth + 1, manager);
 
         workingBlock.erase(startPos, layoutPos - startPos);
         layoutPos = startPos;

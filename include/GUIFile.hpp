@@ -20,7 +20,7 @@ private:
     vec2 parseVec2(const std::string &block, size_t &p);
     vec3 parseVec3(const std::string &block, size_t &p);
     Layout parseLayout(const std::string &block);
-    Tree<Layout>* recurseLayout(const std::string& block, Tree<Layout>* parent, int i, LayoutManager& manager);
+    Tree<Layout>* recurseLayout(const std::string& block, Tree<Layout>* parent, int depth, LayoutManager& manager);
 
 public:
     //file reading/parsing and writing

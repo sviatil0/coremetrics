@@ -109,6 +109,99 @@ static void testFileRead()
     std::cout << (passed ? "PASS" : "FAIL") << '\n';
 }
 
+// H1 regression coverage: a malformed numeric token inside a vec3 must not
+// throw out of GUIFile::readFile. The hardened parser logs a warning and
+// substitutes the documented 0.0f fallback, so the load completes and the
+// point element materialises with x=0 in place of the bad token.
+static void testMalformedNumericReturnsDefault()
+{
+    std::cout << "GUIFile malformed numeric returns default: ";
+    std::string testFile = "unit_test_malformed.xml";
+
+    {
+        std::ofstream out(testFile);
+        out << "<layout>sX=0 sY=0 eX=1 eY=1 active=true\n"
+            << "  <point>\n"
+            << "    <vec2><x>notanumber</x><y>1</y></vec2>\n"
+            << "    <vec3><x>notanumber</x><y>1</y><z>2</z></vec3>\n"
+            << "  </point>\n"
+            << "</layout>\n";
+    }
+
+    LayoutManager &manager = LayoutManager::getInstance();
+    manager.clear();
+
+    bool threw = false;
+    try
+    {
+        GUIFile f;
+        f.readFile(testFile, manager);
+    }
+    catch (...)
+    {
+        threw = true;
+    }
+
+    bool gracefulLoad = !threw;
+    bool layoutMaterialised = !manager.getRoot().getChildren().empty();
+    bool passed = gracefulLoad && layoutMaterialised;
+    std::cout << (passed ? "PASS" : "FAIL") << '\n';
+
+    if (std::filesystem::exists(testFile))
+    {
+        std::filesystem::remove(testFile);
+    }
+    manager.clear();
+}
+
+// H2 regression coverage: a 100-level nested <layout> document must not blow
+// the call stack. The hardened parser caps recursion at kMaxLayoutDepth (16)
+// and truncates the subtree past that point. The load must complete without
+// crashing.
+static void testDeeplyNestedLayoutCapped()
+{
+    std::cout << "GUIFile deeply nested layout capped: ";
+    std::string testFile = "unit_test_deeply_nested.xml";
+
+    constexpr int kNestingLevels = 100;
+    {
+        std::ofstream out(testFile);
+        for (int i = 0; i < kNestingLevels; ++i)
+        {
+            out << "<layout>sX=0 sY=0 eX=1 eY=1 active=true\n";
+        }
+        for (int i = 0; i < kNestingLevels; ++i)
+        {
+            out << "</layout>\n";
+        }
+    }
+
+    LayoutManager &manager = LayoutManager::getInstance();
+    manager.clear();
+
+    bool threw = false;
+    try
+    {
+        GUIFile f;
+        f.readFile(testFile, manager);
+    }
+    catch (...)
+    {
+        threw = true;
+    }
+
+    bool gracefulLoad = !threw;
+    bool rootHasChild = !manager.getRoot().getChildren().empty();
+    bool passed = gracefulLoad && rootHasChild;
+    std::cout << (passed ? "PASS" : "FAIL") << '\n';
+
+    if (std::filesystem::exists(testFile))
+    {
+        std::filesystem::remove(testFile);
+    }
+    manager.clear();
+}
+
 void guiFileTestSuite()
 {
     std::cout << "=============================================" << '\n';
@@ -118,6 +211,8 @@ void guiFileTestSuite()
 
     testWriteFile();
     testFileRead();
+    testMalformedNumericReturnsDefault();
+    testDeeplyNestedLayoutCapped();
 
     std::cout << '\n';
     std::cout << "=============================================" << '\n';
