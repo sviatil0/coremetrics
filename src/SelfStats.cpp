@@ -65,8 +65,12 @@ namespace SelfStats
         // the footer so the badge reads as a deliberate marketing
         // flex sitting alongside the chrome rather than competing
         // with it.
-        constexpr int kFooterBadgeX = 600;
-        constexpr int kFooterBadgeY = 492;
+        // Painted on its own row just above the chrome separator at
+        // y=478 so it never collides with NetIoFooter's worst-case DISK
+        // / NET text. x=24 anchors it to the same left margin as the
+        // "coremetrics" wordmark beneath it.
+        constexpr int kFooterBadgeX = 24;
+        constexpr int kFooterBadgeY = 472;
 
         std::once_flag g_startTimeFlag;
         std::chrono::steady_clock::time_point g_startTime;

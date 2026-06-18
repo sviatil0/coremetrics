@@ -535,10 +535,9 @@ namespace HeadlessRunner
             TabIndicator::render(shot, activeTabIndex);
         }
         FooterLiveStats::render(shot, g_lastProcCount);
-        // Self-monitoring badge: live RSS + CPU% on every tab so each
-        // headless screenshot doubles as marketing for the lightweight
-        // footprint (Pillar E).
-        SelfStats::renderFooterBadge(shot);
+        // Self-monitoring lives on the About tab only; the footer row
+        // is too crowded for a caption-size badge to coexist with
+        // NetIoFooter's worst-case DISK / NET text (Pillar E).
         if (tab == "system")
         {
             // Dominant Title-size CPU/RAM/GPU readouts (Pillar A2).

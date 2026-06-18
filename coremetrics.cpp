@@ -748,10 +748,11 @@ int main(int argc, char **argv)
             }
         }
         FooterLiveStats::render(screen, g_lastProcCount);
-        // Self-monitoring badge. Painted on the row above the chrome
-        // "N procs / DISK / NET" footer line so reviewer screenshots
-        // double as evidence of the lightweight footprint (Pillar E).
-        SelfStats::renderFooterBadge(screen);
+        // Self-monitoring lives on the About tab only. The footer row
+        // is already crowded with NetIoFooter's DISK / NET output and a
+        // caption-size badge here either collided or sat under the NET
+        // history polyline; the About tab gives the same numbers a
+        // proper section without the layout fight (Pillar E).
 
         // Aggregate summary strip sits above the Processes table column
         // headers (y=72) so a glance at the top of the tab shows the
