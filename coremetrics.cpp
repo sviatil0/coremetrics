@@ -60,6 +60,7 @@
 #include "AboutTab.hpp"
 #include "KeyboardEvents.hpp"
 #include "MouseEvents.hpp"
+#include "MetricsPoller.hpp"
 
 constexpr int RESX = 960;
 constexpr int RESY = 540;
@@ -72,19 +73,28 @@ static Uint64 g_pollIntervalMs = 500;
 // Bound constants live in src/ProcessUtils.cpp alongside the
 // clampPollIntervalMs() helper that uses them.
 
-constexpr float ALARM_THRESHOLD = 80.0f;
-static const std::string ALARM_SOUND_PATH = AssetPath::resolve("assets/click.wav");
+// ALARM_THRESHOLD / ALARM_SOUND_PATH moved to src/MetricsPoller.cpp
+// (Phase 1.2 slice 15) alongside the alarm rising-edge detector that
+// owns the only call site for them.
 
-static Bar *g_cpuBar = nullptr;
-static Bar *g_ramBar = nullptr;
-static Bar *g_gpuBar = nullptr;
+// Bar widget pointers. Defined in src/MetricsPoller.cpp (Phase 1.2
+// slice 15) so the tests binary (which links every src/*.cpp object
+// but not the coremetrics.cpp TU) resolves the symbols the poller
+// references. buildScene() / cacheElementPointers() in this TU is
+// still the sole writer of the pointer values; the poller drives
+// setValue / setFillColor each tick.
+extern Bar *g_cpuBar;
+extern Bar *g_ramBar;
+extern Bar *g_gpuBar;
 // Latest sampled percentages, kept at file scope so the render loop can
-// hand them to MetricReadouts::render(...) outside of pollMetrics().
-// The XML labels that used to display these were removed when the
-// readouts moved to programmatic Title-size paint (Pillar A2 wire-up).
-static float g_cpuPct = 0.0f;
-static float g_ramPct = 0.0f;
-static float g_gpuPct = 0.0f;
+// hand them to MetricReadouts::render(...) outside of the poller. The
+// XML labels that used to display these were removed when the readouts
+// moved to programmatic Title-size paint (Pillar A2 wire-up). Defined
+// in src/MetricsPoller.cpp (Phase 1.2 slice 15) so the writer owns the
+// data; this TU consults them every frame to paint the System tab.
+extern float g_cpuPct;
+extern float g_ramPct;
+extern float g_gpuPct;
 // Defined in src/MouseEvents.cpp (Phase 1.2 slice 14). The mouse
 // handler swaps its text between "SOUND ON" and "SOUND OFF" when
 // the user toggles the alarm; buildScene() in this TU assigns the
@@ -99,9 +109,8 @@ extern std::vector<Row *> g_processRows;
 // handler is the sole user-driven writer (SOUND button toggle); the
 // alarm-flash sites in this TU still read it every tick.
 extern bool g_alarmEnabled;
-static bool g_cpuAlarmActive = false;
-static bool g_ramAlarmActive = false;
-static bool g_gpuAlarmActive = false;
+// Alarm rising-edge detector state. Defined in src/MetricsPoller.cpp
+// (Phase 1.2 slice 15) where poll() is the only reader + writer.
 
 // Set by SIGINT/SIGTERM and checked by the main loop. The main loop also
 // exits on its own once an optional --duration is exceeded; this flag covers
@@ -131,22 +140,31 @@ extern Row *g_headerRow;
 // gains 3 live polylines fed by RingBuffer<float> samples.
 static bool g_sparklinesEnabled = false;
 constexpr std::size_t SPARKLINE_CAPACITY = 64;
-static std::unique_ptr<Sparkline> g_cpuSparkline;
-static std::unique_ptr<Sparkline> g_ramSparkline;
-static std::unique_ptr<Sparkline> g_gpuSparkline;
+// Sparkline owners. Defined in src/MetricsPoller.cpp (Phase 1.2
+// slice 15) so the tests link, mirroring the bar pointers above.
+// buildSparklines() / destroySparklines() in this TU is still the
+// sole writer of the unique_ptr itself; the poller pushes a new
+// sample into each polyline every tick.
+extern std::unique_ptr<Sparkline> g_cpuSparkline;
+extern std::unique_ptr<Sparkline> g_ramSparkline;
+extern std::unique_ptr<Sparkline> g_gpuSparkline;
 // Network throughput history: two polylines overlaid in the same rect
 // directly below the GPU strip. rx in accent green, tx in orange so a
 // reviewer can read incoming vs outgoing traffic at a glance without a
 // legend. y-range fixed at 0..2048 KB/s so the chart stays a stable
 // comparison surface across ticks (samples are clamped, not stretched).
-static std::unique_ptr<Sparkline> g_netRxSparkline;
-static std::unique_ptr<Sparkline> g_netTxSparkline;
+// Net sparklines, defined in src/MetricsPoller.cpp (Phase 1.2 slice
+// 15) for the same tests-link reason as the CPU/RAM/GPU triple above.
+extern std::unique_ptr<Sparkline> g_netRxSparkline;
+extern std::unique_ptr<Sparkline> g_netTxSparkline;
 constexpr float NET_SPARKLINE_MAX_KBPS = 2048.0f;
 
 // Per-logical-CPU utilization for the small strip below the aggregate bars.
 // Refreshed every poll. Empty on Windows (backend not implemented yet) and
-// on the very first poll (no prior tick sample to diff against).
-static std::vector<float> g_perCoreCpu;
+// on the very first poll (no prior tick sample to diff against). Defined
+// in src/MetricsPoller.cpp (Phase 1.2 slice 15) where poll() refreshes it
+// each tick; this TU still consults it from the render pass + AboutTab.
+extern std::vector<float> g_perCoreCpu;
 
 // Process kill flow state.
 //
@@ -183,8 +201,12 @@ extern std::size_t g_processVisibleCount;
 // drew. Same length as g_visiblePids; empty string means no glyph
 // (leaf row or flat mode). Parallel bool flags whether the row is
 // collapsed (true => grey '+') or expanded (false => green '-').
-static std::vector<std::string> g_rowGlyphPrefix;
-static std::vector<bool> g_rowGlyphCollapsed;
+// Defined in src/MetricsPoller.cpp (Phase 1.2 slice 15). The poller
+// writes the parallel arrays during the tree-mode flatten pass; this
+// TU's render path reads them to repaint the leading '+ ' / '- '
+// glyph in green/grey on top of the Row widget's white text.
+extern std::vector<std::string> g_rowGlyphPrefix;
+extern std::vector<bool> g_rowGlyphCollapsed;
 
 // Defined in src/KeyboardEvents.cpp. closeSignalMenu() below resets
 // them; the menu render path reads them every frame.
@@ -284,22 +306,25 @@ void closeSignalMenu();
 // (y=136..160 in base.xml). Shows active / wired / cached / free segments
 // at the same horizontal extent so they read as a continuation. htop
 // colors: active = red, wired = orange, cached = blue, free = dark.
-static MemBreakdown g_memBreakdown{0, 0, 0, 0, 0};
-static unsigned long long g_uptimeSeconds = 0;
-static std::vector<float> g_loadAverages;
+// All six snapshot globals below are defined in src/MetricsPoller.cpp
+// (Phase 1.2 slice 15) where poll() refreshes them each tick; this TU
+// consults them from the render pass to paint the System tab strips.
+extern MemBreakdown g_memBreakdown;
+extern unsigned long long g_uptimeSeconds;
+extern std::vector<float> g_loadAverages;
 // Root volume capacity sampled every poll. UI shows
 // "DISK <used>/<total> GB (NN%)" with the same yellow/red threshold
 // recolor as the RAM bar so a full root volume reads as visually
 // urgent. Zero totalKb means the backend failed; the strip is hidden.
-static DiskUsage g_diskUsage{0, 0};
+extern DiskUsage g_diskUsage;
 // Aggregate disk I/O rate summed across the top-N processes the
 // backend returned. Shown on the System tab as 'I/O R X.X MB/s
 // W Y.Y MB/s' so reviewers see system-wide disk pressure without
 // scanning the per-process table.
-static unsigned long long g_aggregateDiskReadKbPerSec = 0;
-static unsigned long long g_aggregateDiskWriteKbPerSec = 0;
+extern unsigned long long g_aggregateDiskReadKbPerSec;
+extern unsigned long long g_aggregateDiskWriteKbPerSec;
 // Aggregate network rx/tx sampled every poll. Loopback excluded.
-static NetIo g_netIo{0, 0};
+extern NetIo g_netIo;
 // MEMSEG_* geometry moved to src/MemBreakdownStrip.cpp alongside the
 // renderer that owns the strip.
 
@@ -312,10 +337,8 @@ extern ivec2 g_headerColMax[5];
 extern ivec2 g_exitBtnMin;
 extern ivec2 g_exitBtnMax;
 
-static bool compareProcesses(const ProcessInfo &a, const ProcessInfo &b)
-{
-    return compareProcessByColumn(a, b, g_sortColumn, g_sortAscending);
-}
+// compareProcesses() moved to src/MetricsPoller.cpp (Phase 1.2 slice 15)
+// alongside the std::sort call site that is its only consumer.
 
 // Defined in src/MouseEvents.cpp (Phase 1.2 slice 14) alongside the
 // header-row click path that drives the sort toggle. Forward-declared
@@ -484,14 +507,15 @@ static void destroySparklines()
 // Live footer string replacing the v0.1.x static "alarm threshold 80%"
 // label. Same color and y-baseline as the other footer chrome
 // (coremetrics / v0.2.0 / poll 500ms) so it reads as a continuation.
-// Latest process count is set by pollMetrics().
-static std::size_t g_lastProcCount = 0;
+// Latest process count is set by MetricsPoller::poll(). Defined in
+// src/MetricsPoller.cpp (Phase 1.2 slice 15).
+extern std::size_t g_lastProcCount;
 // Latest summed CPU% / MEM% across the topProcesses sample. Maintained
-// alongside g_lastProcCount in pollMetrics() and read by the Processes
-// tab summary strip so a reviewer can eyeball aggregate pressure without
-// summing the visible table.
-static float g_sumCpuPct = 0.0f;
-static float g_sumMemPct = 0.0f;
+// alongside g_lastProcCount by MetricsPoller::poll() and read by the
+// Processes tab summary strip so a reviewer can eyeball aggregate
+// pressure without summing the visible table.
+extern float g_sumCpuPct;
+extern float g_sumMemPct;
 
 // Footer "N procs" live count moved to src/FooterLiveStats.cpp as
 // Phase 1.2 slice 8 of the GUI evolution spec. Reaches the same pixels
@@ -513,368 +537,12 @@ static float g_sumMemPct = 0.0f;
 // slice 2 of the GUI evolution spec. Reaches the same pixels via
 // SparklineLabels::render(dest).
 
-static void pollMetrics()
-{
-    float cpuPct = SystemMetrics::readCpuPercent();
-    float memPct = SystemMetrics::readMemPercent();
-    float gpuPct = SystemMetrics::readGpuPercent();
-    // Stash the latest percentages so the render loop can hand them to
-    // MetricReadouts::render(...) outside of this scope.
-    g_cpuPct = cpuPct;
-    g_ramPct = memPct;
-    g_gpuPct = gpuPct;
-
-    // Threshold-based fill colors mirror the per-core strip + DISK
-    // readout palette: accent green idle, yellow at 60%+, red at 80%+.
-    // Re-colors all three bars consistently so the System tab reads
-    // 'pressure rising' across CPU / RAM / GPU at a glance.
-    if (g_cpuBar != nullptr)
-    {
-        g_cpuBar->setValue(cpuPct);
-        g_cpuBar->setFillColor(Thresholds::colorForPct(cpuPct));
-    }
-    if (g_ramBar != nullptr)
-    {
-        g_ramBar->setValue(memPct);
-        g_ramBar->setFillColor(Thresholds::colorForPct(memPct));
-    }
-    if (g_gpuBar != nullptr)
-    {
-        g_gpuBar->setValue(gpuPct);
-        g_gpuBar->setFillColor(Thresholds::colorForPct(gpuPct));
-    }
-    if (g_cpuSparkline != nullptr)
-    {
-        g_cpuSparkline->push(cpuPct);
-    }
-    if (g_ramSparkline != nullptr)
-    {
-        g_ramSparkline->push(memPct);
-    }
-    if (g_gpuSparkline != nullptr)
-    {
-        g_gpuSparkline->push(gpuPct);
-    }
-
-    g_perCoreCpu = SystemMetrics::readPerCoreCpu();
-    g_memBreakdown = SystemMetrics::readMemBreakdown();
-    g_uptimeSeconds = SystemMetrics::readUptimeSeconds();
-    g_loadAverages = SystemMetrics::readLoadAverages();
-    g_diskUsage = SystemMetrics::readDiskUsage();
-
-    bool cpuNowAlarm = cpuPct >= ALARM_THRESHOLD;
-    bool ramNowAlarm = memPct >= ALARM_THRESHOLD;
-    bool gpuNowAlarm = gpuPct >= ALARM_THRESHOLD;
-    if (g_alarmEnabled)
-    {
-        if (cpuNowAlarm && !g_cpuAlarmActive)
-        {
-            EventManager::getInstance().pushEvent(std::make_unique<SoundEvent>(ALARM_SOUND_PATH));
-        }
-        if (ramNowAlarm && !g_ramAlarmActive)
-        {
-            EventManager::getInstance().pushEvent(std::make_unique<SoundEvent>(ALARM_SOUND_PATH));
-        }
-        if (gpuNowAlarm && !g_gpuAlarmActive)
-        {
-            EventManager::getInstance().pushEvent(std::make_unique<SoundEvent>(ALARM_SOUND_PATH));
-        }
-    }
-    g_cpuAlarmActive = cpuNowAlarm;
-    g_ramAlarmActive = ramNowAlarm;
-    g_gpuAlarmActive = gpuNowAlarm;
-
-    if (g_processRows.size() <= 1)
-    {
-        return;
-    }
-
-    std::size_t dataRowCount = g_processRows.size() - 1;
-    // Tree mode walks the parent/child graph; if parents fall outside the
-    // top-N memory window the chain breaks and most rows render at depth 0,
-    // so we fetch a much larger sample when tree mode is on. Flat mode's
-    // 3x over-fetch is enough for the substring filter alone.
-    std::size_t fetchN = g_treeMode ? std::max<std::size_t>(500, dataRowCount * 30)
-                                    : dataRowCount * 3;
-    std::vector<ProcessInfo> procs = SystemMetrics::topProcesses(fetchN);
-    // Captured before filter/truncate so the live footer count reflects
-    // what the backend actually returned (after any over-fetch), which
-    // is the most useful single number a reviewer can see: "this system
-    // monitor is watching N processes right now."
-    g_lastProcCount = procs.size();
-    // Aggregate disk-I/O throughput summed across every process the
-    // backend returned this round. Renders as 'R X.X MB/s  W Y.Y MB/s'
-    // text strip on the System tab so users see system-wide disk
-    // pressure at a glance instead of having to scan the Processes
-    // table. Best-effort: only counts processes the backend surfaced
-    // (top fetchN by memory), which captures the loudest writers in
-    // practice without needing /proc/diskstats or PDH PhysicalDisk.
-    unsigned long long aggReadKb = 0;
-    unsigned long long aggWriteKb = 0;
-    float sumCpuPct = 0.0f;
-    float sumMemPct = 0.0f;
-    for (const auto &p : procs)
-    {
-        aggReadKb += p.diskReadKbPerSec;
-        aggWriteKb += p.diskWriteKbPerSec;
-        sumCpuPct += p.cpuPct;
-        sumMemPct += p.memPct;
-    }
-    g_aggregateDiskReadKbPerSec = aggReadKb;
-    g_aggregateDiskWriteKbPerSec = aggWriteKb;
-    // Cached for ProcessesSummary::render so the strip can paint each frame
-    // without rewalking the process list. Stale by at most one poll tick.
-    g_sumCpuPct = sumCpuPct;
-    g_sumMemPct = sumMemPct;
-    // Sample aggregate net I/O on the same cadence as the rest of the
-    // System tab data. First call returns zeros (no prior sample).
-    g_netIo = SystemMetrics::readNetIo();
-    // Feed the same sample into the rx/tx polylines so the NET history
-    // strip mirrors the live footer 'NET R/T' readout one tick later.
-    if (g_netRxSparkline != nullptr)
-    {
-        g_netRxSparkline->push(static_cast<float>(g_netIo.rxKbPerSec));
-    }
-    if (g_netTxSparkline != nullptr)
-    {
-        g_netTxSparkline->push(static_cast<float>(g_netIo.txKbPerSec));
-    }
-    // Parallel array of indent depths produced when tree mode flattens
-    // the parent/child graph; stays empty in flat mode. Same length as
-    // procs after the sort+filter+truncate pass below.
-    std::vector<int> procDepth;
-    // Parallel flag: row has at least one child in the current sample,
-    // so its name cell should carry a '+' or '-' collapse glyph. Stays
-    // empty in flat mode. Same length policy as procDepth.
-    std::vector<bool> procHasChildren;
-    if (g_treeMode)
-    {
-        // Build a parent -> children index. Roots are entries whose parentPid
-        // isn't itself a pid we have a record for. Children inside each
-        // bucket sort by memPct desc so the heaviest child surfaces first.
-        std::unordered_map<int, std::vector<std::size_t>> childIndices;
-        std::unordered_set<int> knownPids;
-        knownPids.reserve(procs.size());
-        for (const auto &p : procs)
-        {
-            knownPids.insert(p.pid);
-        }
-        for (std::size_t i = 0; i < procs.size(); ++i)
-        {
-            childIndices[procs[i].parentPid].push_back(i);
-        }
-        for (auto &kv : childIndices)
-        {
-            std::sort(kv.second.begin(), kv.second.end(),
-                [&procs](std::size_t a, std::size_t b) {
-                    return procs[a].memPct > procs[b].memPct;
-                });
-        }
-
-        std::vector<ProcessInfo> flat;
-        flat.reserve(procs.size());
-        procDepth.reserve(procs.size());
-        procHasChildren.reserve(procs.size());
-
-        // Iterative DFS so we don't recurse into a kernel-thread chain that
-        // could be thousands deep on weird hosts.
-        std::vector<std::pair<std::size_t, int>> stack;
-        for (std::size_t i = 0; i < procs.size(); ++i)
-        {
-            if (knownPids.find(procs[i].parentPid) == knownPids.end())
-            {
-                stack.push_back({i, 0});
-            }
-        }
-        // Roots also sort by mem desc so the densest tree surfaces first.
-        std::sort(stack.begin(), stack.end(),
-            [&procs](const std::pair<std::size_t, int> &a,
-                     const std::pair<std::size_t, int> &b) {
-                return procs[a.first].memPct > procs[b.first].memPct;
-            });
-        std::vector<bool> emitted(procs.size(), false);
-        while (!stack.empty())
-        {
-            auto [idx, depth] = stack.back();
-            stack.pop_back();
-            if (emitted[idx])
-            {
-                continue;
-            }
-            emitted[idx] = true;
-            flat.push_back(procs[idx]);
-            procDepth.push_back(depth);
-            // Cache whether this pid has any child in the current sample
-            // so the render loop can decide whether to draw a +/- glyph.
-            // Checked against childIndices BEFORE the collapse short-circuit
-            // so collapsed parents still get a glyph (the '+').
-            auto childIt = childIndices.find(procs[idx].pid);
-            bool hasChildren = (childIt != childIndices.end()
-                                && !childIt->second.empty());
-            procHasChildren.push_back(hasChildren);
-            // Skip descendants when this pid is in the collapsed set so
-            // 'space' on a row hides the subtree without dropping the row
-            // itself. Set is empty by default => fully expanded tree.
-            if (g_collapsedPids.count(procs[idx].pid) != 0)
-            {
-                continue;
-            }
-            if (hasChildren)
-            {
-                // Push in reverse so the highest-mem child is popped first.
-                for (auto rit = childIt->second.rbegin(); rit != childIt->second.rend(); ++rit)
-                {
-                    if (!emitted[*rit])
-                    {
-                        stack.push_back({*rit, depth + 1});
-                    }
-                }
-            }
-        }
-        // Append any procs the DFS missed (cycles, ppid pointing at an
-        // already-emitted node, etc.) at depth 0 so the table never
-        // silently drops rows.
-        for (std::size_t i = 0; i < procs.size(); ++i)
-        {
-            if (!emitted[i])
-            {
-                flat.push_back(procs[i]);
-                procDepth.push_back(0);
-                procHasChildren.push_back(false);
-            }
-        }
-        procs = std::move(flat);
-    }
-    else
-    {
-        std::sort(procs.begin(), procs.end(), compareProcesses);
-    }
-    if (!g_filterText.empty())
-    {
-        std::vector<ProcessInfo> kept;
-        kept.reserve(procs.size());
-        for (const auto &p : procs)
-        {
-            if (processNameMatchesFilter(p.name, g_filterText))
-            {
-                kept.push_back(p);
-            }
-        }
-        procs = std::move(kept);
-    }
-    // Stash the post-filter size before truncating so the scroll
-    // clamp + the "N more below" indicator can use it.
-    g_processVisibleCount = procs.size();
-    // Clamp the scroll offset against the current table length so a
-    // shrinking window of matching processes never leaves a stale
-    // offset pointing past the end.
-    if (g_processVisibleCount <= dataRowCount)
-    {
-        g_processScrollOffset = 0;
-    }
-    else
-    {
-        std::size_t maxOffset = g_processVisibleCount - dataRowCount;
-        if (g_processScrollOffset > maxOffset)
-        {
-            g_processScrollOffset = maxOffset;
-        }
-    }
-    // Slice the visible window of dataRowCount entries starting at
-    // g_processScrollOffset so up/down + PgUp/PgDown move through the
-    // full process list instead of being capped at the first page.
-    if (g_processScrollOffset > 0)
-    {
-        procs.erase(procs.begin(),
-                    procs.begin() + static_cast<std::ptrdiff_t>(g_processScrollOffset));
-    }
-    if (procs.size() > dataRowCount)
-    {
-        procs.resize(dataRowCount);
-    }
-
-    g_visiblePids.clear();
-    g_visiblePids.reserve(procs.size());
-    g_rowGlyphPrefix.assign(procs.size(), std::string());
-    g_rowGlyphCollapsed.assign(procs.size(), false);
-
-    for (std::size_t i = 0; i < dataRowCount; ++i)
-    {
-        Row *row = g_processRows[i + 1];
-        if (row == nullptr)
-        {
-            continue;
-        }
-        if (i < procs.size())
-        {
-            const ProcessInfo &info = procs[i];
-            g_visiblePids.push_back(info.pid);
-            // Tree mode: prefix the NAME cell with indent + connector so
-            // the parent/child relationship is visible. Cap depth at 6 to
-            // avoid pushing the name out of its column on a deeply nested
-            // chain (which is rare in practice). Nodes that have children
-            // get a '+ ' (collapsed) or '- ' (expanded) glyph in the
-            // indent area; leaf rows fall back to the previous '|- '
-            // connector so the parent/child line stays readable.
-            std::string nameCell = info.name;
-            if (g_treeMode && i < procDepth.size())
-            {
-                int depth = procDepth[i];
-                if (depth > 6) depth = 6;
-                std::string prefix;
-                for (int d = 0; d < depth; ++d)
-                {
-                    prefix += "  ";
-                }
-                bool hasChildren = (i < procHasChildren.size()) && procHasChildren[i];
-                bool collapsed = (g_collapsedPids.count(info.pid) != 0);
-                if (hasChildren)
-                {
-                    prefix += collapsed ? "+ " : "- ";
-                    // Stash the colored-overlay prefix so the render
-                    // pass can repaint the glyph in green/grey on top
-                    // of the Row's default white text.
-                    g_rowGlyphPrefix[i] = prefix;
-                    g_rowGlyphCollapsed[i] = collapsed;
-                }
-                else if (depth > 0)
-                {
-                    prefix += "|- ";
-                }
-                nameCell = prefix + info.name;
-            }
-            std::vector<std::string> cells = {
-                std::to_string(info.pid),
-                nameCell,
-                formatPct(info.cpuPct),
-                formatPct(info.memPct),
-                formatDiskIo(info.diskReadKbPerSec, info.diskWriteKbPerSec)
-            };
-            row->setCells(cells);
-        }
-        else
-        {
-            row->setCells({"", "", "", "", ""});
-        }
-    }
-
-    // After a re-poll the visible row index for the selected pid may have
-    // moved or the pid may have exited. Re-anchor the highlight so up/down
-    // navigation keeps making sense.
-    if (g_selectedPid >= 0)
-    {
-        auto it = std::find(g_visiblePids.begin(), g_visiblePids.end(), g_selectedPid);
-        if (it == g_visiblePids.end())
-        {
-            g_selectedPid = -1;
-            g_selectedRowIndex = -1;
-        }
-        else
-        {
-            g_selectedRowIndex = static_cast<int>(it - g_visiblePids.begin());
-        }
-    }
-}
+// pollMetrics() moved to src/MetricsPoller.cpp as Phase 1.2 slice 15
+// of the modernization roadmap. The previous 362-line in-place body
+// is now MetricsPoller::poll(); every call site below dispatches
+// through that namespace function. The poller owns the metric
+// snapshot globals it produces (g_cpuPct, g_memBreakdown, etc.) and
+// consults the scene widget pointers + live-UI state via extern.
 
 int main(int argc, char **argv)
 {
@@ -1197,7 +865,7 @@ int main(int argc, char **argv)
             // processes still register measurable ticks.
             for (std::size_t i = 0; i < SPARKLINE_CAPACITY; ++i)
             {
-                pollMetrics();
+                MetricsPoller::poll();
                 SDL_Delay(50);
             }
         }
@@ -1208,10 +876,10 @@ int main(int argc, char **argv)
             // window and round to 0.0% in the shot. 3s captures everything
             // that is doing real work without making the screenshot path
             // feel sluggish.
-            pollMetrics();
+            MetricsPoller::poll();
             SDL_Delay(3000);
         }
-        pollMetrics();
+        MetricsPoller::poll();
 
         if (tab == "processes")
         {
@@ -1358,7 +1026,7 @@ int main(int argc, char **argv)
     {
         buildSparklines();
     }
-    pollMetrics();
+    MetricsPoller::poll();
 
     Uint64 lastPoll = SDL_GetTicks();
     Uint64 startTicks = SDL_GetTicks();
@@ -1424,7 +1092,7 @@ int main(int argc, char **argv)
         Uint64 now = SDL_GetTicks();
         if (now - lastPoll >= g_pollIntervalMs)
         {
-            pollMetrics();
+            MetricsPoller::poll();
             lastPoll = now;
         }
 
