@@ -32,6 +32,7 @@
 #include "NetIoFooter.hpp"
 #include "PerCoreStrip.hpp"
 #include "ProcessesSummary.hpp"
+#include "SelfStats.hpp"
 #include "Row.hpp"
 #include "ShowEvent.hpp"
 #include "Sparkline.hpp"
@@ -534,6 +535,10 @@ namespace HeadlessRunner
             TabIndicator::render(shot, activeTabIndex);
         }
         FooterLiveStats::render(shot, g_lastProcCount);
+        // Self-monitoring badge: live RSS + CPU% on every tab so each
+        // headless screenshot doubles as marketing for the lightweight
+        // footprint (Pillar E).
+        SelfStats::renderFooterBadge(shot);
         if (tab == "system")
         {
             // Dominant Title-size CPU/RAM/GPU readouts (Pillar A2).

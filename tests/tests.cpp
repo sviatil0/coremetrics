@@ -18,6 +18,7 @@
 #include "SignalUtilsTest.hpp"
 #include "CloneableTest.hpp"
 #include "BookmarkTest.hpp"
+#include "SelfStatsTest.hpp"
 
 int main(int argc, char **argv)
 {
@@ -45,6 +46,7 @@ int main(int argc, char **argv)
 	signalUtilsTestSuite();
 	cloneableTestSuite();
 	bookmarkTestSuite();
+	selfStatsTestSuite();
 
 	SDL_Quit();
 
