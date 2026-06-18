@@ -44,6 +44,7 @@
 #include "MemBreakdownStrip.hpp"
 #include "PerCoreStrip.hpp"
 #include "FooterLiveStats.hpp"
+#include "SelfStats.hpp"
 #include "ProcessesSummary.hpp"
 #include "SignalMenuOverlay.hpp"
 #include "FilterStrip.hpp"
@@ -747,6 +748,10 @@ int main(int argc, char **argv)
             }
         }
         FooterLiveStats::render(screen, g_lastProcCount);
+        // Self-monitoring badge. Painted on the row above the chrome
+        // "N procs / DISK / NET" footer line so reviewer screenshots
+        // double as evidence of the lightweight footprint (Pillar E).
+        SelfStats::renderFooterBadge(screen);
 
         // Aggregate summary strip sits above the Processes table column
         // headers (y=72) so a glance at the top of the tab shows the
