@@ -26,13 +26,15 @@
 
 ![CoreMetrics demo](assets/coremetrics-demo.gif)
 
-*Alternating System and Processes tabs, rendered by the binary's own headless `--screenshot` mode and stitched into the loop above. Each frame is a real CoreMetrics paint, not a mockup. Higher-fidelity `assets/coremetrics-demo.mp4` is also checked in.*
+*Alternating System / Processes / About tabs, rendered by the binary's own headless `--screenshot` mode and stitched into the loop above. Each frame is a real CoreMetrics paint, not a mockup. Higher-fidelity `assets/coremetrics-demo.mp4` is also checked in.*
 
 </div>
 
 ## Lightweight by design
 
 CoreMetrics is a graphical system monitor that ships in **1.6 MB on disk** and holds **~60 MB resident** at steady state. The custom rasterizer + SDL3 surfaces strategy keeps the runtime footprint closer to a terminal tool than to a stock GUI app.
+
+The app **shows its own footprint live**: the About tab paints a "Self" section with current RSS, peak RSS, CPU %, process uptime, and binary size on disk so every screenshot doubles as evidence of the claim.
 
 | Tool | Type | Binary | Resident RAM | Notes |
 |---|---|---|---|---|
