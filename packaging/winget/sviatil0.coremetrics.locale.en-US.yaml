@@ -1,0 +1,38 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.6.0.schema.json
+
+PackageIdentifier: sviatil0.coremetrics
+PackageVersion: 0.2.18
+PackageLocale: en-US
+Publisher: Sviatoslav Oleksiienko
+PublisherUrl: https://github.com/sviatil0
+PublisherSupportUrl: https://github.com/sviatil0/coremetrics/issues
+Author: Sviatoslav Oleksiienko
+PackageName: CoreMetrics
+PackageUrl: https://github.com/sviatil0/coremetrics
+License: LGPL-2.1-only
+LicenseUrl: https://raw.githubusercontent.com/sviatil0/coremetrics/main/LICENSE
+Copyright: Copyright (c) 2025 Sviatoslav Oleksiienko
+CopyrightUrl: https://raw.githubusercontent.com/sviatil0/coremetrics/main/LICENSE
+ShortDescription: Cross-platform desktop system metrics monitor (CPU / RAM / GPU / processes)
+Description: |
+  CoreMetrics is a small C++23 system monitor built directly on raw SDL3 pixel
+  surfaces. It shows live CPU, RAM, GPU, and per-process resource usage with an
+  optional rolling sparklines view and an htop-style kill flow on the Processes
+  tab. No Qt, no Electron, no JavaScript runtime. Every widget is hand-rasterized
+  by code in the upstream repository. Three native metrics backends (Linux /proc,
+  macOS Mach + IOKit, Windows PDH) are selected at compile time so the same
+  source tree builds the same UI on each platform.
+Moniker: coremetrics
+Tags:
+  - system
+  - monitor
+  - cpu
+  - ram
+  - gpu
+  - process
+  - htop
+  - sdl3
+  - native
+ReleaseNotesUrl: https://github.com/sviatil0/coremetrics/releases/tag/v0.2.18
+ManifestType: defaultLocale
+ManifestVersion: 1.6.0

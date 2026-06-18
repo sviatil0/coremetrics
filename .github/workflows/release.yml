@@ -21,7 +21,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     outputs:
       tag: ${{ steps.tag.outputs.tag }}
@@ -29,15 +29,25 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Extract tag
+      - name: Extract tag (Unix)
         id: tag
+        if: runner.os != 'Windows'
         run: echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+
+      - name: Extract tag (Windows)
+        id: tag_win
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $tag = $env:GITHUB_REF -replace '^refs/tags/',''
+          "tag=$tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
 
       - name: Install dependencies (Linux)
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential pkg-config libfreetype-dev libharfbuzz-dev
+          sudo apt-get install -y build-essential pkg-config libfreetype-dev libharfbuzz-dev ruby ruby-dev rpm
+          sudo gem install --no-document fpm
 
       - name: Install dependencies (macOS)
         if: runner.os == 'macOS'
@@ -50,6 +60,14 @@ jobs:
         uses: libsdl-org/setup-sdl@main
         with:
           install-linux-dependencies: true
+          version: 3-latest
+          version-sdl-ttf: 3-latest
+          version-sdl-image: 3-latest
+
+      - name: Setup SDL3 (Windows)
+        if: runner.os == 'Windows'
+        uses: libsdl-org/setup-sdl@main
+        with:
           version: 3-latest
           version-sdl-ttf: 3-latest
           version-sdl-image: 3-latest
@@ -70,8 +88,26 @@ jobs:
           mkdir -p obj bin
           make bin/coremetrics CXXFLAGS="-std=c++23 -Wall -O2 -I ./include -I/opt/homebrew/include"
 
-      - name: Detect platform suffix
+      - name: Build (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        # MSYS2 / MinGW-w64 build: the GNU Makefile already drives the C++23
+        # compile, we just point it at the SDL3 dev tree the setup-sdl action
+        # installed and produce coremetrics.exe alongside the bundled DLLs.
+        run: |
+          choco install -y mingw make pkgconfiglite
+          mkdir -p obj bin
+          $env:Path = "C:\ProgramData\chocolatey\bin;$env:Path"
+          $sdlPrefix = "${env:RUNNER_TEMP}\sdl-prefix"
+          if (-not (Test-Path $sdlPrefix)) { $sdlPrefix = "$PWD\sdl-prefix" }
+          make bin/coremetrics CXX=g++ `
+            CXXFLAGS="-std=c++23 -Wall -O2 -I ./include -I${sdlPrefix}/include" `
+            LDFLAGS="-L${sdlPrefix}/lib -lSDL3 -lSDL3_ttf -lSDL3_image"
+          Get-ChildItem bin
+
+      - name: Detect platform suffix (Unix)
         id: plat
+        if: runner.os != 'Windows'
         run: |
           if [ "${{ runner.os }}" = "Linux" ]; then
             echo "suffix=linux-x86_64" >> "$GITHUB_OUTPUT"
@@ -81,7 +117,14 @@ jobs:
             echo "suffix=macos-$ARCH" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Package tarball
+      - name: Detect platform suffix (Windows)
+        id: plat_win
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: 'echo "suffix=windows-x86_64" | Out-File -FilePath $env:GITHUB_OUTPUT -Append'
+
+      - name: Package tarball (Unix)
+        if: runner.os != 'Windows'
         env:
           TAG: ${{ steps.tag.outputs.tag }}
           SUFFIX: ${{ steps.plat.outputs.suffix }}
@@ -105,6 +148,36 @@ jobs:
           EOF
           tar -C dist -czf "dist/${PKG}.tar.gz" "$PKG"
           ls -la "dist/${PKG}.tar.gz"
+
+      - name: Package zip (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          TAG: ${{ steps.tag_win.outputs.tag }}
+          SUFFIX: ${{ steps.plat_win.outputs.suffix }}
+        run: |
+          $pkg = "coremetrics-$env:TAG-$env:SUFFIX"
+          New-Item -ItemType Directory -Force -Path "dist\$pkg" | Out-Null
+          Copy-Item bin\coremetrics.exe "dist\$pkg\coremetrics.exe"
+          Copy-Item -Recurse assets "dist\$pkg\assets"
+          Copy-Item base.xml "dist\$pkg\"
+          if (Test-Path README.md) { Copy-Item README.md "dist\$pkg\" }
+          if (Test-Path LICENSE) { Copy-Item LICENSE "dist\$pkg\" }
+          if (Test-Path CONTRIBUTING.md) { Copy-Item CONTRIBUTING.md "dist\$pkg\" }
+          # Bundle SDL3 runtime DLLs alongside the .exe so the zip is self-contained.
+          $sdlPrefix = "${env:RUNNER_TEMP}\sdl-prefix"
+          if (-not (Test-Path $sdlPrefix)) { $sdlPrefix = "$PWD\sdl-prefix" }
+          Get-ChildItem "$sdlPrefix\bin\*.dll" -ErrorAction SilentlyContinue | Copy-Item -Destination "dist\$pkg\"
+          @"
+          coremetrics $env:TAG ($env:SUFFIX)
+
+          1. Unzip this archive anywhere.
+          2. Double-click coremetrics.exe or run it from a terminal.
+
+          SDL3.dll, SDL3_ttf.dll, and SDL3_image.dll ship next to the binary.
+          "@ | Out-File -FilePath "dist\$pkg\INSTALL.txt" -Encoding ascii
+          Compress-Archive -Path "dist\$pkg" -DestinationPath "dist\$pkg.zip" -Force
+          Get-ChildItem "dist\$pkg.zip"
 
       - name: Build .deb (Linux only)
         if: runner.os == 'Linux'
@@ -135,13 +208,53 @@ jobs:
           dpkg-deb --build "$PKG_ROOT" "dist/coremetrics_${VERSION}_amd64.deb"
           ls -la dist/coremetrics_*.deb
 
-      - name: Upload artifacts
+      - name: Build .rpm (Linux only, via fpm)
+        if: runner.os == 'Linux'
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          # fpm consumes the same staged tree we built for the .deb. We do
+          # not consume packaging/rpm/coremetrics.spec here; that spec is
+          # for distro builds from source (Fedora COPR / openSUSE OBS).
+          VERSION="${TAG#v}"
+          STAGE="dist/rpm-stage"
+          mkdir -p "$STAGE/usr/bin" "$STAGE/usr/share/coremetrics/assets" "$STAGE/usr/share/doc/coremetrics"
+          cp bin/coremetrics "$STAGE/usr/bin/coremetrics"
+          cp -r assets/* "$STAGE/usr/share/coremetrics/assets/"
+          cp base.xml "$STAGE/usr/share/coremetrics/"
+          cp README.md CONTRIBUTING.md "$STAGE/usr/share/doc/coremetrics/" 2>/dev/null || true
+          fpm -s dir -t rpm \
+            --name coremetrics \
+            --version "${VERSION}" \
+            --iteration 1 \
+            --architecture x86_64 \
+            --license LGPL-2.1-only \
+            --maintainer "Sviatoslav Oleksiienko <soleksiienko1@gmail.com>" \
+            --url https://github.com/sviatil0/coremetrics \
+            --description "Cross-platform desktop system metrics monitor (CPU / RAM / GPU / processes)" \
+            --depends SDL3 --depends SDL3_ttf --depends SDL3_image \
+            --package "dist/coremetrics-${VERSION}-1.x86_64.rpm" \
+            -C "$STAGE" .
+          ls -la dist/coremetrics-*.rpm
+
+      - name: Upload artifacts (Unix)
+        if: runner.os != 'Windows'
         uses: actions/upload-artifact@v7
         with:
           name: coremetrics-${{ steps.plat.outputs.suffix }}
           path: |
             dist/coremetrics-*.tar.gz
             dist/coremetrics_*.deb
+            dist/coremetrics-*.rpm
+          if-no-files-found: warn
+
+      - name: Upload artifacts (Windows)
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v7
+        with:
+          name: coremetrics-${{ steps.plat_win.outputs.suffix }}
+          path: |
+            dist/coremetrics-*.zip
           if-no-files-found: warn
 
   codesign-macos:
@@ -182,7 +295,7 @@ jobs:
           # produced. The signed tarball is optional and only present when
           # the Developer ID secrets are configured; -true keeps find quiet
           # when nothing matches.
-          find dist -type f \( -name 'coremetrics-*.tar.gz' -o -name 'coremetrics_*.deb' \) -print -exec cp {} release-assets/ \;
+          find dist -type f \( -name 'coremetrics-*.tar.gz' -o -name 'coremetrics_*.deb' -o -name 'coremetrics-*.rpm' -o -name 'coremetrics-*.zip' \) -print -exec cp {} release-assets/ \;
           ls -la release-assets
 
       - name: Create or update GitHub Release
