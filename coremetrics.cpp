@@ -67,8 +67,8 @@ constexpr int PROCESS_ROW_HEIGHT = 20;
 // be told to repaint faster than the OS can serve samples or so slow
 // the chrome looks frozen).
 static Uint64 g_pollIntervalMs = 500;
-constexpr Uint64 POLL_INTERVAL_MIN_MS = 100;
-constexpr Uint64 POLL_INTERVAL_MAX_MS = 10000;
+// Bound constants live in src/ProcessUtils.cpp alongside the
+// clampPollIntervalMs() helper that uses them.
 
 constexpr float ALARM_THRESHOLD = 80.0f;
 static const std::string ALARM_SOUND_PATH = AssetPath::resolve("assets/click.wav");
@@ -472,17 +472,8 @@ static void destroySparklines()
 // slice 3 of the GUI evolution spec. Call site passes g_uptimeSeconds
 // and g_loadAverages explicitly via UptimeAndLoad::render(...).
 
-static std::string formatRate(unsigned long long kbPerSec)
-{
-    if (kbPerSec >= 1024)
-    {
-        std::ostringstream oss;
-        oss.precision(1);
-        oss << std::fixed << (static_cast<double>(kbPerSec) / 1024.0) << " MB/s";
-        return oss.str();
-    }
-    return std::to_string(kbPerSec) + " KB/s";
-}
+// Old formatRate(kbPerSec) helper deleted; superseded by the
+// compact-rate formatter inside src/NetIoFooter.cpp (slice 4 extract).
 
 // NetIo footer paint moved to src/NetIoFooter.cpp as Phase 1.2 slice 4
 // of the GUI evolution spec. Call site passes the three globals
