@@ -61,6 +61,7 @@
 #include "MouseEvents.hpp"
 #include "MetricsPoller.hpp"
 #include "HeadlessRunner.hpp"
+#include "ArgParse.hpp"
 
 constexpr int RESX = 960;
 constexpr int RESY = 540;
@@ -436,37 +437,6 @@ extern float g_sumMemPct;
 
 int main(int argc, char **argv)
 {
-    // Optional headless screenshot mode: `coremetrics --screenshot out.bmp`
-    // renders one frame to an offscreen surface and saves it, no window needed.
-    std::string screenshotPath;
-    // Optional `--duration <seconds>` cleanly exits the live UI after N
-    // seconds. Useful for backgrounded smoke tests and screenshot capture
-    // pipelines that need a guaranteed-finite run. 0 means "run forever".
-    double durationSeconds = 0.0;
-    // Optional `--export-csv <path>` / `--export-json <path>` write one
-    // sample of the live aggregates plus the top-N process list to a flat
-    // file and exit. Both run before SDL_Init so they need no display.
-    std::string exportCsvPath;
-    std::string exportJsonPath;
-    // `--top N` prints the top N processes by memory % to stdout as a
-    // plain text table and exits. Lets the binary be piped into shell
-    // tools without scraping a screenshot or a CSV file. N is clamped
-    // to [1, 999]; default 20 if the value is missing or unparseable.
-    int topCount = 0;
-    // `--watch` switches --top from one-shot to live tail-style: the
-    // table re-prints every poll interval, clearing the terminal first
-    // so the latest snapshot replaces the previous one in place. Ctrl-C
-    // exits cleanly via the existing SIGINT handler.
-    bool watchMode = false;
-    // `--top-sort cpu|mem|io` re-orders the printed table by the
-    // chosen column. Default is mem (matches the backend's natural
-    // sort order from topProcesses(N)). Unknown values fall back to mem.
-    TopSortKey topSortKey = TopSortKey::Mem;
-    // `--top-color auto|always|never`: colorize the --top / --watch
-    // output. auto (default) checks isatty so piped output stays
-    // ASCII-clean. always forces color on. never forces it off.
-    int topColorMode = 0; // 0=auto, 1=always, 2=never
-
     // Hydrate persisted preferences before argv parsing so any CLI
     // flag the user supplies this run overrides the saved value.
     // Settings::load is a no-op on a fresh install with no config file
@@ -479,169 +449,54 @@ int main(int argc, char **argv)
                    g_collapsedPids);
     g_sortColumn = static_cast<SortColumn>(loadedSortColumn);
 
-    // --help / -h print the same flag reference the manpage carries.
-    // --version / -V print a one-line semver string. Both exit 0
-    // before any other state is touched.
-    for (int i = 1; i < argc; ++i)
+    // CLI parsing moved to src/ArgParse.cpp (Phase 1.2 slice 17) so
+    // main() can focus on dispatching the parsed Result into the
+    // right runner. The parser owns the --help / --version short
+    // circuit and returns exitCode >= 0 in that case; main() forwards
+    // the code straight back. Everything else lands in the Result
+    // struct and main() propagates it into the live-UI globals
+    // after Settings::load so a flag this run overrides the saved
+    // value, exactly the way the old in-place loops behaved.
+    ArgParse::Result args = ArgParse::parse(argc, argv);
+    if (args.exitCode >= 0)
     {
-        std::string arg = argv[i];
-        if (arg == "--version" || arg == "-V")
-        {
-            // Mirrors base.xml's footer label; bumped by the release
-            // flow that touches the XML.
-            std::printf("coremetrics 0.3.0\n");
-            return 0;
-        }
-        if (arg == "--help" || arg == "-h")
-        {
-            std::printf(
-                "Usage: coremetrics [options]\n"
-                "\n"
-                "Live UI flags:\n"
-                "  --sparklines              show CPU/RAM/GPU/NET history sparklines\n"
-                "  --tree                    open Processes tab in parent/child tree mode\n"
-                "  --filter PATTERN          seed the Processes-tab name filter\n"
-                "  --poll-ms N               refresh cadence in ms (clamped 100..10000)\n"
-                "  --duration SECONDS        auto-exit after N seconds (live UI)\n"
-                "\n"
-                "Headless modes:\n"
-                "  --screenshot PATH [system|processes|about]\n"
-                "                            render one frame to PATH and exit\n"
-                "  --export-csv PATH         dump one-shot CSV and exit\n"
-                "  --export-json PATH        dump one-shot JSON and exit\n"
-                "  --top N                   print top-N processes to stdout and exit\n"
-                "  --watch                   used with --top: re-print every poll interval\n"
-                "  --top-sort cpu|mem|io     re-order --top output (default mem)\n"
-                "  --top-color auto|always|never\n"
-                "                            colorize --top output (default auto via isatty)\n"
-                "\n"
-                "Other:\n"
-                "  -h, --help                print this help and exit\n"
-                "  -V, --version             print version and exit\n"
-                "\n"
-                "See coremetrics(1) for the full manpage and key bindings.\n"
-            );
-            return 0;
-        }
+        return args.exitCode;
     }
 
-    for (int i = 1; i < argc; ++i)
+    // Apply CLI overrides on top of the Settings::load seed. The
+    // parser only writes pollIntervalMs > 0 when --poll-ms was
+    // supplied (and parsed to a positive number after the clamp),
+    // so the saved-setting cadence survives when the flag is
+    // absent. The sparkline / tree / filter flags are write-once:
+    // the parser sets them true only when the flag is present, so
+    // an unrelated launch keeps the saved/default value.
+    if (args.pollIntervalMs > 0)
     {
-        if (std::string(argv[i]) == "--screenshot" && i + 1 < argc)
-        {
-            screenshotPath = argv[i + 1];
-        }
-        if (std::string(argv[i]) == "--duration" && i + 1 < argc)
-        {
-            durationSeconds = std::atof(argv[i + 1]);
-            if (durationSeconds < 0.0)
-            {
-                durationSeconds = 0.0;
-            }
-        }
-        if (std::string(argv[i]) == "--sparklines")
-        {
-            g_sparklinesEnabled = true;
-        }
-        // --tree opens the Processes tab in parent/child indented hierarchy
-        // mode, same as pressing 't' on that tab interactively. Lets the
-        // screenshot pipeline capture tree mode without simulating keystrokes.
-        if (std::string(argv[i]) == "--tree")
-        {
-            g_treeMode = true;
-        }
-        // --filter <substring> seeds the Processes-tab name filter so the
-        // screenshot pipeline can demonstrate search. Case-insensitive
-        // substring match against process names, applied during pollMetrics.
-        if (std::string(argv[i]) == "--filter" && i + 1 < argc)
-        {
-            g_filterText = argv[i + 1];
-        }
-        // --poll-ms <N> overrides the default 500ms refresh cadence.
-        // Validation + clamp delegated to ProcessUtils so the same
-        // logic gets unit coverage and negative / non-numeric inputs
-        // fall back to the default instead of wrapping.
-        if (std::string(argv[i]) == "--poll-ms" && i + 1 < argc)
-        {
-            g_pollIntervalMs = static_cast<Uint64>(
-                clampPollIntervalMs(argv[i + 1], g_pollIntervalMs));
-        }
-        // --export-csv <path> / --export-json <path>: one-shot dump of the
-        // live aggregates + top-N process list, written to `path` and then
-        // the process exits 0. Lets external tools consume CoreMetrics data
-        // without scraping screenshots.
-        if (std::string(argv[i]) == "--export-csv" && i + 1 < argc)
-        {
-            exportCsvPath = argv[i + 1];
-        }
-        if (std::string(argv[i]) == "--export-json" && i + 1 < argc)
-        {
-            exportJsonPath = argv[i + 1];
-        }
-        if (std::string(argv[i]) == "--top")
-        {
-            int parsed = 20;
-            if (i + 1 < argc)
-            {
-                parsed = std::atoi(argv[i + 1]);
-                if (parsed < 1)
-                {
-                    parsed = 20;
-                }
-                if (parsed > 999)
-                {
-                    parsed = 999;
-                }
-            }
-            topCount = parsed;
-        }
-        if (std::string(argv[i]) == "--watch")
-        {
-            watchMode = true;
-        }
-        if (std::string(argv[i]) == "--top-sort" && i + 1 < argc)
-        {
-            std::string key = argv[i + 1];
-            if (key == "cpu")
-            {
-                topSortKey = TopSortKey::Cpu;
-            }
-            else if (key == "io")
-            {
-                topSortKey = TopSortKey::Io;
-            }
-            else
-            {
-                topSortKey = TopSortKey::Mem;
-            }
-        }
-        if (std::string(argv[i]) == "--top-color" && i + 1 < argc)
-        {
-            std::string mode = argv[i + 1];
-            if (mode == "always")
-            {
-                topColorMode = 1;
-            }
-            else if (mode == "never")
-            {
-                topColorMode = 2;
-            }
-            else
-            {
-                topColorMode = 0;
-            }
-        }
+        g_pollIntervalMs = args.pollIntervalMs;
+    }
+    if (args.sparklinesEnabled)
+    {
+        g_sparklinesEnabled = true;
+    }
+    if (args.treeMode)
+    {
+        g_treeMode = true;
+    }
+    if (!args.seedFilter.empty())
+    {
+        g_filterText = args.seedFilter;
     }
 
-    // Resolve the auto color mode by checking whether stdout is a TTY.
-    // Pipes and CI logs get plain text; an interactive terminal gets
-    // the threshold-colored CPU% / MEM% cells.
+    // Resolve the auto color mode by checking whether stdout is a
+    // TTY. Pipes and CI logs get plain text; an interactive terminal
+    // gets the threshold-colored CPU% / MEM% cells. Result encoding:
+    // 0 = force off, 1 = auto (default), 2 = force on.
     bool topColorize = false;
-    if (topColorMode == 1)
+    if (args.topColorize == 2)
     {
         topColorize = true;
     }
-    else if (topColorMode == 0)
+    else if (args.topColorize == 1)
     {
         topColorize = (isatty(fileno(stdout)) != 0);
     }
@@ -651,12 +506,12 @@ int main(int argc, char **argv)
     // exits 0. Reads metrics with the same backend the live UI uses
     // so output reflects the same numbers a user would see on screen.
     // Dispatched to HeadlessRunner as of Phase 1.2 slice 16.
-    if (topCount > 0)
+    if (args.topCount > 0)
     {
-        return HeadlessRunner::runTopMode(topCount,
-                                          topSortKey,
+        return HeadlessRunner::runTopMode(args.topCount,
+                                          args.topSortKey,
                                           topColorize,
-                                          watchMode,
+                                          args.watchMode,
                                           g_pollIntervalMs);
     }
 
@@ -664,27 +519,24 @@ int main(int argc, char **argv)
     // SystemMetrics calls are pure platform queries so they work fine
     // headless. If both flags are present we honor both. Dispatched to
     // HeadlessRunner as of Phase 1.2 slice 16.
-    if (!exportCsvPath.empty() || !exportJsonPath.empty())
+    if (!args.exportCsvPath.empty() || !args.exportJsonPath.empty())
     {
-        return HeadlessRunner::runExportMode(exportCsvPath, exportJsonPath);
+        return HeadlessRunner::runExportMode(args.exportCsvPath,
+                                             args.exportJsonPath);
     }
 
     // The --screenshot path owns its own SDL_Init(VIDEO) + SDL_Quit
-    // inside HeadlessRunner. Optional second positional arg selects
-    // the tab to capture (system / processes / about); main() parses
-    // it here so the runner stays argv-agnostic.
-    if (!screenshotPath.empty())
+    // inside HeadlessRunner. The optional second positional that
+    // selects the tab to capture (system / processes / about) is
+    // already in args.screenshotTab; empty falls back to "system"
+    // inside the runner.
+    if (!args.screenshotPath.empty())
     {
-        std::string screenshotTab = "system";
-        for (int i = 1; i < argc - 1; ++i)
-        {
-            if (std::string(argv[i]) == "--screenshot" && i + 2 < argc)
-            {
-                screenshotTab = argv[i + 2];
-            }
-        }
-        return HeadlessRunner::runScreenshotMode(screenshotPath, screenshotTab);
+        return HeadlessRunner::runScreenshotMode(args.screenshotPath,
+                                                 args.screenshotTab);
     }
+
+    double durationSeconds = args.durationSeconds;
 
     std::signal(SIGINT, handleShutdownSignal);
     std::signal(SIGTERM, handleShutdownSignal);
