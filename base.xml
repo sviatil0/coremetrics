@@ -250,7 +250,7 @@
         <label>
             <ivec2><x>24</x><y>108</y></ivec2>
             <vec3><x>0.604</x><y>0.647</y><z>0.808</z></vec3>
-            <text>v0.3.0</text>
+            <text>v0.4.0</text>
         </label>
         <label>
             <ivec2><x>24</x><y>128</y></ivec2>
@@ -312,7 +312,7 @@
         <label>
             <ivec2><x>148</x><y>492</y></ivec2>
             <vec3><x>0.604</x><y>0.647</y><z>0.808</z></vec3>
-            <text>v0.3.0</text>
+            <text>v0.4.0</text>
         </label>
         <label>
             <ivec2><x>240</x><y>492</y></ivec2>
