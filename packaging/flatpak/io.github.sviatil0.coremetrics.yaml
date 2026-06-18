@@ -1,0 +1,73 @@
+# Flathub manifest for CoreMetrics.
+#
+# Submit at: https://github.com/flathub/flathub (file an Issue + new repo
+# request, then push this file to the per-app repo flathub/io.github.sviatil0.coremetrics).
+# Flathub CI rebuilds on each commit; we only have to maintain this file.
+#
+# TODO: Flathub requires verified sha256 sums on every `archive` source.
+# When first submitting, run `sha256sum <tarball>` on the SDL3 release
+# tarballs and replace REPLACE_WITH_*_SHA256 below. Until then the manifest
+# is structurally correct but Flathub CI will reject the submission.
+
+app-id: io.github.sviatil0.coremetrics
+runtime: org.freedesktop.Platform
+runtime-version: '23.08'
+sdk: org.freedesktop.Sdk
+command: coremetrics
+
+finish-args:
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --share=ipc
+  - --device=dri
+  # Required so the Processes tab can enumerate /proc and read per-process stats.
+  - --filesystem=host-os:ro
+  - --socket=pulseaudio
+
+modules:
+  - name: sdl3
+    buildsystem: cmake-ninja
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=Release
+      - -DSDL_TESTS=OFF
+    sources:
+      - type: archive
+        url: https://github.com/libsdl-org/SDL/releases/download/release-3.2.16/SDL3-3.2.16.tar.gz
+        sha256: REPLACE_WITH_SDL3_TARBALL_SHA256
+
+  - name: sdl3-ttf
+    buildsystem: cmake-ninja
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=Release
+      - -DSDLTTF_VENDORED=OFF
+    sources:
+      - type: archive
+        url: https://github.com/libsdl-org/SDL_ttf/releases/download/release-3.2.2/SDL3_ttf-3.2.2.tar.gz
+        sha256: REPLACE_WITH_SDL3_TTF_TARBALL_SHA256
+
+  - name: sdl3-image
+    buildsystem: cmake-ninja
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=Release
+      - -DSDLIMAGE_VENDORED=OFF
+    sources:
+      - type: archive
+        url: https://github.com/libsdl-org/SDL_image/releases/download/release-3.2.4/SDL3_image-3.2.4.tar.gz
+        sha256: REPLACE_WITH_SDL3_IMAGE_TARBALL_SHA256
+
+  - name: coremetrics
+    buildsystem: simple
+    build-commands:
+      - mkdir -p obj bin
+      - make CXXFLAGS="-std=c++23 -Wall -O2 -I ./include -I/app/include"
+             LDFLAGS="-L/app/lib -lSDL3 -lSDL3_ttf -lSDL3_image -Wl,-rpath,/app/lib"
+             bin/coremetrics
+      - install -D -m 0755 bin/coremetrics /app/bin/coremetrics
+      - install -D -m 0644 base.xml /app/bin/base.xml
+      - cp -r assets /app/bin/assets
+      - install -D -m 0644 packaging/flatpak/io.github.sviatil0.CoreMetrics.desktop /app/share/applications/io.github.sviatil0.coremetrics.desktop
+      - install -D -m 0644 assets/logo.png /app/share/icons/hicolor/256x256/apps/io.github.sviatil0.coremetrics.png
+      - install -D -m 0644 packaging/flatpak/io.github.sviatil0.coremetrics.appdata.xml /app/share/metainfo/io.github.sviatil0.coremetrics.appdata.xml
+    sources:
+      - type: dir
+        path: ../..

@@ -1,0 +1,20 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.6.0.schema.json
+# TODO: when the Windows .zip is first published by release.yml, regenerate the
+# InstallerSha256 below with:
+#   curl -L https://github.com/sviatil0/coremetrics/releases/download/v0.2.18/coremetrics-v0.2.18-windows-x86_64.zip \
+#     | sha256sum
+# and replace REPLACE_WITH_WINDOWS_ZIP_SHA256.
+
+PackageIdentifier: sviatil0.coremetrics
+PackageVersion: 0.2.18
+InstallerType: zip
+NestedInstallerType: portable
+NestedInstallerFiles:
+  - RelativeFilePath: coremetrics-v0.2.18-windows-x86_64\coremetrics.exe
+    PortableCommandAlias: coremetrics
+Installers:
+  - Architecture: x64
+    InstallerUrl: https://github.com/sviatil0/coremetrics/releases/download/v0.2.18/coremetrics-v0.2.18-windows-x86_64.zip
+    InstallerSha256: REPLACE_WITH_WINDOWS_ZIP_SHA256
+ManifestType: installer
+ManifestVersion: 1.6.0

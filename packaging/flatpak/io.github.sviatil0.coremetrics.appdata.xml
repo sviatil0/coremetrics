@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- AppStream metadata for the CoreMetrics Flatpak. Flathub validates this
+     file with appstream-util on every submission, so any new <release>
+     entry must use ISO-8601 dates and a real version number. -->
+<component type="desktop-application">
+  <id>io.github.sviatil0.coremetrics</id>
+
+  <name>CoreMetrics</name>
+  <summary>Cross-platform desktop system monitor (CPU, RAM, GPU, processes)</summary>
+
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>LGPL-2.1-only</project_license>
+
+  <developer_name>Sviatoslav Oleksiienko</developer_name>
+  <url type="homepage">https://github.com/sviatil0/coremetrics</url>
+  <url type="bugtracker">https://github.com/sviatil0/coremetrics/issues</url>
+  <url type="vcs-browser">https://github.com/sviatil0/coremetrics</url>
+
+  <description>
+    <p>
+      CoreMetrics is a small C++23 system monitor built directly on raw SDL3
+      pixel surfaces. It shows live CPU, RAM, GPU, and per-process resource
+      usage with an optional rolling sparklines view and an htop-style kill
+      flow on the Processes tab.
+    </p>
+    <p>
+      No Qt, no Electron, no JavaScript runtime. Every widget is hand-rasterized
+      by code in the upstream repository. Three native metrics backends (Linux
+      /proc, macOS Mach + IOKit, Windows PDH) are selected at compile time so
+      the same source tree builds the same UI on each platform.
+    </p>
+  </description>
+
+  <launchable type="desktop-id">io.github.sviatil0.coremetrics.desktop</launchable>
+
+  <categories>
+    <category>System</category>
+    <category>Monitor</category>
+  </categories>
+
+  <keywords>
+    <keyword>system</keyword>
+    <keyword>monitor</keyword>
+    <keyword>cpu</keyword>
+    <keyword>ram</keyword>
+    <keyword>gpu</keyword>
+    <keyword>process</keyword>
+    <keyword>htop</keyword>
+  </keywords>
+
+  <screenshots>
+    <screenshot type="default">
+      <caption>System tab with CPU, RAM, GPU, and disk readouts</caption>
+      <image>https://raw.githubusercontent.com/sviatil0/coremetrics/main/assets/screenshot-system.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Processes tab with sortable table and signal menu</caption>
+      <image>https://raw.githubusercontent.com/sviatil0/coremetrics/main/assets/screenshot-processes.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>About tab with host snapshot</caption>
+      <image>https://raw.githubusercontent.com/sviatil0/coremetrics/main/assets/screenshot-about.png</image>
+    </screenshot>
+  </screenshots>
+
+  <content_rating type="oars-1.1" />
+
+  <releases>
+    <release version="0.2.18" date="2025-11-16">
+      <description>
+        <p>Initial Flatpak submission. See the upstream changelog for details.</p>
+      </description>
+    </release>
+  </releases>
+</component>
