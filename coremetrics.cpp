@@ -58,6 +58,7 @@
 #include "TabIndicator.hpp"
 #include "EmptyStates.hpp"
 #include "AboutTab.hpp"
+#include "KeyboardEvents.hpp"
 
 constexpr int RESX = 960;
 constexpr int RESY = 540;
@@ -85,7 +86,9 @@ static float g_ramPct = 0.0f;
 static float g_gpuPct = 0.0f;
 static Label *g_muteLabel = nullptr;
 static Label *g_pollLabel = nullptr;
-static std::vector<Row *> g_processRows;
+// Defined in src/KeyboardEvents.cpp (Phase 1.2 slice 13) so the live-UI
+// state-machine globals all live next to the handler that owns them.
+extern std::vector<Row *> g_processRows;
 
 static bool g_alarmEnabled = true;
 static bool g_cpuAlarmActive = false;
@@ -142,19 +145,22 @@ constexpr int PROCESSES_ROW_X0 = 24;
 constexpr int PROCESSES_ROW_X1 = 936;
 constexpr int PROCESSES_VISIBLE_ROWS = 15;
 
-static int g_selectedPid = -1;
-static int g_selectedRowIndex = -1;
-static std::vector<int> g_visiblePids;
+// Defined in src/KeyboardEvents.cpp so the live-UI state lives next to
+// the handler that mutates it. coremetrics.cpp still reads + writes
+// these from the mouse handler, polling loop, and CLI / scene setup.
+extern int g_selectedPid;
+extern int g_selectedRowIndex;
+extern std::vector<int> g_visiblePids;
 // First-row index in the fetched process list. PgDown/PgUp shift the
 // visible window by PROCESSES_VISIBLE_ROWS; up/down arrow at the edge
 // of the visible window scrolls by one. Stays clamped to
 // [0, max(0, procCount - dataRowCount)] so the bottom row of data
 // fills the last visible slot even on overscroll.
-static std::size_t g_processScrollOffset = 0;
+extern std::size_t g_processScrollOffset;
 // Snapshot of the most recent procs.size() after filter+truncate, set
 // by pollMetrics for the key handler so PgDown / arrow keys can clamp
 // against the actual table length without recomputing.
-static std::size_t g_processVisibleCount = 0;
+extern std::size_t g_processVisibleCount;
 // Per-visible-row glyph overlay state for tree mode. When non-empty,
 // the prefix string contains the indent spaces + '+ ' or '- ' that
 // should be re-painted in color over the white text the Row already
@@ -164,49 +170,55 @@ static std::size_t g_processVisibleCount = 0;
 static std::vector<std::string> g_rowGlyphPrefix;
 static std::vector<bool> g_rowGlyphCollapsed;
 
-static bool g_signalMenuVisible = false;
-static int g_signalMenuPickedIndex = -1; // -1 = picking, 0..5 = awaiting confirm
+// Defined in src/KeyboardEvents.cpp. closeSignalMenu() below resets
+// them; the menu render path reads them every frame.
+extern bool g_signalMenuVisible;
+extern int g_signalMenuPickedIndex; // -1 = picking, 0..5 = awaiting confirm
 
-static std::string g_statusFlash;
-static Uint64 g_statusFlashExpiryMs = 0;
-constexpr Uint64 STATUS_FLASH_DURATION_MS = 2500;
+// Defined in src/KeyboardEvents.cpp alongside flashStatus(). The
+// renderer below reads them every tick to decide whether to paint
+// the "sent TERM -> pid N" footer line.
+extern std::string g_statusFlash;
+extern Uint64 g_statusFlashExpiryMs;
 
 // Process search/filter. '/' on the Processes tab enters input mode.
 // g_filterText is the case-insensitive substring matched against process
 // names; an empty string disables filtering. g_filterInputActive tracks
 // whether keystrokes append to the filter (input mode) or trigger the
 // usual row navigation (filter applied but no longer being edited).
-static std::string g_filterText;
-static bool g_filterInputActive = false;
+// Defined in src/KeyboardEvents.cpp. coremetrics.cpp still consults
+// the text + flag when filtering the row table each tick.
+extern std::string g_filterText;
+extern bool g_filterInputActive;
 
 // Tree mode: when on, the Processes table groups parent/child pairs
 // depth-first and indents the name cell with tree connectors. Toggled
 // by 't' on the Processes tab. When off the table sorts by the active
 // column the way it has since the SAFE wave.
-static bool g_treeMode = false;
+// Defined in src/KeyboardEvents.cpp. Tree-mode tick reads the flag
+// each poll to decide whether to flatten parent/child rows.
+extern bool g_treeMode;
 // Per-pid collapse state for tree mode. Pids in this set hide their
 // descendants in the flattened row list; pressing 'space' on a row
 // toggles membership. Initial state: empty (everything expanded).
 // Kept across tree-mode toggles so the user's layout sticks.
-static std::unordered_set<int> g_collapsedPids;
+// Defined in src/KeyboardEvents.cpp.
+extern std::unordered_set<int> g_collapsedPids;
 
 // Help overlay: a translucent-feel dark panel listing every hotkey,
 // toggled by '?' and dismissed with '?' or Esc. Painted last in the
 // render pass so it sits on top of every tab and every other overlay.
-static bool g_helpOverlayVisible = false;
+// Defined in src/KeyboardEvents.cpp; consulted at render time here.
+extern bool g_helpOverlayVisible;
 
-static void flashStatus(const std::string &text)
-{
-    g_statusFlash = text;
-    g_statusFlashExpiryMs = SDL_GetTicks() + STATUS_FLASH_DURATION_MS;
-}
+// Defined in src/KeyboardEvents.cpp; declared here so callers in
+// this TU (mouse handler, scene builder, alarm flash sites) can
+// post status flashes without duplicating the body.
+void flashStatus(const std::string &text);
 
-static bool processesTabActive()
-{
-    Tree<Layout> *node = EventManager::findLayoutByName(
-        LayoutManager::getInstance().getRoot(), "processes");
-    return node != nullptr && node->getData().isActive();
-}
+// Defined in src/KeyboardEvents.cpp; declared here so the mouse
+// handler and the polling loop can guard tab-specific behavior.
+bool processesTabActive();
 
 static bool aboutTabActive()
 {
@@ -274,11 +286,9 @@ static void recenterMuteLabel()
     g_muteLabel->setPos(ivec2(newX, pos.y));
 }
 
-static void closeSignalMenu()
-{
-    g_signalMenuVisible = false;
-    g_signalMenuPickedIndex = -1;
-}
+// Defined in src/KeyboardEvents.cpp; declared here so the mouse
+// handler can dismiss the menu when the click misses the panel.
+void closeSignalMenu();
 // PERCORE_* geometry moved to src/PerCoreStrip.cpp alongside the
 // renderer that owns the strip.
 
@@ -1588,286 +1598,7 @@ int main(int argc, char **argv)
             }
             case SDL_EVENT_KEY_DOWN:
             {
-                SDL_Keycode key = event.key.key;
-
-                // '?' toggles the keyboard shortcuts overlay. Lives before
-                // every other handler so it works on any tab and even with
-                // another overlay underneath; the help panel is read-only
-                // chrome and never consumes a follow-up keystroke besides
-                // its own dismiss.
-                if (key == SDLK_QUESTION)
-                {
-                    g_helpOverlayVisible = !g_helpOverlayVisible;
-                    break;
-                }
-
-                // Esc and N close the signal menu without sending; if no
-                // menu is open Esc clears the selection (the htop default).
-                if (key == SDLK_ESCAPE)
-                {
-                    if (g_helpOverlayVisible)
-                    {
-                        // Esc on help overlay: dismiss only. Don't fall
-                        // through to clearing selection or filter so the
-                        // user can dismiss without side effects.
-                        g_helpOverlayVisible = false;
-                        break;
-                    }
-                    if (g_signalMenuVisible)
-                    {
-                        closeSignalMenu();
-                    }
-                    else if (g_filterInputActive)
-                    {
-                        // Esc while editing: drop the filter entirely so
-                        // a typo or accidental '/' isn't sticky.
-                        g_filterInputActive = false;
-                        g_filterText.clear();
-                        SDL_StopTextInput(window);
-                    }
-                    else if (!g_filterText.empty())
-                    {
-                        // Esc with filter applied but not editing: clear
-                        // the filter, mirrors htop F3.
-                        g_filterText.clear();
-                    }
-                    else
-                    {
-                        g_selectedPid = -1;
-                        g_selectedRowIndex = -1;
-                    }
-                    break;
-                }
-
-                // Backspace in filter input mode edits the filter; outside
-                // input mode it does nothing (no other use).
-                if (g_filterInputActive && key == SDLK_BACKSPACE)
-                {
-                    if (!g_filterText.empty())
-                    {
-                        g_filterText.pop_back();
-                    }
-                    break;
-                }
-
-                // Enter commits the filter and exits input mode; the
-                // filter stays applied and Up/Down + 'k' resume working.
-                if (g_filterInputActive && (key == SDLK_RETURN || key == SDLK_KP_ENTER))
-                {
-                    g_filterInputActive = false;
-                    SDL_StopTextInput(window);
-                    break;
-                }
-
-                // While the user is editing the filter, do NOT let other
-                // bindings (Up/Down/k/1-6) fire underneath; that would be
-                // surprising and the SDL_StartTextInput path may have
-                // already enqueued the keystroke as text.
-                if (g_filterInputActive)
-                {
-                    break;
-                }
-
-                if (g_signalMenuVisible)
-                {
-                    if (g_signalMenuPickedIndex < 0)
-                    {
-                        // Picking phase: 1..6 chooses a signal, anything
-                        // else is ignored so a stray keystroke cannot send.
-                        if (key >= SDLK_1 && key <= SDLK_6)
-                        {
-                            g_signalMenuPickedIndex = static_cast<int>(key - SDLK_1);
-                        }
-                    }
-                    else
-                    {
-                        // Confirm phase: Y / Enter sends, N / Esc cancels.
-                        if (key == SDLK_Y || key == SDLK_RETURN || key == SDLK_KP_ENTER)
-                        {
-                            SignalUtils::Signal sig =
-                                static_cast<SignalUtils::Signal>(g_signalMenuPickedIndex);
-                            SignalUtils::SendStatus s = SignalUtils::send(g_selectedPid, sig);
-                            std::string label = std::string(SignalUtils::name(sig))
-                                                 + " -> " + std::to_string(g_selectedPid);
-                            switch (s)
-                            {
-                            case SignalUtils::SendStatus::Ok:
-                                flashStatus("sent " + label);
-                                // Audit trail: one line per successful kill so a
-                                // user can later reconstruct which signal landed
-                                // on which pid. Best-effort and silent on I/O
-                                // failure so the live UI never blocks on disk.
-                                KillLog::append(g_selectedPid,
-                                                (g_selectedRowIndex >= 0
-                                                 && g_selectedRowIndex + 1 < static_cast<int>(g_processRows.size())
-                                                 && g_processRows[g_selectedRowIndex + 1] != nullptr
-                                                 && g_processRows[g_selectedRowIndex + 1]->getCells().size() > 1)
-                                                    ? g_processRows[g_selectedRowIndex + 1]->getCells()[1]
-                                                    : std::string{},
-                                                SignalUtils::name(sig));
-                                break;
-                            case SignalUtils::SendStatus::NoSuchProcess:
-                                flashStatus(label + " : no such process");
-                                break;
-                            case SignalUtils::SendStatus::PermissionDenied:
-                                flashStatus(label + " : permission denied");
-                                break;
-                            case SignalUtils::SendStatus::InvalidSignal:
-                                flashStatus(label + " : invalid signal");
-                                break;
-                            case SignalUtils::SendStatus::InvalidPid:
-                                flashStatus(label + " : refused (pid <= 1)");
-                                break;
-                            case SignalUtils::SendStatus::Unsupported:
-                                flashStatus(label + " : windows: not implemented");
-                                break;
-                            }
-                            closeSignalMenu();
-                        }
-                        else if (key == SDLK_N)
-                        {
-                            closeSignalMenu();
-                        }
-                    }
-                    break;
-                }
-
-                // No menu open: arrow keys move row selection; 'k' opens
-                // the menu when a row is selected and the Processes tab
-                // is active.
-                if (!processesTabActive())
-                {
-                    break;
-                }
-                if (key == SDLK_UP || key == SDLK_DOWN)
-                {
-                    if (g_visiblePids.empty())
-                    {
-                        break;
-                    }
-                    int next = g_selectedRowIndex;
-                    if (next < 0)
-                    {
-                        next = 0;
-                    }
-                    else if (key == SDLK_UP)
-                    {
-                        if (next > 0)
-                        {
-                            next -= 1;
-                        }
-                        else if (g_processScrollOffset > 0)
-                        {
-                            // Already at top visible row; scroll the
-                            // window up by one so the previous off-screen
-                            // process becomes the new selection on the
-                            // next poll tick.
-                            g_processScrollOffset -= 1;
-                        }
-                    }
-                    else
-                    {
-                        int max = static_cast<int>(g_visiblePids.size()) - 1;
-                        if (next < max)
-                        {
-                            next += 1;
-                        }
-                        else if (g_processVisibleCount
-                                 > g_processScrollOffset + g_visiblePids.size())
-                        {
-                            // Already at bottom visible row; scroll the
-                            // window down by one so the next off-screen
-                            // process becomes the new selection.
-                            g_processScrollOffset += 1;
-                        }
-                    }
-                    g_selectedRowIndex = next;
-                    g_selectedPid = g_visiblePids[next];
-                }
-                else if (key == SDLK_PAGEUP)
-                {
-                    if (g_processScrollOffset >= PROCESSES_VISIBLE_ROWS)
-                    {
-                        g_processScrollOffset -= PROCESSES_VISIBLE_ROWS;
-                    }
-                    else
-                    {
-                        g_processScrollOffset = 0;
-                    }
-                }
-                else if (key == SDLK_PAGEDOWN)
-                {
-                    std::size_t dataRowCount = PROCESSES_VISIBLE_ROWS;
-                    if (g_processVisibleCount > dataRowCount)
-                    {
-                        std::size_t maxOffset = g_processVisibleCount - dataRowCount;
-                        g_processScrollOffset += PROCESSES_VISIBLE_ROWS;
-                        if (g_processScrollOffset > maxOffset)
-                        {
-                            g_processScrollOffset = maxOffset;
-                        }
-                    }
-                }
-                else if (key == SDLK_HOME)
-                {
-                    g_processScrollOffset = 0;
-                    if (!g_visiblePids.empty())
-                    {
-                        g_selectedRowIndex = 0;
-                        g_selectedPid = g_visiblePids.front();
-                    }
-                }
-                else if (key == SDLK_END)
-                {
-                    std::size_t dataRowCount = PROCESSES_VISIBLE_ROWS;
-                    if (g_processVisibleCount > dataRowCount)
-                    {
-                        g_processScrollOffset = g_processVisibleCount - dataRowCount;
-                    }
-                    else
-                    {
-                        g_processScrollOffset = 0;
-                    }
-                }
-                else if (key == SDLK_K && g_selectedPid >= 0)
-                {
-                    g_signalMenuVisible = true;
-                    g_signalMenuPickedIndex = -1;
-                }
-                else if (key == SDLK_SLASH)
-                {
-                    // '/' on Processes tab enters filter input mode. If
-                    // a filter is already applied, re-enter with the
-                    // existing text so the user can keep typing.
-                    g_filterInputActive = true;
-                    SDL_StartTextInput(window);
-                }
-                else if (key == SDLK_T)
-                {
-                    // 't' toggles tree mode. When the user is editing a
-                    // filter the key path was already swallowed above, so
-                    // the toggle only fires when input is idle.
-                    g_treeMode = !g_treeMode;
-                    flashStatus(g_treeMode ? "tree mode on" : "tree mode off");
-                }
-                else if (key == SDLK_SPACE && g_treeMode && g_selectedPid >= 0)
-                {
-                    // Space collapses/expands the subtree rooted at the
-                    // selected pid. State lives in g_collapsedPids and is
-                    // consulted by the tree-mode flattener; the next poll
-                    // hides (or restores) the descendants.
-                    auto it = g_collapsedPids.find(g_selectedPid);
-                    if (it == g_collapsedPids.end())
-                    {
-                        g_collapsedPids.insert(g_selectedPid);
-                        flashStatus("collapsed pid " + std::to_string(g_selectedPid));
-                    }
-                    else
-                    {
-                        g_collapsedPids.erase(it);
-                        flashStatus("expanded pid " + std::to_string(g_selectedPid));
-                    }
-                }
+                KeyboardEvents::handle(event.key);
                 break;
             }
             }
