@@ -2,6 +2,7 @@
 #include <atomic>
 #include <csignal>
 #include <cstdio>
+#include <cstdint>
 #include <cstdlib>
 #ifndef _WIN32
 #include <unistd.h>
@@ -45,7 +46,6 @@
 #include "FooterLiveStats.hpp"
 #include "ProcessesSummary.hpp"
 #include "SignalMenuOverlay.hpp"
-#include "TopProcessesPrinter.hpp"
 #include "FilterStrip.hpp"
 #include "StatusFlash.hpp"
 #include "Thresholds.hpp"
@@ -53,7 +53,6 @@
 #include "AssetPath.hpp"
 #include "SignalUtils.hpp"
 #include "KillLog.hpp"
-#include "Exporter.hpp"
 #include "Settings.hpp"
 #include "TabIndicator.hpp"
 #include "EmptyStates.hpp"
@@ -61,6 +60,7 @@
 #include "KeyboardEvents.hpp"
 #include "MouseEvents.hpp"
 #include "MetricsPoller.hpp"
+#include "HeadlessRunner.hpp"
 
 constexpr int RESX = 960;
 constexpr int RESY = 540;
@@ -68,8 +68,13 @@ constexpr int PROCESS_ROW_HEIGHT = 20;
 // Default poll interval is 500ms; overridable at startup via the
 // --poll-ms <N> CLI flag (clamped to [100, 10000] so the UI cannot
 // be told to repaint faster than the OS can serve samples or so slow
-// the chrome looks frozen).
-static Uint64 g_pollIntervalMs = 500;
+// the chrome looks frozen). Defined in src/HeadlessRunner.cpp (Phase
+// 1.2 slice 16) so the tests binary (which links every src/*.cpp
+// object but not the coremetrics.cpp TU) resolves the symbol via
+// HeadlessRunner.o. coremetrics.cpp still owns the writers: the
+// Settings::load() seed, the --poll-ms argv override, and the
+// Settings::save() persist on clean exit.
+extern std::uint64_t g_pollIntervalMs;
 // Bound constants live in src/ProcessUtils.cpp alongside the
 // clampPollIntervalMs() helper that uses them.
 
@@ -100,7 +105,10 @@ extern float g_gpuPct;
 // the user toggles the alarm; buildScene() in this TU assigns the
 // pointer once the scene tree is loaded.
 extern Label *g_muteLabel;
-static Label *g_pollLabel = nullptr;
+// Footer 'poll Xms' label pointer. Defined in src/HeadlessRunner.cpp
+// (Phase 1.2 slice 16) alongside the cacheElementPointers() helper
+// that is its sole writer.
+extern Label *g_pollLabel;
 // Defined in src/KeyboardEvents.cpp (Phase 1.2 slice 13) so the live-UI
 // state-machine globals all live next to the handler that owns them.
 extern std::vector<Row *> g_processRows;
@@ -137,14 +145,21 @@ extern Row *g_headerRow;
 // Sparklines are moonshot UI: a rolling time-series chart per metric drawn
 // over the System tab's lower half. Behind a flag (--sparklines) so the
 // default install matches the audit baseline; with the flag the System tab
-// gains 3 live polylines fed by RingBuffer<float> samples.
-static bool g_sparklinesEnabled = false;
-constexpr std::size_t SPARKLINE_CAPACITY = 64;
+// gains 3 live polylines fed by RingBuffer<float> samples. Defined in
+// src/HeadlessRunner.cpp (Phase 1.2 slice 16) so the screenshot mode and
+// the tests binary both resolve the symbol without depending on
+// coremetrics.o; the CLI parser in main() still writes the flag via the
+// extern below when --sparklines is passed on the command line.
+extern bool g_sparklinesEnabled;
+// SPARKLINE_CAPACITY + NET_SPARKLINE_MAX_KBPS moved to
+// src/HeadlessRunner.cpp (Phase 1.2 slice 16) alongside
+// buildSparklines() which is their sole caller.
+//
 // Sparkline owners. Defined in src/MetricsPoller.cpp (Phase 1.2
 // slice 15) so the tests link, mirroring the bar pointers above.
-// buildSparklines() / destroySparklines() in this TU is still the
-// sole writer of the unique_ptr itself; the poller pushes a new
-// sample into each polyline every tick.
+// buildSparklines() / destroySparklines() in src/HeadlessRunner.cpp
+// (slice 16) are still the sole writers of the unique_ptr itself;
+// the poller pushes a new sample into each polyline every tick.
 extern std::unique_ptr<Sparkline> g_cpuSparkline;
 extern std::unique_ptr<Sparkline> g_ramSparkline;
 extern std::unique_ptr<Sparkline> g_gpuSparkline;
@@ -157,7 +172,6 @@ extern std::unique_ptr<Sparkline> g_gpuSparkline;
 // 15) for the same tests-link reason as the CPU/RAM/GPU triple above.
 extern std::unique_ptr<Sparkline> g_netRxSparkline;
 extern std::unique_ptr<Sparkline> g_netTxSparkline;
-constexpr float NET_SPARKLINE_MAX_KBPS = 2048.0f;
 
 // Per-logical-CPU utilization for the small strip below the aggregate bars.
 // Refreshed every poll. Empty on Windows (backend not implemented yet) and
@@ -346,140 +360,16 @@ extern ivec2 g_exitBtnMax;
 // row pointer is wired up.
 void updateHeaderSortGlyph();
 
-static void buildScene()
-{
-    LayoutManager &manager = LayoutManager::getInstance();
-    GUIFile g;
-    g.readFile(AssetPath::resolve("base.xml"), manager);
-
-    g_muteBtnMin = ivec2(812, 8);
-    g_muteBtnMax = ivec2(952, 40);
-
-    g_exitBtnMin = ivec2(820, 478);
-    g_exitBtnMax = ivec2(944, 520);
-
-    int rowY = 64;
-    std::vector<float> weights = {0.10f, 0.42f, 0.12f, 0.12f, 0.24f};
-    int headerRowWidth = 936 - 24;
-    int colX = 24;
-    for (int c = 0; c < 5; ++c)
-    {
-        int colW = static_cast<int>(weights[c] * static_cast<float>(headerRowWidth));
-        g_headerColMin[c] = ivec2(colX, rowY);
-        g_headerColMax[c] = ivec2(colX + colW, rowY + PROCESS_ROW_HEIGHT);
-        colX += colW;
-    }
-}
-
-static void cacheElementPointers()
-{
-    Tree<Layout> &root = LayoutManager::getInstance().getRoot();
-    g_cpuBar = findBarByMetric(root, "cpu");
-    g_ramBar = findBarByMetric(root, "ram");
-
-    g_gpuBar = findBarByMetric(root, "gpu");
-
-    Tree<Layout> *tabbarNode = EventManager::findLayoutByName(root, "tabbar");
-    if (tabbarNode != nullptr)
-    {
-        // Tabbar labels in document order: 0 System, 1 Processes, 2 About,
-        // 3 SOUND ON/OFF. Pre-v3 code used index 2 which silently pointed
-        // at the "About" tab label and would mutate the tab title every
-        // time the user toggled sound; nobody noticed because the alarm
-        // strings happened to overwrite "About" with comparable-width
-        // characters. Index 3 is the actual SOUND label.
-        g_muteLabel = nthLabelInLayout(*tabbarNode, 3);
-        // Recenter the SOUND label from its XML default once the TTF face is
-        // initialized so the static "SOUND ON" string ends up pixel-centered
-        // inside the button rect; subsequent toggles re-run the same logic.
-        recenterMuteLabel();
-    }
-
-    g_processRows.clear();
-    collectRows(root, g_processRows);
-
-    if (!g_processRows.empty())
-    {
-        g_headerRow = g_processRows.front();
-        // Seed the header with the current sort glyph so the indicator is
-        // visible from the first frame, not only after the user clicks a
-        // header. Keeps the screenshot/headless renders honest too.
-        updateHeaderSortGlyph();
-    }
-
-    // Find the footer 'POLL_PLACEHOLDER' label so the displayed poll
-    // interval can track the --poll-ms override at runtime. Walk every
-    // layout in the tree because the footer labels could end up at any
-    // depth depending on base.xml structure.
-    std::vector<Tree<Layout> *> stack;
-    stack.push_back(&root);
-    while (!stack.empty() && g_pollLabel == nullptr)
-    {
-        Tree<Layout> *node = stack.back();
-        stack.pop_back();
-        for (const auto &element : node->getData().elements)
-        {
-            Label *lbl = dynamic_cast<Label *>(element.get());
-            if (lbl != nullptr && lbl->getText() == "POLL_PLACEHOLDER")
-            {
-                g_pollLabel = lbl;
-                break;
-            }
-        }
-        for (auto &child : node->getChildren())
-        {
-            stack.push_back(child.get());
-        }
-    }
-    if (g_pollLabel != nullptr)
-    {
-        g_pollLabel->setText("poll " + std::to_string(g_pollIntervalMs) + "ms");
-    }
-}
-
-static void buildSparklines()
-{
-    // Stacked sparklines in the System tab's empty lower half. Each row spans
-    // the same horizontal range as the bars above (x in [24, 864]) and
-    // matches the same accent color, so the polyline reads as a continuation
-    // of its bar. Heights are 56px / row with 12px gaps.
-    const vec3 accent = Theme::accentGreen();
-    // Sparkline stack: 4 charts at 40px each with a 14px label band above
-    // each chart. Labels live at chart-top minus 12px so they sit cleanly
-    // above the polyline instead of being overwritten by the fill. Tick
-    // labels ("100" / "0") render at maxPos.x + 4 in the 80px right
-    // gutter (chart maxPos.x = 864, screen width = 960). 0 tick now sits
-    // 4px BELOW the chart (maxPos.y + 4) so it never sits inside the
-    // polyline fill area.
-    g_cpuSparkline = std::make_unique<Sparkline>(
-        ivec2(24, 246), ivec2(864, 286), accent, 0.0f, 100.0f, SPARKLINE_CAPACITY);
-    g_cpuSparkline->setThresholdMode(true);
-    g_ramSparkline = std::make_unique<Sparkline>(
-        ivec2(24, 312), ivec2(864, 352), accent, 0.0f, 100.0f, SPARKLINE_CAPACITY);
-    g_ramSparkline->setThresholdMode(true);
-    g_gpuSparkline = std::make_unique<Sparkline>(
-        ivec2(24, 378), ivec2(864, 418), accent, 0.0f, 100.0f, SPARKLINE_CAPACITY);
-    g_gpuSparkline->setThresholdMode(true);
-    // tx (orange) is constructed first so it renders behind the rx
-    // (green) line in the draw pass; incoming traffic reads as more
-    // important. NET strip ends at y=474 leaving 8px clear of the
-    // y=482..516 EXIT button + footer chrome.
-    const vec3 netTx(0.95f, 0.65f, 0.30f);
-    const vec3 netRx(0.5f, 0.85f, 0.5f);
-    g_netTxSparkline = std::make_unique<Sparkline>(
-        ivec2(24, 444), ivec2(864, 474), netTx, 0.0f, NET_SPARKLINE_MAX_KBPS, SPARKLINE_CAPACITY);
-    g_netRxSparkline = std::make_unique<Sparkline>(
-        ivec2(24, 444), ivec2(864, 474), netRx, 0.0f, NET_SPARKLINE_MAX_KBPS, SPARKLINE_CAPACITY);
-}
-
-static void destroySparklines()
-{
-    g_cpuSparkline.reset();
-    g_ramSparkline.reset();
-    g_gpuSparkline.reset();
-    g_netRxSparkline.reset();
-    g_netTxSparkline.reset();
-}
+// Scene-build helpers moved to src/HeadlessRunner.cpp (Phase 1.2 slice
+// 16) so the screenshot runner and the live UI path both reach the
+// same definitions. coremetrics.cpp forward-declares them below and
+// calls them from main(); the bodies live next to runScreenshotMode()
+// which is the other caller. destroySparklines() moved with them so
+// the four helpers stay in lockstep.
+void buildScene();
+void cacheElementPointers();
+void buildSparklines();
+void destroySparklines();
 
 // Uptime + Load row paint moved to src/UptimeAndLoad.cpp as Phase 1.2
 // slice 3 of the GUI evolution spec. Call site passes g_uptimeSeconds
@@ -760,245 +650,51 @@ int main(int argc, char **argv)
     // fixed-width text table to stdout (PID/NAME/CPU%/MEM%/IO) and
     // exits 0. Reads metrics with the same backend the live UI uses
     // so output reflects the same numbers a user would see on screen.
+    // Dispatched to HeadlessRunner as of Phase 1.2 slice 16.
     if (topCount > 0)
     {
-        // Install the signal handler before the loop so Ctrl-C exits
-        // cleanly out of --watch instead of leaving a half-cleared
-        // terminal. The same flag the GUI main loop watches.
-        std::signal(SIGINT, handleShutdownSignal);
-        std::signal(SIGTERM, handleShutdownSignal);
-        if (!watchMode)
-        {
-            TopProcessesPrinter::print(topCount, topSortKey, topColorize);
-            return 0;
-        }
-        // --watch: clear the terminal with the ANSI 2J + cursor home
-        // sequence then re-print. Cheap, no curses, works in any
-        // terminal emulator. Uses g_pollIntervalMs (defaults 500 ms,
-        // overridable via --poll-ms) so the cadence matches the GUI.
-        while (!g_shutdownRequested.load())
-        {
-            std::printf("\033[2J\033[H");
-            TopProcessesPrinter::print(topCount, topSortKey, topColorize);
-            SDL_Delay(static_cast<Uint32>(g_pollIntervalMs));
-        }
-        return 0;
+        return HeadlessRunner::runTopMode(topCount,
+                                          topSortKey,
+                                          topColorize,
+                                          watchMode,
+                                          g_pollIntervalMs);
     }
 
     // Export path runs before SDL_Init: no window, no audio, no font.
     // SystemMetrics calls are pure platform queries so they work fine
-    // headless. If both flags are present we honor both.
+    // headless. If both flags are present we honor both. Dispatched to
+    // HeadlessRunner as of Phase 1.2 slice 16.
     if (!exportCsvPath.empty() || !exportJsonPath.empty())
     {
-        int exportStatus = 0;
-        if (!exportCsvPath.empty())
+        return HeadlessRunner::runExportMode(exportCsvPath, exportJsonPath);
+    }
+
+    // The --screenshot path owns its own SDL_Init(VIDEO) + SDL_Quit
+    // inside HeadlessRunner. Optional second positional arg selects
+    // the tab to capture (system / processes / about); main() parses
+    // it here so the runner stays argv-agnostic.
+    if (!screenshotPath.empty())
+    {
+        std::string screenshotTab = "system";
+        for (int i = 1; i < argc - 1; ++i)
         {
-            if (!Exporter::writeCsv(exportCsvPath))
+            if (std::string(argv[i]) == "--screenshot" && i + 2 < argc)
             {
-                std::cerr << "Failed to write CSV export to "
-                          << exportCsvPath << '\n';
-                exportStatus = 1;
-            }
-            else
-            {
-                std::cout << "Wrote CSV export to " << exportCsvPath << '\n';
+                screenshotTab = argv[i + 2];
             }
         }
-        if (!exportJsonPath.empty())
-        {
-            if (!Exporter::writeJson(exportJsonPath))
-            {
-                std::cerr << "Failed to write JSON export to "
-                          << exportJsonPath << '\n';
-                exportStatus = 1;
-            }
-            else
-            {
-                std::cout << "Wrote JSON export to " << exportJsonPath << '\n';
-            }
-        }
-        return exportStatus;
+        return HeadlessRunner::runScreenshotMode(screenshotPath, screenshotTab);
     }
 
     std::signal(SIGINT, handleShutdownSignal);
     std::signal(SIGTERM, handleShutdownSignal);
 
-    // Headless --screenshot does not play sound, so initializing the
-    // SDL audio subsystem is wasted work and on macOS the AudioQueue
-    // background thread races the screenshot teardown, producing a
-    // sporadic EXC_BAD_ACCESS in pthread_mutex_lock during static
-    // destructors after the PNG has already been written. Init only
-    // VIDEO in the screenshot path; the live path still inits both.
-    Uint32 sdlInitFlags = SDL_INIT_VIDEO;
-    if (screenshotPath.empty())
-    {
-        sdlInitFlags |= SDL_INIT_AUDIO;
-    }
-    if (!SDL_Init(sdlInitFlags))
+    // Live UI path keeps SDL_INIT_VIDEO + SDL_INIT_AUDIO; the audio
+    // subsystem is required for the alarm-flash SoundEvent path.
+    if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO))
     {
         std::cerr << "Failed to init SDL: " << SDL_GetError() << '\n';
         return -1;
-    }
-
-    if (!screenshotPath.empty())
-    {
-        // Optional second arg selects the tab: --screenshot out.bmp processes
-        std::string tab = "system";
-        for (int i = 1; i < argc - 1; ++i)
-        {
-            if (std::string(argv[i]) == "--screenshot" && i + 2 < argc)
-            {
-                tab = argv[i + 2];
-            }
-        }
-
-        Screen shot(RESX, RESY);
-        buildScene();
-        cacheElementPointers();
-        if (g_sparklinesEnabled)
-        {
-            buildSparklines();
-            // Prime the sparklines so a single headless --screenshot frame has
-            // enough history to draw a visible polyline. 64 samples at 50ms
-            // each (~3.2s) fills the rolling window exactly and also gives the
-            // per-process CPU% delta a wide enough sampling window that idle
-            // processes still register measurable ticks.
-            for (std::size_t i = 0; i < SPARKLINE_CAPACITY; ++i)
-            {
-                MetricsPoller::poll();
-                SDL_Delay(50);
-            }
-        }
-        else
-        {
-            // Per-process CPU% is a delta between two samples. 1.1s was too
-            // tight: many processes accumulate sub-tick activity in that
-            // window and round to 0.0% in the shot. 3s captures everything
-            // that is doing real work without making the screenshot path
-            // feel sluggish.
-            MetricsPoller::poll();
-            SDL_Delay(3000);
-        }
-        MetricsPoller::poll();
-
-        if (tab == "processes")
-        {
-            EventManager::getInstance().pushEvent(std::make_unique<ShowEvent>("system", false));
-            EventManager::getInstance().pushEvent(std::make_unique<ShowEvent>("processes", true));
-            EventManager::getInstance().processEvents(ivec2(0, 0), ivec2(RESX - 1, RESY - 1));
-        }
-        else if (tab == "about")
-        {
-            EventManager::getInstance().pushEvent(std::make_unique<ShowEvent>("system", false));
-            EventManager::getInstance().pushEvent(std::make_unique<ShowEvent>("about", true));
-            EventManager::getInstance().processEvents(ivec2(0, 0), ivec2(RESX - 1, RESY - 1));
-        }
-
-        shot.clear();
-        LayoutManager::getInstance().render(shot, ivec2(0, 0), ivec2(RESX - 1, RESY - 1));
-        // Active-tab indicator: keeps the headless screenshot output in
-        // sync with what the live loop paints (Pillar A5).
-        {
-            int activeTabIndex = 0;
-            if (tab == "about")
-            {
-                activeTabIndex = 2;
-            }
-            else if (tab == "processes")
-            {
-                activeTabIndex = 1;
-            }
-            TabIndicator::render(shot, activeTabIndex);
-        }
-        FooterLiveStats::render(shot, g_lastProcCount);
-        if (tab == "system")
-        {
-            // Dominant Title-size CPU/RAM/GPU readouts (Pillar A2). Paints
-            // before the per-tab helpers so the smaller dim "%" sign sits
-            // above the card background without getting overdrawn.
-            MetricReadouts::render(shot, g_cpuPct, g_ramPct, g_gpuPct);
-            UptimeAndLoad::render(shot, g_uptimeSeconds, g_loadAverages);
-            DiskUsageRow::render(shot, g_diskUsage);
-            NetIoFooter::render(shot, g_aggregateDiskReadKbPerSec, g_aggregateDiskWriteKbPerSec, g_netIo);
-            MemBreakdownStrip::render(shot, g_memBreakdown);
-            PerCoreStrip::render(shot, g_perCoreCpu, g_sparklinesEnabled);
-            if (g_sparklinesEnabled)
-            {
-                if (g_cpuSparkline != nullptr) g_cpuSparkline->draw(shot);
-                if (g_ramSparkline != nullptr) g_ramSparkline->draw(shot);
-                if (g_gpuSparkline != nullptr) g_gpuSparkline->draw(shot);
-                // tx (orange) first so the rx (green) line reads on top;
-                // incoming traffic is the headline number for most users.
-                if (g_netTxSparkline != nullptr) g_netTxSparkline->draw(shot);
-                if (g_netRxSparkline != nullptr) g_netRxSparkline->draw(shot);
-                SparklineLabels::render(shot);
-            }
-        }
-        else if (tab == "processes" && !g_filterText.empty())
-        {
-            const vec3 labelColor = Theme::accentGreen();
-            const vec3 textColor(1.0f, 1.0f, 1.0f);
-            Font::drawText(shot, "filter: ", ivec2(24, 44), labelColor);
-            Font::drawText(shot, g_filterText, ivec2(120, 44), textColor);
-        }
-        if (tab == "processes")
-        {
-            ProcessesSummary::render(shot,
-                                     g_lastProcCount,
-                                     g_sumCpuPct,
-                                     g_sumMemPct,
-                                     g_processScrollOffset,
-                                     g_processVisibleCount,
-                                     PROCESSES_VISIBLE_ROWS);
-            // Mirror the live loop's empty-state hint so the screenshot
-            // matches what a user sees during the boot moment (Pillar A6).
-            if (g_lastProcCount == 0)
-            {
-                EmptyStates::renderProcessesEmpty(shot);
-            }
-        }
-        else if (tab == "about")
-        {
-            AboutTab::render(shot, g_uptimeSeconds, g_perCoreCpu.size());
-        }
-        SDL_Surface *out = SDL_CreateSurface(RESX, RESY, SDL_PIXELFORMAT_RGBA32);
-        if (out == nullptr)
-        {
-            std::cerr << "Failed to create screenshot surface: " << SDL_GetError() << '\n';
-            SDL_Quit();
-            return -3;
-        }
-        shot.blitTo(out);
-
-        // Pick the writer by extension so the same flag produces what the
-        // README expects (PNG hero images) without forcing callers to run an
-        // external converter step. Falls back to BMP for any other suffix.
-        auto endsWith = [](const std::string &s, const std::string &suffix)
-        {
-            return s.size() >= suffix.size()
-                   && s.compare(s.size() - suffix.size(), suffix.size(), suffix) == 0;
-        };
-        bool saved = false;
-        if (endsWith(screenshotPath, ".png") || endsWith(screenshotPath, ".PNG"))
-        {
-            saved = IMG_SavePNG(out, screenshotPath.c_str());
-        }
-        else
-        {
-            saved = SDL_SaveBMP(out, screenshotPath.c_str());
-        }
-        if (!saved)
-        {
-            std::cerr << "Failed to save screenshot: " << SDL_GetError() << '\n';
-        }
-        else
-        {
-            std::cout << "Saved screenshot to " << screenshotPath << '\n';
-        }
-        SDL_DestroySurface(out);
-        Font::shutdown();
-        SDL_Quit();
-        return 0;
     }
 
     SDL_Window *window = SDL_CreateWindow("CoreMetrics", RESX, RESY, SDL_WINDOW_RESIZABLE);
