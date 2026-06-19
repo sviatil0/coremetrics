@@ -38,8 +38,13 @@ jobs:
         for P in $LIB_PATHS; do export LD_LIBRARY_PATH="$P:$LD_LIBRARY_PATH"; done
         RPATHS=""
         for P in $LIB_PATHS; do RPATHS="$RPATHS -Wl,-rpath,$P"; done
+        # Build the binary target directly. The phony `coremetrics`
+        # target also runs the binary on completion, which would hang
+        # under SDL_VIDEODRIVER=dummy. Pre-create obj/ and bin/ so the
+        # dep-file (-MMD) write does not fail on a fresh checkout.
+        mkdir -p obj bin
         make CXXFLAGS="-std=c++23 -Wall -I ./include $(pkg-config --cflags sdl3 sdl3-ttf sdl3-image)" \
-             LDFLAGS="$(pkg-config --libs sdl3 sdl3-ttf sdl3-image) $RPATHS" coremetrics
+             LDFLAGS="$(pkg-config --libs sdl3 sdl3-ttf sdl3-image) $RPATHS" bin/coremetrics
 
     - name: Capture layout JSON per tab
       env:
