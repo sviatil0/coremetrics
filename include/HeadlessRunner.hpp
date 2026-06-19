@@ -43,8 +43,12 @@ namespace HeadlessRunner
                    unsigned long long pollIntervalMs);
     int runExportMode(const std::string &csvPath,
                       const std::string &jsonPath);
+    // debugLayoutPath: if non-empty, enable LayoutSink before rendering
+    // so paint rects can be dumped to JSON for the CI layout audit.
+    // Empty string preserves the legacy behavior (no introspection).
     int runScreenshotMode(const std::string &screenshotPath,
-                          const std::string &screenshotTab);
+                          const std::string &screenshotTab,
+                          const std::string &debugLayoutPath = "");
 }
 
 #endif

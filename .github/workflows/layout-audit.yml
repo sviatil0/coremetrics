@@ -1,0 +1,78 @@
+name: Layout Audit
+
+on:
+  push:
+    branches: [ "main", "dev" ]
+  pull_request:
+    branches: [ "main", "dev" ]
+
+concurrency:
+  group: ci-layout-${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential pkg-config libfreetype-dev libharfbuzz-dev python3
+
+    - name: Setup SDL3
+      uses: libsdl-org/setup-sdl@a966470e7d9b6a5c93eec3f08d5dac370325c860  # main@2026-05-15
+      with:
+        install-linux-dependencies: true
+        version: 3-latest
+        version-sdl-ttf: 3-latest
+        version-sdl-image: 3-latest
+
+    - name: Build coremetrics
+      env:
+        SDL_VIDEO_DRIVER: dummy
+      run: |
+        LIB_PATHS=$(pkg-config --libs-only-L sdl3 sdl3-ttf sdl3-image | sed 's|-L||g')
+        for P in $LIB_PATHS; do export LD_LIBRARY_PATH="$P:$LD_LIBRARY_PATH"; done
+        RPATHS=""
+        for P in $LIB_PATHS; do RPATHS="$RPATHS -Wl,-rpath,$P"; done
+        # Build the binary target directly. The phony `coremetrics`
+        # target also runs the binary on completion, which would hang
+        # under SDL_VIDEODRIVER=dummy. Pre-create obj/ and bin/ so the
+        # dep-file (-MMD) write does not fail on a fresh checkout.
+        mkdir -p obj bin
+        make CXXFLAGS="-std=c++23 -Wall -I ./include $(pkg-config --cflags sdl3 sdl3-ttf sdl3-image)" \
+             LDFLAGS="$(pkg-config --libs sdl3 sdl3-ttf sdl3-image) $RPATHS" bin/coremetrics
+
+    - name: Capture layout JSON per tab
+      env:
+        SDL_VIDEO_DRIVER: dummy
+      run: |
+        mkdir -p layout-audit
+        LIB_PATHS=$(pkg-config --libs-only-L sdl3 sdl3-ttf sdl3-image | sed 's|-L||g')
+        for P in $LIB_PATHS; do export LD_LIBRARY_PATH="$P:$LD_LIBRARY_PATH"; done
+        ./bin/coremetrics --screenshot layout-audit/system.png system \
+                          --debug-layout layout-audit/system.json
+        ./bin/coremetrics --screenshot layout-audit/processes.png processes \
+                          --debug-layout layout-audit/processes.json
+        ./bin/coremetrics --screenshot layout-audit/about.png about \
+                          --debug-layout layout-audit/about.json
+        ls -la layout-audit/
+
+    - name: Run layout audit
+      run: |
+        python3 scripts/layout-audit.py \
+          layout-audit/system.json \
+          layout-audit/processes.json \
+          layout-audit/about.json
+
+    - name: Upload layout audit artifacts
+      if: always()
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+      with:
+        name: layout-audit
+        path: layout-audit/
+        if-no-files-found: warn
+        retention-days: 14

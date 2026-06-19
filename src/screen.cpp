@@ -1,4 +1,5 @@
 #include "screen.hpp"
+#include "LayoutSink.hpp"
 #include "ThreadPool.hpp"
 #include "font.hpp"
 
@@ -246,6 +247,15 @@ void Screen::drawBox(const Tvec2<int> &a, const Tvec2<int> &b, const Tvec3<float
 
     int numRows = yMax - yMin + 1;
     int numCols = xMax - xMin + 1;
+
+    if (LayoutSink::isActive())
+    {
+        LayoutSink::recordBox(
+            xMin, yMin, numCols, numRows,
+            static_cast<int>(std::clamp(color.x, 0.0f, 1.0f) * 255.0f),
+            static_cast<int>(std::clamp(color.y, 0.0f, 1.0f) * 255.0f),
+            static_cast<int>(std::clamp(color.z, 0.0f, 1.0f) * 255.0f));
+    }
     // Fast path: small boxes (1-row separators, thin borders, signal-
     // menu cell strokes) cost more in thread-pool dispatch than in
     // pixel fill. Skip the pool and run inline when the box area is
