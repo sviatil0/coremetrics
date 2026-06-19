@@ -1,5 +1,6 @@
 #include "font.hpp"
 #include "AssetPath.hpp"
+#include "LayoutSink.hpp"
 #include <SDL3_ttf/SDL_ttf.h>
 #include <iostream>
 #include <unordered_map>
@@ -27,6 +28,20 @@ static TTF_Font *g_fontTitle = nullptr;
 // rather than per-size. Asset resolution is also a one-time concern.
 static bool g_ttfInitTried = false;
 static bool g_ttfInitOk = false;
+
+static const char *sizeLabel(Font::Size size)
+{
+    switch (size)
+    {
+        case Font::Size::Caption:
+            return "Caption";
+        case Font::Size::Title:
+            return "Title";
+        case Font::Size::Body:
+        default:
+            return "Body";
+    }
+}
 
 static float fontSizeFor(Font::Size size)
 {
@@ -178,6 +193,15 @@ void Font::drawText(Screen &screen, const std::string &text, ivec2 pos, vec3 col
     {
         return;
     }
+    if (LayoutSink::isActive())
+    {
+        LayoutSink::recordText(
+            pos.x, pos.y, rendered->w, rendered->h,
+            text, sizeLabel(size),
+            static_cast<int>(color.x * 255.0f),
+            static_cast<int>(color.y * 255.0f),
+            static_cast<int>(color.z * 255.0f));
+    }
     screen.blitSurface(rendered, pos);
 }
 
@@ -202,6 +226,15 @@ void Font::drawTextBold(Screen &screen, const std::string &text, ivec2 pos, vec3
     if (rendered == nullptr)
     {
         return;
+    }
+    if (LayoutSink::isActive())
+    {
+        LayoutSink::recordText(
+            pos.x, pos.y, rendered->w + 1, rendered->h,
+            text, sizeLabel(size),
+            static_cast<int>(color.x * 255.0f),
+            static_cast<int>(color.y * 255.0f),
+            static_cast<int>(color.z * 255.0f));
     }
     screen.blitSurface(rendered, pos);
     screen.blitSurface(rendered, ivec2(pos.x + 1, pos.y));

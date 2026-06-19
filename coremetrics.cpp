@@ -534,7 +534,8 @@ int main(int argc, char **argv)
     if (!args.screenshotPath.empty())
     {
         return HeadlessRunner::runScreenshotMode(args.screenshotPath,
-                                                 args.screenshotTab);
+                                                 args.screenshotTab,
+                                                 args.debugLayoutPath);
     }
 
     double durationSeconds = args.durationSeconds;

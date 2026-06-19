@@ -10,6 +10,8 @@
 #include <string>
 #include <vector>
 
+#include "LayoutSink.hpp"
+
 #include <SDL3/SDL.h>
 #include <SDL3_image/SDL_image.h>
 
@@ -441,7 +443,8 @@ namespace HeadlessRunner
     }
 
     int runScreenshotMode(const std::string &screenshotPath,
-                          const std::string &screenshotTab)
+                          const std::string &screenshotTab,
+                          const std::string &debugLayoutPath)
     {
         if (screenshotPath.empty())
         {
@@ -515,6 +518,13 @@ namespace HeadlessRunner
                 ivec2(kCanvasWidth - 1, kCanvasHeight - 1));
         }
 
+        // Engage the layout sink before any paint so every drawBox and
+        // Font::drawText call lands in the capture buffer. Off by
+        // default; the --debug-layout flag is the only opt-in path.
+        if (!debugLayoutPath.empty())
+        {
+            LayoutSink::enable();
+        }
         shot.clear();
         LayoutManager::getInstance().render(
             shot,
@@ -593,6 +603,21 @@ namespace HeadlessRunner
         else if (tab == "about")
         {
             AboutTab::render(shot, g_uptimeSeconds, g_perCoreCpu.size());
+        }
+        if (!debugLayoutPath.empty())
+        {
+            LayoutSink::disable();
+            if (!LayoutSink::writeJson(debugLayoutPath, tab,
+                                       kCanvasWidth, kCanvasHeight))
+            {
+                std::cerr << "Failed to write layout JSON to "
+                          << debugLayoutPath << '\n';
+            }
+            else
+            {
+                std::cout << "Wrote layout JSON to "
+                          << debugLayoutPath << '\n';
+            }
         }
         SDL_Surface *out = SDL_CreateSurface(
             kCanvasWidth, kCanvasHeight, SDL_PIXELFORMAT_RGBA32);

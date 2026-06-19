@@ -39,6 +39,12 @@ namespace ArgParse
         // should fall back to "system" the way the screenshot
         // runner already does.
         std::string screenshotTab;
+        // --debug-layout PATH dumps the captured paint rects (text +
+        // boxes) for the requested tab as JSON. Consumed by the Python
+        // layout-audit script in CI to detect text-vs-text overlaps,
+        // out-of-bounds rects, and other visual regressions without
+        // depending on OCR. Empty means the flag was not passed.
+        std::string debugLayoutPath;
         std::string exportCsvPath;
         std::string exportJsonPath;
         int topCount = 0;

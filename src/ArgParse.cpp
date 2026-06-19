@@ -54,6 +54,8 @@ namespace ArgParse
                     "Headless modes:\n"
                     "  --screenshot PATH [system|processes|about]\n"
                     "                            render one frame to PATH and exit\n"
+                    "  --debug-layout PATH       dump paint rects as JSON for the screenshot tab\n"
+                    "                            (combine with --screenshot, used by CI layout audit)\n"
                     "  --export-csv PATH         dump one-shot CSV and exit\n"
                     "  --export-json PATH        dump one-shot JSON and exit\n"
                     "  --top N                   print top-N processes to stdout and exit\n"
@@ -78,6 +80,10 @@ namespace ArgParse
             if (std::string(argv[i]) == "--screenshot" && i + 1 < argc)
             {
                 result.screenshotPath = argv[i + 1];
+            }
+            if (std::string(argv[i]) == "--debug-layout" && i + 1 < argc)
+            {
+                result.debugLayoutPath = argv[i + 1];
             }
             if (std::string(argv[i]) == "--duration" && i + 1 < argc)
             {
