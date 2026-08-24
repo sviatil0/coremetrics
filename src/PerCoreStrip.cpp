@@ -32,7 +32,7 @@ namespace PerCoreStrip
         }
         // Left-edge label sits in the same x=24 column as the
         // CPU/RAM/GPU labels above. Hidden when --sparklines is
-        // enabled because the CPU history label at y=230 would crowd
+        // enabled because the CPU history label at y=242 would crowd
         // it.
         if (!sparklinesEnabled)
         {

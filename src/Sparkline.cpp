@@ -13,8 +13,19 @@ Sparkline::Sparkline(ivec2 minPos, ivec2 maxPos, vec3 color,
       maxValue(maxValue),
       samples(capacity),
       thresholdMode(false),
-      autoScale(false)
+      autoScale(false),
+      drawTickLabels(true)
 {
+}
+
+void Sparkline::setDrawTickLabels(bool enabled)
+{
+    drawTickLabels = enabled;
+}
+
+bool Sparkline::getDrawTickLabels() const
+{
+    return drawTickLabels;
 }
 
 void Sparkline::push(float value)
@@ -224,10 +235,17 @@ void Sparkline::draw(Screen &screen) const
     // values (0..100). Brighter color (0.55 vs 0.30) so the labels are
     // clearly readable rather than fading into the panel background.
     // "100" sits at chart top, "0" at chart bottom, both outside the
-    // polyline fill area.
+    // polyline fill area. Caption size: the 20pt Body face is 27px
+    // tall, which made the two ticks of a 40px chart nearly touch and
+    // the ticks of adjacent charts collide; the 14pt Caption face
+    // leaves clear air between them.
+    if (!drawTickLabels)
+    {
+        return;
+    }
     vec3 labelColor(0.55f, 0.55f, 0.55f);
     ivec2 hiPos(maxPos.x + 4, minPos.y - 4);
     ivec2 loPos(maxPos.x + 4, maxPos.y - 16);
-    Font::drawText(screen, "100", hiPos, labelColor);
-    Font::drawText(screen, "0", loPos, labelColor);
+    Font::drawText(screen, "100", hiPos, labelColor, Font::Size::Caption);
+    Font::drawText(screen, "0", loPos, labelColor, Font::Size::Caption);
 }

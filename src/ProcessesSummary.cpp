@@ -21,17 +21,21 @@ namespace ProcessesSummary
 {
     namespace
     {
-        // Strip lives at y=448..464, BELOW the 15 visible data rows
-        // (y=100..400) and ABOVE the footer chrome (y=476..520).
-        // Earlier versions sat the strip at y=40..60 which physically
-        // collided with the y=8..40 tab buttons defined in base.xml;
-        // glyph descenders bled into the button outlines.
+        // Strip lives at y=446..474, BELOW the 14 visible data rows
+        // (y=100..436) and ABOVE the footer divider at y=478. The
+        // strip is 28px tall because the 20pt Body face rasterizes a
+        // 27px glyph surface: the previous 18px-tall strip (448..466)
+        // was shorter than its own text, so the descenders spilled
+        // onto the footer divider. Earlier versions sat the strip at
+        // y=40..60 which physically collided with the y=8..40 tab
+        // buttons defined in base.xml; glyph descenders bled into the
+        // button outlines.
         constexpr int kStripX0 = 24;
-        constexpr int kStripY0 = 448;
+        constexpr int kStripY0 = 446;
         constexpr int kStripX1 = 936;
-        constexpr int kStripY1 = 466;
+        constexpr int kStripY1 = 474;
 
-        constexpr int kTextY = 452;
+        constexpr int kTextY = 447;
         constexpr int kTotalX = 32;
         constexpr int kCpuX = 280;
         constexpr int kMemX = 520;

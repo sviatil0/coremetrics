@@ -63,10 +63,11 @@
 #include "MetricsPoller.hpp"
 #include "HeadlessRunner.hpp"
 #include "ArgParse.hpp"
+#include "ProcessesLayout.hpp"
 
 constexpr int RESX = 960;
 constexpr int RESY = 540;
-constexpr int PROCESS_ROW_HEIGHT = 20;
+constexpr int PROCESS_ROW_HEIGHT = ProcessesLayout::kRowHeight;
 // Default poll interval is 500ms; overridable at startup via the
 // --poll-ms <N> CLI flag (clamped to [100, 10000] so the UI cannot
 // be told to repaint faster than the OS can serve samples or so slow
@@ -190,10 +191,10 @@ extern std::vector<float> g_perCoreCpu;
 // signal, Y/Enter confirms send, N/Esc cancels. The menu and the per-row
 // highlight are painted after the LayoutManager render so they sit on
 // top of the Processes table without modifying the Row widget.
-constexpr int PROCESSES_FIRST_ROW_Y = 100;
-constexpr int PROCESSES_ROW_X0 = 24;
-constexpr int PROCESSES_ROW_X1 = 936;
-constexpr int PROCESSES_VISIBLE_ROWS = 15;
+constexpr int PROCESSES_FIRST_ROW_Y = ProcessesLayout::kFirstRowY;
+constexpr int PROCESSES_ROW_X0 = ProcessesLayout::kRowX0;
+constexpr int PROCESSES_ROW_X1 = ProcessesLayout::kRowX1;
+constexpr int PROCESSES_VISIBLE_ROWS = ProcessesLayout::kVisibleRows;
 
 // Defined in src/KeyboardEvents.cpp so the live-UI state lives next to
 // the handler that mutates it. coremetrics.cpp still reads + writes

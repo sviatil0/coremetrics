@@ -33,6 +33,7 @@
 #include "MetricsPoller.hpp"
 #include "NetIoFooter.hpp"
 #include "PerCoreStrip.hpp"
+#include "ProcessesLayout.hpp"
 #include "ProcessesSummary.hpp"
 #include "SelfStats.hpp"
 #include "Row.hpp"
@@ -206,10 +207,10 @@ namespace
     // so the headless prime loop fills exactly one window before the
     // shot lands.
     constexpr std::size_t kSparklineCapacity = 64;
-    // Visible Processes-tab row count. Mirrors PROCESSES_VISIBLE_ROWS
-    // in coremetrics.cpp so the Processes-tab summary strip clamps
-    // its scroll math to the same row count the live UI does.
-    constexpr int kProcessesVisibleRows = 15;
+    // Visible Processes-tab row count, from the shared ProcessesLayout
+    // header so the Processes-tab summary strip clamps its scroll math
+    // to the same row count the live UI does.
+    constexpr int kProcessesVisibleRows = ProcessesLayout::kVisibleRows;
 
     // Shutdown handler the --top --watch loop wires up so Ctrl-C and
     // SIGTERM both break the print cadence cleanly. The atomic flag
@@ -334,32 +335,39 @@ void buildSparklines()
     // matches the same accent color, so the polyline reads as a continuation
     // of its bar. Heights are 56px / row with 12px gaps.
     const vec3 accent = Theme::accentGreen();
-    // Sparkline stack: 4 charts at 40px each with a 14px label band above
-    // each chart. Labels live at chart-top minus 12px so they sit cleanly
-    // above the polyline instead of being overwritten by the fill. Tick
-    // labels ("100" / "0") render at maxPos.x + 4 in the 80px right
-    // gutter (chart maxPos.x = 864, screen width = 960). 0 tick now sits
-    // 4px BELOW the chart (maxPos.y + 4) so it never sits inside the
-    // polyline fill area.
+    // Sparkline stack: 4 sections of 58px each starting at y=242, an
+    // 18px Caption label band followed by a 40px chart. All four
+    // charts are the same height now; the NET chart used to be
+    // squeezed to 30px, which forced its "100" / "0" tick labels to
+    // overlap each other and spill past the y=478 footer divider.
+    // Chart rects: CPU 260..300, RAM 318..358, GPU 376..416,
+    // NET 434..474. Tick labels ("100" / "0") render at maxPos.x + 4
+    // in the 80px right gutter (chart maxPos.x = 864, screen width =
+    // 960). The NET strip still ends at y=474, 8px clear of the
+    // y=482..516 EXIT button + footer chrome. The label band
+    // positions live in SparklineLabels.cpp and must move in lockstep
+    // with these rects.
     g_cpuSparkline = std::make_unique<Sparkline>(
-        ivec2(24, 246), ivec2(864, 286), accent, 0.0f, 100.0f, kSparklineCapacity);
+        ivec2(24, 260), ivec2(864, 300), accent, 0.0f, 100.0f, kSparklineCapacity);
     g_cpuSparkline->setThresholdMode(true);
     g_ramSparkline = std::make_unique<Sparkline>(
-        ivec2(24, 312), ivec2(864, 352), accent, 0.0f, 100.0f, kSparklineCapacity);
+        ivec2(24, 318), ivec2(864, 358), accent, 0.0f, 100.0f, kSparklineCapacity);
     g_ramSparkline->setThresholdMode(true);
     g_gpuSparkline = std::make_unique<Sparkline>(
-        ivec2(24, 378), ivec2(864, 418), accent, 0.0f, 100.0f, kSparklineCapacity);
+        ivec2(24, 376), ivec2(864, 416), accent, 0.0f, 100.0f, kSparklineCapacity);
     g_gpuSparkline->setThresholdMode(true);
     // tx (orange) is constructed first so it renders behind the rx
     // (green) line in the draw pass; incoming traffic reads as more
-    // important. NET strip ends at y=474 leaving 8px clear of the
-    // y=482..516 EXIT button + footer chrome.
+    // important. Both NET lines share one rect, so only rx draws the
+    // tick labels; tx suppresses its own copy to avoid double-painting
+    // the same glyphs.
     const vec3 netTx(0.95f, 0.65f, 0.30f);
     const vec3 netRx(0.5f, 0.85f, 0.5f);
     g_netTxSparkline = std::make_unique<Sparkline>(
-        ivec2(24, 444), ivec2(864, 474), netTx, 0.0f, kNetSparklineMaxKbps, kSparklineCapacity);
+        ivec2(24, 434), ivec2(864, 474), netTx, 0.0f, kNetSparklineMaxKbps, kSparklineCapacity);
+    g_netTxSparkline->setDrawTickLabels(false);
     g_netRxSparkline = std::make_unique<Sparkline>(
-        ivec2(24, 444), ivec2(864, 474), netRx, 0.0f, kNetSparklineMaxKbps, kSparklineCapacity);
+        ivec2(24, 434), ivec2(864, 474), netRx, 0.0f, kNetSparklineMaxKbps, kSparklineCapacity);
 }
 
 void destroySparklines()

@@ -12,6 +12,7 @@
 #include "Layout.hpp"
 #include "LayoutManager.hpp"
 #include "ProcessUtils.hpp"
+#include "ProcessesLayout.hpp"
 #include "Row.hpp"
 #include "Tree.hpp"
 #include "font.hpp"
@@ -166,21 +167,17 @@ namespace MouseEvents
 {
     namespace
     {
-        // Mirrors of the geometry constants coremetrics.cpp defines
-        // at file scope. Keeping them as named constants here rather
-        // than reaching into the other TU's `constexpr`s; if any of
-        // them ever changes both sites need to update in lockstep,
-        // the same lockstep slice 13 already tolerates for
-        // kProcessesVisibleRows. The wider C-pillar slice that
-        // unifies the Processes-table surface will fold these into
-        // a shared header.
+        // Table geometry comes from the shared ProcessesLayout header
+        // (the unification the old lockstep-mirror comments promised).
+        // Canvas dimensions stay local: they mirror coremetrics.cpp's
+        // RESX/RESY, which are not table geometry.
         constexpr int kResX = 960;
         constexpr int kResY = 540;
-        constexpr int kProcessRowHeight = 20;
-        constexpr int kProcessesFirstRowY = 100;
-        constexpr int kProcessesRowX0 = 24;
-        constexpr int kProcessesRowX1 = 936;
-        constexpr int kProcessesVisibleRows = 15;
+        constexpr int kProcessRowHeight = ProcessesLayout::kRowHeight;
+        constexpr int kProcessesFirstRowY = ProcessesLayout::kFirstRowY;
+        constexpr int kProcessesRowX0 = ProcessesLayout::kRowX0;
+        constexpr int kProcessesRowX1 = ProcessesLayout::kRowX1;
+        constexpr int kProcessesVisibleRows = ProcessesLayout::kVisibleRows;
 
         // How many rows one mouse-wheel tick scrolls the Processes
         // table. Matches the in-place value the previous in-line

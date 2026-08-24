@@ -9,6 +9,7 @@
 #include "KillLog.hpp"
 #include "Layout.hpp"
 #include "LayoutManager.hpp"
+#include "ProcessesLayout.hpp"
 #include "Row.hpp"
 #include "SignalUtils.hpp"
 #include "Tree.hpp"
@@ -85,13 +86,10 @@ namespace KeyboardEvents
 {
     namespace
     {
-        // Mirror of coremetrics.cpp's PROCESSES_VISIBLE_ROWS. Keeping
-        // this as a named constant rather than a magic number; if the
-        // visible row count ever changes both sites need to update
-        // in lockstep. The wider C-pillar slice that finally pulls the
-        // process table out will let us unify the constant in one
-        // header.
-        constexpr int kProcessesVisibleRows = 15;
+        // Visible row count comes from the shared ProcessesLayout
+        // header (the unification the old lockstep-mirror comment
+        // promised).
+        constexpr int kProcessesVisibleRows = ProcessesLayout::kVisibleRows;
     }
 
     bool handle(SDL_KeyboardEvent const &event)

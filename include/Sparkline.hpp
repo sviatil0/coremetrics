@@ -37,6 +37,7 @@ private:
     RingBuffer<float> samples;
     bool thresholdMode;
     bool autoScale;
+    bool drawTickLabels;
 
 public:
     Sparkline(ivec2 minPos, ivec2 maxPos, vec3 color,
@@ -55,6 +56,13 @@ public:
 
     void setAutoScale(bool enabled);
     bool getAutoScale() const;
+
+    // The "100" / "0" axis tick labels at the chart's right edge.
+    // Default on; a sparkline that shares its rect with another
+    // (network tx behind rx) turns its copy off so the shared labels
+    // are painted exactly once.
+    void setDrawTickLabels(bool enabled);
+    bool getDrawTickLabels() const;
 
     void draw(Screen &screen) const;
 };

@@ -9,6 +9,7 @@ without needing a screenshot diff baseline.
 Checks performed:
   * out-of-bounds  text rects extend past the canvas dimensions
   * text-vs-text   two distinct text labels overlap on screen
+  * footer-spill   text ink crosses a footer separator rule
   * empty-text     zero-width / zero-height text rect (renderer no-op smell)
   * right-margin   text within RIGHT_MARGIN_PX of the right edge (warning)
 
@@ -30,15 +31,25 @@ SEVERITY_FAIL = "FAIL"
 SEVERITY_WARN = "WARN"
 
 # TTF_RenderText_Blended surfaces include ascender + descender padding,
-# so a 20pt body face rasterizes to ~27px tall even though the visible
-# glyph footprint is closer to 18px. The row strides in base.xml are
-# 20px, which means a naive bbox intersection flags every vertically
-# stacked row as overlapping. We crop the surface bbox by these
-# per-side paddings before running the intersection test, which keeps
-# row stacks clean but still catches genuine collisions (two labels
-# painted at the same y).
+# so a 20pt body face rasterizes to ~27px tall even though cap-height
+# glyphs only occupy roughly y+4..y+21 and descenders reach y+24. We
+# crop the surface bbox by these per-side paddings before running the
+# intersection test so dead surface padding does not flag vertically
+# adjacent labels, while genuine ink collisions still fail. The Body
+# bottom pad is 3, not the descender-free 5 an earlier revision used:
+# that looser crop hid real collisions (the NET sparkline's "100" and
+# "0" ticks overlapped by 9px and still audited clean).
 TEXT_PAD_TOP = {"Caption": 2, "Body": 4, "Title": 5}
-TEXT_PAD_BOTTOM = {"Caption": 3, "Body": 5, "Title": 6}
+TEXT_PAD_BOTTOM = {"Caption": 3, "Body": 3, "Title": 4}
+
+# Footer separator detection for the footer-spill check: a near-full-
+# width, hairline-thin box in the bottom band of the canvas (the
+# y=478 rule above the footer chrome in base.xml). Card borders are
+# also thin full-width boxes, so the check is restricted to the
+# footer band rather than applied to every rule on screen.
+SEPARATOR_MIN_W = 900
+SEPARATOR_MAX_H = 4
+FOOTER_BAND_PX = 70
 
 
 @dataclass
@@ -159,6 +170,38 @@ def check_text_overlap(rects: list[Rect]) -> list[Finding]:
     return out
 
 
+def check_footer_spill(
+    rects: list[Rect], canvas_h: int
+) -> list[Finding]:
+    separators = [
+        r
+        for r in rects
+        if r.kind == "box"
+        and r.w >= SEPARATOR_MIN_W
+        and r.h <= SEPARATOR_MAX_H
+        and r.y >= canvas_h - FOOTER_BAND_PX
+    ]
+    out: list[Finding] = []
+    for r in rects:
+        if r.kind != "text":
+            continue
+        _, iy1, _, iy2 = r.visible_bbox()
+        for sep in separators:
+            # Text that lives entirely below the rule is footer chrome;
+            # only ink that starts above the rule and reaches into or
+            # past it has spilled out of the content area.
+            if iy1 < sep.y and iy2 > sep.y:
+                out.append(
+                    Finding(
+                        SEVERITY_FAIL,
+                        "footer-spill",
+                        f"text '{r.text}' at ({r.x},{r.y}) size {r.w}x{r.h} crosses the footer rule at y={sep.y}",
+                    )
+                )
+                break
+    return out
+
+
 def check_right_margin(
     rects: Iterable[Rect], canvas_w: int
 ) -> list[Finding]:
@@ -190,6 +233,7 @@ def audit_file(path: Path) -> tuple[str, list[Finding]]:
     findings.extend(check_out_of_bounds(rects, cw, ch))
     findings.extend(check_empty_text(rects))
     findings.extend(check_text_overlap(rects))
+    findings.extend(check_footer_spill(rects, ch))
     findings.extend(check_right_margin(rects, cw))
     return tab, findings
 
